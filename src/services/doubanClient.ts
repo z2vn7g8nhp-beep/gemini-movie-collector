@@ -1,7 +1,7 @@
 import type { ArchiveCategory, OnlineSearchResult } from '../types/archive';
 import type { CoverCandidate } from '../utils/coverPicker';
 import {
-  extractJsonFromJinaEnvelope,
+  extractJsonFromBridgeText,
   normalizeDoubanImageUrl,
   normalizeRelayBaseUrl,
   parseDoubanCelebrityDetail,
@@ -15,8 +15,21 @@ import {
   parseDoubanUrlOrId,
   parseWmdbMovieRecord,
   parseWmdbSearchPayload,
+  rankStaticDoubanFilmResults,
 } from '../utils/doubanParsers';
 import { normalizeEntityKey } from '../utils/wikiCast';
+
+export type DoubanBridgeFailureReason = 'timeout' | 'rate-limit' | 'network';
+
+export class DoubanBridgeError extends Error {
+  readonly reason: DoubanBridgeFailureReason;
+
+  constructor(reason: DoubanBridgeFailureReason, message?: string) {
+    super(message || `Douban static bridge failed: ${reason}`);
+    this.name = 'DoubanBridgeError';
+    this.reason = reason;
+  }
+}
 
 export interface DoubanClientOptions {
   /**
@@ -99,48 +112,119 @@ export function formatDoubanImageForTransport(
   return trimmed;
 }
 
+interface StaticBridgeResult<T> {
+  data: T | null;
+  error?: DoubanBridgeFailureReason;
+}
+
+async function sleepMs(ms: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) return;
+  await new Promise<void>((resolve) => {
+    const t = setTimeout(resolve, ms);
+    const onAbort = () => {
+      clearTimeout(t);
+      resolve();
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+async function singleStaticBridgeAttempt<T>(
+  targetUrl: string,
+  useJsonHeader: boolean,
+  timeoutMs: number,
+  externalSignal?: AbortSignal
+): Promise<StaticBridgeResult<T>> {
+  const controller = new AbortController();
+  let timedOut = false;
+  const onAbort = () => controller.abort();
+  if (externalSignal) {
+    if (externalSignal.aborted) return { data: null };
+    externalSignal.addEventListener('abort', onAbort, { once: true });
+  }
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
+
+  try {
+    // Default attempt sends ZERO custom headers so iOS Safari/PWA treats it as a
+    // pure simple CORS GET request with no preflight overhead.
+    const init: RequestInit = useJsonHeader
+      ? { headers: { Accept: 'application/json' }, signal: controller.signal }
+      : { signal: controller.signal };
+    const res = await fetch(`https://r.jina.ai/${targetUrl}`, init);
+    if (res.status === 429) {
+      return { data: null, error: 'rate-limit' };
+    }
+    if (!res.ok) {
+      return { data: null, error: 'network' };
+    }
+    const rawText = await res.text();
+    const extracted = extractJsonFromBridgeText(rawText) as T | null;
+    if (extracted === null) {
+      return { data: null, error: 'network' };
+    }
+    return { data: extracted };
+  } catch {
+    if (externalSignal?.aborted) return { data: null };
+    return { data: null, error: timedOut ? 'timeout' : 'network' };
+  } finally {
+    clearTimeout(timer);
+    if (externalSignal) externalSignal.removeEventListener('abort', onAbort);
+  }
+}
+
 /**
- * Zero-config CORS-open JSON bridge for pure static pages (GitHub Pages / mobile PWA)
- * using `https://r.jina.ai/<targetUrl>` with 15-minute caching & in-flight deduplication.
+ * Zero-config CORS-open bridge for pure static pages (GitHub Pages / mobile PWA)
+ * using headerless simple-GET `https://r.jina.ai/<targetUrl>` with 1 automatic retry
+ * on transient failures and 15-minute result caching.
  */
-async function fetchViaStaticBridgeJson<T>(
+async function fetchViaStaticBridgeDetailed<T>(
   targetUrl: string,
   options: DoubanClientOptions,
-  timeoutMs = 7500
-): Promise<T | null> {
+  timeoutMs = 9500
+): Promise<StaticBridgeResult<T>> {
   const cacheKey = `static-direct:${targetUrl}`;
   const cached = readCache<T>(cacheKey);
-  if (cached !== undefined) return cached;
+  if (cached !== undefined) return { data: cached };
 
   const existing = inFlight.get(cacheKey);
-  if (existing) return (await existing) as T | null;
+  if (existing) return (await existing) as StaticBridgeResult<T>;
 
-  const task = (async (): Promise<T | null> => {
-    const controller = new AbortController();
-    const ext = options.signal;
-    const onAbort = () => controller.abort();
-    if (ext) {
-      if (ext.aborted) return null;
-      ext.addEventListener('abort', onAbort, { once: true });
-    }
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const task = (async (): Promise<StaticBridgeResult<T>> => {
     try {
-      const res = await fetch(`https://r.jina.ai/${targetUrl}`, {
-        headers: { Accept: 'application/json' },
-        signal: controller.signal,
-      });
-      if (!res.ok) return null;
-      const envelope = (await res.json()) as unknown;
-      const extracted = extractJsonFromJinaEnvelope(envelope) as T | null;
-      if (extracted !== null) {
-        writeCache(cacheKey, extracted);
+      const first = await singleStaticBridgeAttempt<T>(
+        targetUrl,
+        false,
+        timeoutMs,
+        options.signal
+      );
+      if (first.data !== null) {
+        writeCache(cacheKey, first.data);
+        return first;
       }
-      return extracted;
-    } catch {
-      return null;
+      if (options.signal?.aborted) return { data: null };
+
+      // One short retry using JSON envelope mode if the first attempt had a transient hiccup
+      if (first.error === 'rate-limit' || first.error === 'network') {
+        await sleepMs(first.error === 'rate-limit' ? 850 : 350, options.signal);
+        if (options.signal?.aborted) return { data: null };
+        const second = await singleStaticBridgeAttempt<T>(
+          targetUrl,
+          true,
+          Math.min(timeoutMs, 7500),
+          options.signal
+        );
+        if (second.data !== null) {
+          writeCache(cacheKey, second.data);
+          return second;
+        }
+        return second.error ? second : first;
+      }
+
+      return first;
     } finally {
-      clearTimeout(timer);
-      if (ext) ext.removeEventListener('abort', onAbort);
       inFlight.delete(cacheKey);
     }
   })();
@@ -149,44 +233,88 @@ async function fetchViaStaticBridgeJson<T>(
   return task;
 }
 
+async function fetchViaStaticBridgeJson<T>(
+  targetUrl: string,
+  options: DoubanClientOptions,
+  timeoutMs = 9500
+): Promise<T | null> {
+  const res = await fetchViaStaticBridgeDetailed<T>(targetUrl, options, timeoutMs);
+  return res.data;
+}
+
+async function waitWithGrace<T>(
+  promise: Promise<T>,
+  graceMs: number,
+  fallback: T
+): Promise<T> {
+  return new Promise<T>((resolve) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      resolve(fallback);
+    }, graceMs);
+    promise
+      .then((val) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(val);
+      })
+      .catch(() => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(fallback);
+      });
+  });
+}
+
 async function fetchStaticSubjectMerged(
   id: string,
   options: DoubanClientOptions
-): Promise<{ result: OnlineSearchResult; people: OnlineSearchResult[] } | null> {
-  const [wmdbRaw, absRaw] = await Promise.all([
-    fetchViaStaticBridgeJson<Record<string, any>>(
+): Promise<{
+  entry: { result: OnlineSearchResult; people: OnlineSearchResult[] } | null;
+  error?: DoubanBridgeFailureReason;
+}> {
+  const [wmdbRes, absRes] = await Promise.all([
+    fetchViaStaticBridgeDetailed<Record<string, any>>(
       `https://api.wmdb.tv/movie/api?id=${encodeURIComponent(id)}`,
       options,
-      6500
+      9000
     ),
-    fetchViaStaticBridgeJson<Record<string, any>>(
+    fetchViaStaticBridgeDetailed<Record<string, any>>(
       `https://movie.douban.com/j/subject_abstract?subject_id=${encodeURIComponent(id)}`,
       options,
-      6500
+      9000
     ),
   ]);
 
-  const wmdb = parseWmdbMovieRecord(wmdbRaw);
-  const abs = parseDoubanSubjectAbstract(absRaw);
-  if (!wmdb && !abs) return null;
+  const wmdb = parseWmdbMovieRecord(wmdbRes.data);
+  const abs = parseDoubanSubjectAbstract(absRes.data);
+  if (!wmdb && !abs) {
+    return { entry: null, error: wmdbRes.error || absRes.error };
+  }
 
   if (wmdb && abs) {
     const hasRatingInWmdb = /豆瓣\s*\d/.test(wmdb.result.subtitle || '');
     return {
-      result: {
-        ...wmdb.result,
-        subtitle: hasRatingInWmdb ? wmdb.result.subtitle : abs.result.subtitle,
-        year: wmdb.result.year || abs.result.year,
-        region: wmdb.result.region || abs.result.region,
-        tags:
-          wmdb.result.tags && wmdb.result.tags.length > 0
-            ? wmdb.result.tags
-            : abs.result.tags,
+      entry: {
+        result: {
+          ...wmdb.result,
+          subtitle: hasRatingInWmdb ? wmdb.result.subtitle : abs.result.subtitle,
+          year: wmdb.result.year || abs.result.year,
+          region: wmdb.result.region || abs.result.region,
+          tags:
+            wmdb.result.tags && wmdb.result.tags.length > 0
+              ? wmdb.result.tags
+              : abs.result.tags,
+        },
+        people: wmdb.people.length >= abs.people.length ? wmdb.people : abs.people,
       },
-      people: wmdb.people.length >= abs.people.length ? wmdb.people : abs.people,
     };
   }
-  return wmdb || abs;
+  return { entry: wmdb || abs };
 }
 
 async function searchDoubanStaticDirect(
@@ -198,30 +326,42 @@ async function searchDoubanStaticDirect(
   const directRef = parseDoubanUrlOrId(trimmed);
   if (directRef) {
     if (directRef.kind === 'subject') {
-      const merged = await fetchStaticSubjectMerged(directRef.id, options);
-      if (merged) {
-        return category === 'person' ? merged.people.slice(0, 10) : [merged.result];
+      const { entry, error } = await fetchStaticSubjectMerged(directRef.id, options);
+      if (entry) {
+        return category === 'person' ? entry.people.slice(0, 10) : [entry.result];
+      }
+      if (error) {
+        throw new DoubanBridgeError(error);
       }
     }
   }
 
-  // 1. Film & TV Search: parallel WMDB (Douban-indexed + direct img.wmdb.tv posters) + Douban Suggest
+  // 1. Film & TV Search: Single-wave fast path!
+  //    WMDB (Douban-indexed + ratings + Chinese synopsis + anti-hotlink-free img.wmdb.tv posters)
+  //    races alongside Douban `subject_suggest`, returning immediately once WMDB succeeds
+  //    (with a short 900ms grace window for suggest) and NEVER blocking on slow Wave 2 calls.
   if (category === 'film') {
-    const [wmdbRaw, suggestRaw] = await Promise.all([
-      fetchViaStaticBridgeJson<Record<string, any>>(
-        `https://api.wmdb.tv/api/v1/movie/search?q=${encodeURIComponent(trimmed)}`,
-        options,
-        7000
-      ),
-      fetchViaStaticBridgeJson<unknown>(
-        `https://movie.douban.com/j/subject_suggest?q=${encodeURIComponent(trimmed)}`,
-        options,
-        6500
-      ),
-    ]);
+    const wmdbPromise = fetchViaStaticBridgeDetailed<Record<string, any>>(
+      `https://api.wmdb.tv/api/v1/movie/search?q=${encodeURIComponent(trimmed)}&limit=12`,
+      options,
+      9500
+    );
+    const suggestPromise = fetchViaStaticBridgeDetailed<unknown>(
+      `https://movie.douban.com/j/subject_suggest?q=${encodeURIComponent(trimmed)}`,
+      options,
+      9500
+    );
 
-    const wmdbEntries = parseWmdbSearchPayload(wmdbRaw);
-    const suggestParsed = parseDoubanSuggest(suggestRaw, () => undefined);
+    const wmdbRes = await wmdbPromise;
+    const wmdbEntries = parseWmdbSearchPayload(wmdbRes.data);
+
+    // If WMDB already returned rich Douban hits, give Douban suggest at most 900ms to merge in;
+    // if WMDB had 0 hits or failed, wait cleanly for Douban suggest to finish.
+    const suggestRes: StaticBridgeResult<unknown> =
+      wmdbEntries.length > 0
+        ? await waitWithGrace(suggestPromise, 900, { data: null })
+        : await suggestPromise;
+    const suggestParsed = parseDoubanSuggest(suggestRes.data, () => undefined);
 
     const byId = new Map<string, OnlineSearchResult>();
     const order: string[] = [];
@@ -237,10 +377,9 @@ async function searchDoubanStaticDirect(
           originalTitle: existing.originalTitle || item.originalTitle,
           year: existing.year || item.year,
           coverUrl: existing.coverUrl || item.coverUrl,
-          subtitle:
-            /豆瓣\s*\d/.test(existing.subtitle || '')
-              ? existing.subtitle
-              : item.subtitle || existing.subtitle,
+          subtitle: /豆瓣\s*\d/.test(existing.subtitle || '')
+            ? existing.subtitle
+            : item.subtitle || existing.subtitle,
         });
       }
     };
@@ -253,74 +392,43 @@ async function searchDoubanStaticDirect(
     }
 
     const merged = order.map((k) => byId.get(k)!).filter(Boolean);
-    if (merged.length === 0) return [];
-
-    // Hydrate up to top 2 hits missing live Douban score or poster via subject_abstract / wmdb-by-id
-    const needHydrate = merged
-      .slice(0, 2)
-      .filter(
-        (m) =>
-          !/豆瓣\s*\d/.test(m.subtitle || '') || !m.coverUrl
-      );
-
-    if (needHydrate.length > 0) {
-      const hydrated = await Promise.all(
-        needHydrate.map(async (item) => {
-          const sid = extractSubjectIdFromUrl(item.sourceUrl);
-          if (!sid) return null;
-          const rich = await fetchStaticSubjectMerged(sid, options);
-          return rich ? { externalId: item.externalId, rich: rich.result } : null;
-        })
-      );
-      const richMap = new Map<string, OnlineSearchResult>();
-      for (const h of hydrated) {
-        if (h) richMap.set(h.externalId, h.rich);
+    if (merged.length === 0) {
+      if (wmdbRes.error && suggestRes.error) {
+        const reason =
+          wmdbRes.error === 'rate-limit' || suggestRes.error === 'rate-limit'
+            ? 'rate-limit'
+            : wmdbRes.error === 'timeout' || suggestRes.error === 'timeout'
+              ? 'timeout'
+              : 'network';
+        throw new DoubanBridgeError(reason);
       }
-      return merged.slice(0, 12).map((item) => {
-        const rich = richMap.get(item.externalId);
-        if (!rich) return item;
-        return {
-          ...item,
-          subtitle: /豆瓣\s*\d/.test(rich.subtitle || '')
-            ? rich.subtitle
-            : item.subtitle || rich.subtitle,
-          year: item.year || rich.year,
-          region: item.region || rich.region,
-          coverUrl: item.coverUrl || rich.coverUrl,
-          summary:
-            item.summary && item.summary.length > 35
-              ? item.summary
-              : rich.summary || item.summary,
-          tags:
-            item.tags && item.tags.length > 0 ? item.tags : rich.tags,
-        };
-      });
+      return [];
     }
 
-    return merged.slice(0, 12);
+    return rankStaticDoubanFilmResults(merged, trimmed).slice(0, 12);
   }
 
-  // 2. Person Search via Douban Suggest celebrity hits + WMDB director/actor fallback
+  // 2. Person Search: Douban Suggest celebrity hits + WMDB `actor=` lookup in parallel
   if (category === 'person') {
-    const [suggestRaw, wmdbRaw] = await Promise.all([
-      fetchViaStaticBridgeJson<unknown>(
+    const [suggestRes, wmdbActorRes] = await Promise.all([
+      fetchViaStaticBridgeDetailed<unknown>(
         `https://movie.douban.com/j/subject_suggest?q=${encodeURIComponent(trimmed)}`,
         options,
-        6500
+        9000
       ),
-      fetchViaStaticBridgeJson<Record<string, any>>(
-        `https://api.wmdb.tv/api/v1/movie/search?q=${encodeURIComponent(trimmed)}`,
+      fetchViaStaticBridgeDetailed<Record<string, any>>(
+        `https://api.wmdb.tv/api/v1/movie/search?actor=${encodeURIComponent(trimmed)}&limit=8`,
         options,
-        6500
+        9000
       ),
     ]);
 
-    const suggestParsed = parseDoubanSuggest(suggestRaw, () => undefined);
+    const suggestParsed = parseDoubanSuggest(suggestRes.data, () => undefined);
     const out: OnlineSearchResult[] = [...suggestParsed.celebrities];
     const seen = new Set(out.map((p) => normalizeEntityKey(p.title)));
 
+    const entries = parseWmdbSearchPayload(wmdbActorRes.data);
     if (out.length === 0) {
-      const entries = parseWmdbSearchPayload(wmdbRaw);
       for (const entry of entries) {
         for (const p of entry.people) {
           if (!matchesPersonName(p.title, p.originalTitle, trimmed)) continue;
@@ -328,22 +436,35 @@ async function searchDoubanStaticDirect(
           if (seen.has(key)) continue;
           seen.add(key);
           out.push(p);
-          if (out.length >= 4) break;
+          if (out.length >= 6) break;
         }
-        if (out.length >= 4) break;
+        if (out.length >= 6) break;
       }
+    }
+
+    if (out.length === 0 && suggestRes.error && wmdbActorRes.error) {
+      throw new DoubanBridgeError(
+        suggestRes.error === 'rate-limit' || wmdbActorRes.error === 'rate-limit'
+          ? 'rate-limit'
+          : suggestRes.error
+      );
     }
     return out.slice(0, 6);
   }
 
-  // 3. Character Search: resolve matched movie/TV via WMDB + Douban suggest for cast/work context
-  const wmdbRaw = await fetchViaStaticBridgeJson<Record<string, any>>(
-    `https://api.wmdb.tv/api/v1/movie/search?q=${encodeURIComponent(trimmed)}`,
+  // 3. Character Search: resolve matched movie/TV via single WMDB query
+  const wmdbRes = await fetchViaStaticBridgeDetailed<Record<string, any>>(
+    `https://api.wmdb.tv/api/v1/movie/search?q=${encodeURIComponent(trimmed)}&limit=6`,
     options,
-    6500
+    9000
   );
-  const entries = parseWmdbSearchPayload(wmdbRaw);
-  if (entries.length === 0) return [];
+  const entries = parseWmdbSearchPayload(wmdbRes.data);
+  if (entries.length === 0) {
+    if (wmdbRes.error) {
+      throw new DoubanBridgeError(wmdbRes.error);
+    }
+    return [];
+  }
   const lead = entries[0];
   const actorNames = lead.people
     .filter((p) => p.subtitle === '主演')
@@ -877,8 +998,8 @@ export async function fetchDoubanFilmRelations(
       }
     }
     if (!sid) return empty;
-    const merged = await fetchStaticSubjectMerged(sid, options);
-    return merged ? { people: merged.people, characters: [] } : empty;
+    const { entry } = await fetchStaticSubjectMerged(sid, options);
+    return entry ? { people: entry.people, characters: [] } : empty;
   }
 
   const subjectId = await resolveDoubanSubjectId(
@@ -917,9 +1038,9 @@ export async function fetchDoubanPersonRelations(
   const empty = { films: [], characters: [] };
   if (options.transport === 'static-direct') {
     const wmdbRaw = await fetchViaStaticBridgeJson<Record<string, any>>(
-      `https://api.wmdb.tv/api/v1/movie/search?q=${encodeURIComponent(title.trim())}`,
+      `https://api.wmdb.tv/api/v1/movie/search?actor=${encodeURIComponent(title.trim())}&limit=12`,
       options,
-      6500
+      8500
     );
     const entries = parseWmdbSearchPayload(wmdbRaw);
     const matched = entries

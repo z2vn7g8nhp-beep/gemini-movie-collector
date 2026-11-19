@@ -806,7 +806,18 @@ export function extractJsonFromJinaEnvelope(envelope: unknown): unknown {
   if (!envelope || typeof envelope !== 'object') return null;
   const content = (envelope as { data?: { content?: unknown } })?.data?.content;
   if (typeof content !== 'string') return null;
-  const trimmed = content.trim();
+  return extractJsonFromBridgeText(content);
+}
+
+/**
+ * Extracts raw JSON from either:
+ * - a `https://r.jina.ai/...` JSON envelope (`{ code: 200, data: { content } }`)
+ * - a `https://r.jina.ai/...` headerless plain-text response (`Title: ...\nMarkdown Content:\n{...}`)
+ * - a direct JSON or markdown-fenced JSON response from any CORS bridge.
+ */
+export function extractJsonFromBridgeText(rawText: string | null | undefined): unknown {
+  if (typeof rawText !== 'string') return null;
+  const trimmed = rawText.trim();
   if (!trimmed) return null;
 
   const tryParse = (s: string): unknown => {
@@ -817,18 +828,42 @@ export function extractJsonFromJinaEnvelope(envelope: unknown): unknown {
     }
   };
 
+  // 1. Direct JSON (either raw payload or Jina JSON envelope)
   const direct = tryParse(trimmed);
-  if (direct !== null) return direct;
+  if (direct !== null) {
+    if (
+      direct &&
+      typeof direct === 'object' &&
+      !Array.isArray(direct) &&
+      typeof (direct as { data?: { content?: unknown } }).data?.content === 'string'
+    ) {
+      const unwrapped = extractJsonFromBridgeText(
+        (direct as { data: { content: string } }).data.content
+      );
+      if (unwrapped !== null) return unwrapped;
+    }
+    return direct;
+  }
 
-  // Strip optional markdown code fences or leading metadata lines
-  const fenceMatch = /```(?:json)?\s*([\s\S]*?)```/i.exec(trimmed);
+  // 2. Strip Jina plain-text header (`Markdown Content:`) if present
+  const marker = 'Markdown Content:';
+  const markerIdx = trimmed.indexOf(marker);
+  const body =
+    markerIdx >= 0 ? trimmed.slice(markerIdx + marker.length).trim() : trimmed;
+
+  const bodyDirect = tryParse(body);
+  if (bodyDirect !== null) return bodyDirect;
+
+  // 3. Strip optional markdown code fences
+  const fenceMatch = /```(?:json)?\s*([\s\S]*?)```/i.exec(body);
   if (fenceMatch?.[1]) {
     const inside = tryParse(fenceMatch[1].trim());
     if (inside !== null) return inside;
   }
 
-  const firstObj = trimmed.indexOf('{');
-  const firstArr = trimmed.indexOf('[');
+  // 4. Slice from first `{` or `[` to matching last `}` or `]`
+  const firstObj = body.indexOf('{');
+  const firstArr = body.indexOf('[');
   const start =
     firstObj === -1
       ? firstArr
@@ -836,12 +871,59 @@ export function extractJsonFromJinaEnvelope(envelope: unknown): unknown {
         ? firstObj
         : Math.min(firstObj, firstArr);
   if (start >= 0) {
-    const lastEnd = Math.max(trimmed.lastIndexOf('}'), trimmed.lastIndexOf(']'));
+    const lastEnd = Math.max(body.lastIndexOf('}'), body.lastIndexOf(']'));
     if (lastEnd > start) {
-      return tryParse(trimmed.slice(start, lastEnd + 1));
+      return tryParse(body.slice(start, lastEnd + 1));
     }
   }
   return null;
+}
+
+/**
+ * Ranks static-direct Douban film search results so exact title matches with
+ * an actual Douban score and poster appear first (ahead of unrated upcoming stubs).
+ */
+export function rankStaticDoubanFilmResults(
+  items: OnlineSearchResult[],
+  query: string
+): OnlineSearchResult[] {
+  const norm = (s: string) =>
+    s
+      .toLowerCase()
+      .replace(/[\s·•:：\-—_（）()《》「」『』,，.。!！?？]/g, '');
+  const qNorm = norm(query);
+  if (!qNorm || items.length <= 1) return items;
+
+  const scoreItem = (item: OnlineSearchResult): number => {
+    const tNorm = norm(item.title || '');
+    const oNorm = norm(item.originalTitle || '');
+    let score = 0;
+
+    if (tNorm === qNorm || (oNorm && oNorm === qNorm)) {
+      score += 130;
+    } else if (tNorm.startsWith(qNorm) || (oNorm && oNorm.startsWith(qNorm))) {
+      score += 65;
+    } else if (tNorm.includes(qNorm) || (oNorm && oNorm.includes(qNorm))) {
+      score += 35;
+    }
+
+    const rateMatch = /豆瓣\s*(\d+(?:\.\d+)?)/.exec(item.subtitle || '');
+    if (rateMatch) {
+      score += 30 + Math.min(10, Number(rateMatch[1]) || 0);
+    }
+    if (item.coverUrl) {
+      score += 12;
+    }
+    if (item.summary && item.summary.length >= 40) {
+      score += 5;
+    }
+    return score;
+  };
+
+  return items
+    .map((item, idx) => ({ item, score: scoreItem(item), idx }))
+    .sort((a, b) => b.score - a.score || a.idx - b.idx)
+    .map((row) => row.item);
 }
 
 export interface ParsedStaticDoubanEntry {

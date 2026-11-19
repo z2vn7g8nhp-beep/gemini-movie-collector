@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   extractDoubanCharacterName,
+  extractJsonFromBridgeText,
   extractJsonFromJinaEnvelope,
   normalizeDoubanImageUrl,
   normalizeRelayBaseUrl,
@@ -16,6 +17,7 @@ import {
   parseDoubanSuggest,
   parseDoubanUrlOrId,
   parseWmdbSearchPayload,
+  rankStaticDoubanFilmResults,
 } from './doubanParsers';
 
 test('parseDoubanUrlOrId recognizes movie, mobile, celebrity, personage, and shorthand IDs', () => {
@@ -392,4 +394,68 @@ test('parseWmdbSearchPayload and parseDoubanSubjectAbstract parse zero-config st
   assert.equal(abs.result.title, '漫长的季节');
   assert.match(abs.result.subtitle || '', /豆瓣 9\.4/);
   assert.equal(abs.people.length, 3);
+});
+
+test('extractJsonFromBridgeText parses headerless Jina plain text, JSON envelope, and raw JSON', () => {
+  const jinaPlain =
+    'Title: \n\nURL Source: https://api.wmdb.tv/api/v1/movie/search?q=test\n\nMarkdown Content:\n{"total":2,"data":[{"doubanId":"1306809"}]}';
+  assert.deepEqual(extractJsonFromBridgeText(jinaPlain), {
+    total: 2,
+    data: [{ doubanId: '1306809' }],
+  });
+
+  const jinaJson = JSON.stringify({
+    code: 200,
+    data: { content: '[{"id":"1306809","title":"生化危机"}]' },
+  });
+  assert.deepEqual(extractJsonFromBridgeText(jinaJson), [
+    { id: '1306809', title: '生化危机' },
+  ]);
+
+  assert.equal(extractJsonFromBridgeText('not json at all'), null);
+});
+
+test('rankStaticDoubanFilmResults prioritizes rated exact matches ahead of unrated upcoming stubs', () => {
+  const ranked = rankStaticDoubanFilmResults(
+    [
+      {
+        externalId: 'douban-subj-37068446',
+        category: 'film',
+        title: '生化危机',
+        year: '2026',
+        subtitle: '电影 · 科幻 / 恐怖',
+        coverUrl: 'https://img.wmdb.tv/p1.jpg',
+        summary: '2026 reboot',
+        sourceName: '豆瓣影视',
+        tags: ['科幻', '恐怖'],
+      },
+      {
+        externalId: 'douban-subj-34806914',
+        category: 'film',
+        title: '生化危机4：孵化',
+        year: '2006',
+        subtitle: '电影 · 豆瓣 7.4',
+        coverUrl: 'https://img.wmdb.tv/p2.jpg',
+        summary: 'sequel summary text with enough characters to count as detailed',
+        sourceName: '豆瓣影视',
+        tags: ['动作', '科幻'],
+      },
+      {
+        externalId: 'douban-subj-1306809',
+        category: 'film',
+        title: '生化危机',
+        year: '2002',
+        subtitle: '电影 · 豆瓣 8.1 · 导演 保罗·安德森',
+        coverUrl: 'https://img.wmdb.tv/p3.jpg',
+        summary: '为军方研究生化武器的安布雷拉公司在浣熊市地下建立了一个巨大的生物学实验室。',
+        sourceName: '豆瓣影视',
+        tags: ['动作', '科幻', '恐怖'],
+      },
+    ],
+    '生化危机'
+  );
+
+  assert.equal(ranked[0].externalId, 'douban-subj-1306809');
+  assert.equal(ranked[1].externalId, 'douban-subj-37068446');
+  assert.equal(ranked[2].externalId, 'douban-subj-34806914');
 });

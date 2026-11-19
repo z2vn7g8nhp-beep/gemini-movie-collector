@@ -40,6 +40,7 @@ import {
 } from '../utils/wikiFilmography';
 import { getConfiguredDoubanRelayUrl } from '../utils/doubanRelay';
 import {
+  DoubanBridgeError,
   fetchDoubanFilmRelations,
   fetchDoubanPersonRelations,
   searchDoubanCoverCandidates,
@@ -857,20 +858,32 @@ export async function searchOnline(
     };
   }
 
-  const mode = await detectRuntimeMode();
-  if (
-    mode === 'server' &&
+  const isExplicitStatic = detectInitialStaticHint(getInitialSignals());
+  const useBackendSearch =
+    !isExplicitStatic &&
+    cachedMode !== 'static' &&
     source !== 'baike' &&
     source !== 'iqiyi' &&
-    source !== 'moegirl'
-  ) {
+    source !== 'moegirl';
+
+  if (useBackendSearch) {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 9500);
     try {
       const res = await fetch(
         `/api/search?q=${encodeURIComponent(trimmed)}&category=${encodeURIComponent(
           category
-        )}&source=${encodeURIComponent(source)}`
+        )}&source=${encodeURIComponent(source)}`,
+        {
+          signal: controller.signal,
+          cache: 'no-store',
+          headers: { Accept: 'application/json' },
+        }
       );
-      if (res.ok) {
+      const contentType = res.headers.get('content-type') || '';
+      if (res.ok && contentType.includes('application/json')) {
+        cachedMode = 'server';
+        softStaticUntil = 0;
         const data = (await res.json()) as {
           results?: OnlineSearchResult[];
           activeSources?: string[];
@@ -885,21 +898,57 @@ export async function searchOnline(
           error: data.error,
         };
       }
+      if (
+        res.status === 404 ||
+        res.status === 405 ||
+        (res.ok && !contentType.includes('application/json'))
+      ) {
+        cachedMode = 'static';
+      }
     } catch {
-      // Fall through to browser direct search
+      // Transient backend timeout or pure static fallback -> continue to browser-direct
+    } finally {
+      window.clearTimeout(timer);
     }
   }
 
-  const tasks: Array<NamedSourceTask<OnlineSearchResult>> = [];
+  const mode = await detectRuntimeMode();
   const relayUrl = getConfiguredDoubanRelayUrl();
   const doubanOpts = relayUrl
     ? ({ transport: 'relay', relayBaseUrl: relayUrl } as const)
     : ({ transport: 'static-direct' } as const);
 
-  if (source === 'all' || source === 'douban') {
+  // Pure Douban direct path in static / relay mode: preserve real errors instead of
+  // misleadingly displaying "未检索到" when the bridge times out or hits rate limits.
+  if (source === 'douban') {
+    try {
+      const doubanResults = await searchDoubanMedia(trimmed, category, doubanOpts);
+      return {
+        results: deduplicateSearchResults(doubanResults).slice(0, 16),
+        activeSources: doubanResults.length > 0 ? ['豆瓣影视'] : [],
+        mode,
+      };
+    } catch (err) {
+      const reason = err instanceof DoubanBridgeError ? err.reason : 'network';
+      const errorMsg =
+        reason === 'rate-limit'
+          ? '豆瓣公开直连通道当前请求繁忙（限流），请等待几秒后点「重试」；如需长期免限流，可在「我的 → 豆瓣影视直连通道」绑定个人免费 Cloudflare Worker 中转。'
+          : '当前网络暂无法连通豆瓣直连节点（超时或网络受限），请点「重试」或切换网络；也可在「我的 → 豆瓣影视直连通道」绑定个人中转以获得稳定直连。';
+      return {
+        results: [],
+        activeSources: [],
+        mode,
+        error: errorMsg,
+      };
+    }
+  }
+
+  const tasks: Array<NamedSourceTask<OnlineSearchResult>> = [];
+
+  if (source === 'all') {
     tasks.push({
       name: '豆瓣影视',
-      promise: searchDoubanMedia(trimmed, category, doubanOpts),
+      promise: searchDoubanMedia(trimmed, category, doubanOpts).catch(() => []),
     });
   }
 
@@ -948,7 +997,7 @@ export async function searchOnline(
 
   const { items, activeSources } = await settleSourcesWithFastWindow(
     tasks,
-    source === 'all' ? 2800 : source === 'douban' ? 7500 : 4800
+    source === 'all' ? 3200 : 4800
   );
 
   return {

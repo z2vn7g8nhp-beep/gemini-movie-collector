@@ -38,15 +38,15 @@ const PRESETS: Record<ArchiveCategory, string[]> = {
 };
 
 const SOURCE_OPTIONS: Array<{ id: SearchSourceOption; label: string }> = [
-  { id: 'all', label: '全网直连聚合（豆瓣优先）' },
   { id: 'douban', label: '豆瓣影视' },
-  { id: 'baike', label: '百度百科' },
-  { id: 'iqiyi', label: '爱奇艺影视库' },
-  { id: 'moegirl', label: '萌娘百科' },
+  { id: 'all', label: '全网直连聚合（豆瓣优先）' },
   { id: 'bangumi', label: '番组计划 Bangumi' },
   { id: 'wiki', label: '中文维基百科' },
   { id: 'itunes', label: 'iTunes 影视库' },
   { id: 'tvmaze', label: 'TVMaze 剧集库' },
+  { id: 'baike', label: '百度百科' },
+  { id: 'iqiyi', label: '爱奇艺影视库' },
+  { id: 'moegirl', label: '萌娘百科' },
 ];
 
 export function OnlineSearchModal({
@@ -63,7 +63,7 @@ export function OnlineSearchModal({
 
   // Online search state
   const [category, setCategory] = useState<ArchiveCategory>(initialCategory);
-  const [source, setSource] = useState<SearchSourceOption>('all');
+  const [source, setSource] = useState<SearchSourceOption>('douban');
   const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [loading, setLoading] = useState(false);
   const [searchError, setSearchError] = useState('');
