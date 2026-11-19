@@ -4,8 +4,13 @@ import fs from 'fs';
 import path from 'path';
 import {defineConfig} from 'vite';
 
-export default defineConfig(() => {
+export default defineConfig(({mode}) => {
+  const isPages = mode === 'pages' || process.env.VITE_STATIC_MODE === 'true';
+  const base =
+    process.env.VITE_BASE_PATH || (isPages ? '/gemini-movie-collector/' : '/');
+
   return {
+    base,
     plugins: [
       react(),
       tailwindcss(),
@@ -24,6 +29,13 @@ export default defineConfig(() => {
           const distAssets = path.resolve(distDir, 'src/assets');
           if (fs.existsSync(distDir) && fs.existsSync(srcAssets)) {
             fs.cpSync(srcAssets, distAssets, {recursive: true, force: true});
+          }
+          if (isPages && fs.existsSync(distDir)) {
+            fs.writeFileSync(path.join(distDir, '.nojekyll'), '');
+            const indexHtml = path.join(distDir, 'index.html');
+            if (fs.existsSync(indexHtml)) {
+              fs.copyFileSync(indexHtml, path.join(distDir, '404.html'));
+            }
           }
         },
       },

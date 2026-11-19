@@ -17,6 +17,7 @@ import {
   parseTagsInput,
   validateArchiveInput,
 } from '../utils/archive';
+import { apiSearchMedia, shouldUseBackendApi } from '../services/apiClient';
 import { ArchivalImage } from './ArchivalImage';
 
 interface OnlineSearchModalProps {
@@ -125,21 +126,23 @@ export function OnlineSearchModal({
     setSearchError('');
     setHasSearched(true);
     try {
-      const res = await fetch(
-        `/api/search?q=${encodeURIComponent(trimmed)}&category=${encodeURIComponent(
-          cat
-        )}&source=${encodeURIComponent(src)}`
-      );
-      const data = await res.json();
-      if (!res.ok) {
-        setSearchError(data?.error || '联网检索失败，请稍后重试');
-        setResults([]);
-        return;
-      }
+      const data = await apiSearchMedia({
+        query: trimmed,
+        category: cat,
+        source: src,
+      });
       setResults(Array.isArray(data.results) ? data.results : []);
-      setActiveSources(Array.isArray(data.activeSources) ? data.activeSources : []);
-    } catch {
-      setSearchError('网络连接中断，无法连接服务端直连检索接口，请稍后重试。');
+      setActiveSources(
+        Array.isArray(data.activeSources) ? data.activeSources : []
+      );
+    } catch (err) {
+      setSearchError(
+        err instanceof Error && err.message
+          ? err.message
+          : shouldUseBackendApi()
+            ? '网络连接中断，无法连接服务端直连检索接口，请稍后重试。'
+            : '网络连接中断，无法连接公开资料检索接口，请稍后重试。'
+      );
       setResults([]);
     } finally {
       setLoading(false);
@@ -244,7 +247,9 @@ export function OnlineSearchModal({
               收录新藏品
             </h2>
             <p className="mt-0.5 text-xs text-[#625C54]">
-              服务端直连全网公开影视资料库并代理封面图片，无需梯子即可快速建档
+              {shouldUseBackendApi()
+                ? '服务端直连全网公开影视资料库并代理封面图片，无需梯子即可快速建档'
+                : '直连全网公开影视与角色资料库，快速检索并保存至当前浏览器馆藏'}
             </p>
           </div>
           <button

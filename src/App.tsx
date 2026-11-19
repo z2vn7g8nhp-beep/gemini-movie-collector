@@ -12,6 +12,8 @@ import { ProfileBackupView } from './components/ProfileBackupView';
 import { RandomEncounterModal } from './components/RandomEncounterModal';
 import { SearchTabView } from './components/SearchTabView';
 import { TimelineMemoriesView } from './components/TimelineMemoriesView';
+import { SEED_COLLECTION } from './data/seedCollection';
+import { getApiBaseUrl, shouldUseBackendApi } from './services/apiClient';
 import type {
   ArchiveCategory,
   ArchiveDraftInput,
@@ -163,53 +165,60 @@ export default function App() {
   const unlockedStampsRef = useRef<Set<string>>(new Set());
   const medalTiersRef = useRef<Map<string, MedalTier>>(new Map());
 
-  // Sync collection & collector rituals with server-side JSON store on mount
+  // Sync collection & collector rituals with server-side JSON store on mount (or localStorage in static mode)
   useEffect(() => {
     let cancelled = false;
     async function hydrate() {
       try {
-        const [colRes, collectorRes] = await Promise.all([
-          fetch('/api/collection'),
-          fetch('/api/collector'),
-        ]);
-        if (cancelled) return;
-
         let loadedItems = loadLocalFallback() ?? [];
-        if (colRes.ok) {
-          const data = (await colRes.json()) as {
-            initialized: boolean;
-            items: ArchiveItem[];
-          };
-          if (data.initialized) {
-            loadedItems = data.items;
-            setItems(data.items);
-            saveLocalFallback(data.items);
-          } else {
-            setItems(loadedItems);
-            saveLocalFallback(loadedItems);
-            await fetch('/api/collection/init', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ items: loadedItems }),
-            });
-          }
-        }
-
         let loadedCollector = loadLocalCollector();
-        if (collectorRes.ok) {
-          const cData = (await collectorRes.json()) as Partial<CollectorState>;
-          const serverDates = Array.isArray(cData.checkInDates)
-            ? cData.checkInDates
-            : [];
-          const serverAlbums = Array.isArray(cData.albums) ? cData.albums : [];
-          if (serverDates.length > 0 || serverAlbums.length > 0) {
-            loadedCollector = {
-              checkInDates: serverDates,
-              albums: serverAlbums,
+
+        if (shouldUseBackendApi()) {
+          const apiBase = getApiBaseUrl();
+          const [colRes, collectorRes] = await Promise.all([
+            fetch(`${apiBase}/api/collection`),
+            fetch(`${apiBase}/api/collector`),
+          ]);
+          if (cancelled) return;
+
+          if (colRes.ok) {
+            const data = (await colRes.json()) as {
+              initialized: boolean;
+              items: ArchiveItem[];
             };
+            if (data.initialized) {
+              loadedItems = data.items;
+              setItems(data.items);
+              saveLocalFallback(data.items);
+            } else {
+              setItems(loadedItems);
+              saveLocalFallback(loadedItems);
+              await fetch(`${apiBase}/api/collection/init`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ items: loadedItems }),
+              });
+            }
           }
+
+          if (collectorRes.ok) {
+            const cData = (await collectorRes.json()) as Partial<CollectorState>;
+            const serverDates = Array.isArray(cData.checkInDates)
+              ? cData.checkInDates
+              : [];
+            const serverAlbums = Array.isArray(cData.albums) ? cData.albums : [];
+            if (serverDates.length > 0 || serverAlbums.length > 0) {
+              loadedCollector = {
+                checkInDates: serverDates,
+                albums: serverAlbums,
+              };
+            }
+            setCollector(loadedCollector);
+            saveLocalCollector(loadedCollector);
+          }
+        } else {
+          setItems(loadedItems);
           setCollector(loadedCollector);
-          saveLocalCollector(loadedCollector);
         }
 
         const initialStamps = computeCollectorStamps(
@@ -445,8 +454,9 @@ export default function App() {
   const persistCollector = async (nextState: CollectorState) => {
     setCollector(nextState);
     saveLocalCollector(nextState);
+    if (!shouldUseBackendApi()) return;
     try {
-      const res = await fetch('/api/collector', {
+      const res = await fetch(`${getApiBaseUrl()}/api/collector`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(nextState),
@@ -509,8 +519,9 @@ export default function App() {
   const persistSnapshot = async (nextItems: ArchiveItem[]) => {
     setItems(nextItems);
     saveLocalFallback(nextItems);
+    if (!shouldUseBackendApi()) return;
     try {
-      const res = await fetch('/api/collection/replace', {
+      const res = await fetch(`${getApiBaseUrl()}/api/collection/replace`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ items: nextItems }),
@@ -525,6 +536,11 @@ export default function App() {
     } catch {
       // Saved locally
     }
+  };
+
+  const handleLoadSampleCollection = async () => {
+    await persistSnapshot(SEED_COLLECTION);
+    setNotice('已载入 6 件精选示例馆藏');
   };
 
   const buildItemsWithNewAndBidirectionalLinks = (
@@ -760,12 +776,16 @@ export default function App() {
       saveLocalFallback(next);
       return next;
     });
+    if (!shouldUseBackendApi()) return;
     try {
-      const res = await fetch(`/api/collection/${encodeURIComponent(id)}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patch),
-      });
+      const res = await fetch(
+        `${getApiBaseUrl()}/api/collection/${encodeURIComponent(id)}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(patch),
+        }
+      );
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data.items)) {
@@ -790,19 +810,24 @@ export default function App() {
       saveLocalFallback(next);
       return next;
     });
-    try {
-      const res = await fetch(`/api/collection/${encodeURIComponent(id)}`, {
-        method: 'DELETE',
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data.items)) {
-          setItems(data.items);
-          saveLocalFallback(data.items);
+    if (shouldUseBackendApi()) {
+      try {
+        const res = await fetch(
+          `${getApiBaseUrl()}/api/collection/${encodeURIComponent(id)}`,
+          {
+            method: 'DELETE',
+          }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.items)) {
+            setItems(data.items);
+            saveLocalFallback(data.items);
+          }
         }
+      } catch {
+        // Local state updated
       }
-    } catch {
-      // Local state updated
     }
     if (target) {
       setNotice(`已移除「${target.title}」`);
@@ -812,8 +837,9 @@ export default function App() {
   const handleReplaceAll = async (nextItems: ArchiveItem[]) => {
     setItems(nextItems);
     saveLocalFallback(nextItems);
+    if (!shouldUseBackendApi()) return;
     try {
-      await fetch('/api/collection/replace', {
+      await fetch(`${getApiBaseUrl()}/api/collection/replace`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ items: nextItems }),
@@ -1158,6 +1184,7 @@ export default function App() {
               onJumpToSearch={jumpToSearch}
               onJumpToCreate={() => jumpToCreate()}
               onResetFilters={handleResetFilters}
+              onLoadSampleCollection={() => void handleLoadSampleCollection()}
             />
           </>
         )}

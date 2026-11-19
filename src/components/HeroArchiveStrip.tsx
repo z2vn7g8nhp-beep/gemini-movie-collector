@@ -1,4 +1,5 @@
 import { Download } from 'lucide-react';
+import { shouldUseBackendApi } from '../services/apiClient';
 import type {
   ArchiveCategory,
   ArchiveItem,
@@ -34,13 +35,17 @@ export function HeroArchiveStrip({
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-2xl">
             <p className="text-xs tracking-[0.16em] text-[#625C54]">
-              私人影像馆藏 · 服务端直连联网检索
+              {shouldUseBackendApi()
+                ? '私人影像馆藏 · 服务端直连联网检索'
+                : '私人影像馆藏 · 全网公开资料检索'}
             </p>
             <h1 className="mt-2 font-editorial text-[26px] leading-[1.3] font-medium tracking-normal text-[#1A1816] sm:text-4xl">
               收藏动人影视、影人与鲜活角色
             </h1>
             <p className="mt-2.5 text-sm leading-relaxed text-[#625C54]">
-              直接搜索即可直连公开影视与角色资料库并代理封面图，无需梯子，一键收入你的个人藏馆。
+              {shouldUseBackendApi()
+                ? '直接搜索即可直连公开影视与角色资料库并代理封面图，无需梯子，一键收入你的个人藏馆。'
+                : '直接搜索即可检索公开影视、影人与角色资料库，一键收入你的个人浏览器藏馆。'}
             </p>
           </div>
 

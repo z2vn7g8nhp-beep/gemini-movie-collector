@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Download, Upload, X } from 'lucide-react';
 import type { ArchiveItem } from '../types/archive';
+import { shouldUseBackendApi } from '../services/apiClient';
 import { mergeImportedItems, parseImportPayload } from '../utils/archive';
 
 interface BackupModalProps {
@@ -118,7 +119,9 @@ export function BackupModal({
               馆藏数据备份与恢复
             </h2>
             <p className="mt-0.5 text-xs text-[#625C54]">
-              数据已自动保存至服务端与本地浏览器，无需登录第三方账号
+              {shouldUseBackendApi()
+                ? '数据已自动保存至服务端与本地浏览器，无需登录第三方账号'
+                : '数据已自动保存至当前浏览器本地存储，无需登录第三方账号，可随时导出 JSON 备份'}
             </p>
           </div>
           <button

@@ -7,6 +7,7 @@ import type {
   SearchSourceOption,
 } from '../types/archive';
 import { CATEGORY_LABELS, isAlreadyCollected } from '../utils/archive';
+import { apiSearchMedia } from '../services/apiClient';
 import { ArchivalImage } from './ArchivalImage';
 
 interface OnlineSearchSectionProps {
@@ -82,21 +83,21 @@ export function OnlineSearchSection({
     setError('');
     setHasSearched(true);
     try {
-      const res = await fetch(
-        `/api/search?q=${encodeURIComponent(trimmed)}&category=${encodeURIComponent(
-          cat
-        )}&source=${encodeURIComponent(src)}`
-      );
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data?.error || '联网检索失败，请稍后重试');
-        setResults([]);
-        return;
-      }
+      const data = await apiSearchMedia({
+        query: trimmed,
+        category: cat,
+        source: src,
+      });
       setResults(Array.isArray(data.results) ? data.results : []);
-      setActiveSources(Array.isArray(data.activeSources) ? data.activeSources : []);
-    } catch {
-      setError('网络连接中断，请稍后重试。');
+      setActiveSources(
+        Array.isArray(data.activeSources) ? data.activeSources : []
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error && err.message
+          ? err.message
+          : '网络连接中断，请稍后重试。'
+      );
       setResults([]);
     } finally {
       setLoading(false);

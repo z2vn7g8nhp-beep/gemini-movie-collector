@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Film, Sparkles, User } from 'lucide-react';
 import type { ArchiveCategory } from '../types/archive';
+import { resolveAssetOrImageUrl } from '../services/apiClient';
 import { CATEGORY_LABELS } from '../utils/archive';
 
 interface ArchivalImageProps {
@@ -53,7 +54,7 @@ export function ArchivalImage({
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
-  const cleanSrc = src?.trim() || '';
+  const cleanSrc = resolveAssetOrImageUrl(src) || '';
 
   useEffect(() => {
     setFailed(false);

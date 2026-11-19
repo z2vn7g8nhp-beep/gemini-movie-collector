@@ -7,6 +7,7 @@ import type {
   SearchSourceOption,
 } from '../types/archive';
 import { CATEGORY_LABELS, isAlreadyCollected } from '../utils/archive';
+import { apiSearchMedia, shouldUseBackendApi } from '../services/apiClient';
 import { ArchivalImage } from './ArchivalImage';
 
 interface SearchTabViewProps {
@@ -61,21 +62,21 @@ export function SearchTabView({
     setError('');
     setHasSearched(true);
     try {
-      const res = await fetch(
-        `/api/search?q=${encodeURIComponent(trimmed)}&category=${encodeURIComponent(
-          cat
-        )}&source=${encodeURIComponent(src)}`
-      );
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data?.error || '联网检索失败，请稍后重试');
-        setResults([]);
-        return;
-      }
+      const data = await apiSearchMedia({
+        query: trimmed,
+        category: cat,
+        source: src,
+      });
       setResults(Array.isArray(data.results) ? data.results : []);
-      setActiveSources(Array.isArray(data.activeSources) ? data.activeSources : []);
-    } catch {
-      setError('网络连接中断，请检查网络后重试。');
+      setActiveSources(
+        Array.isArray(data.activeSources) ? data.activeSources : []
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error && err.message
+          ? err.message
+          : '网络连接中断，请检查网络后重试。'
+      );
       setResults([]);
     } finally {
       setLoading(false);
@@ -223,7 +224,9 @@ export function SearchTabView({
         </form>
 
         <p className="mt-3 text-[12px] text-[#7A7268]">
-          所有检索与海报图片均由服务端直连代理加载，手机端无需梯子。
+          {shouldUseBackendApi()
+            ? '所有检索与海报图片均由服务端直连代理加载，手机端无需梯子。'
+            : '直连公开影视与角色资料库检索（维基百科 / Wikidata / iTunes / TVMaze / Bangumi），结果实时保存至当前浏览器本地。'}
         </p>
       </div>
 

@@ -13,6 +13,7 @@ import type {
   CollectorState,
 } from '../types/archive';
 import { mergeImportedItems, parseImportPayload } from '../utils/archive';
+import { shouldUseBackendApi } from '../services/apiClient';
 import {
   buildCollectorRank,
   computeCheckInStreak,
@@ -546,7 +547,9 @@ export function ProfileBackupView({
           备份与导出
         </h2>
         <p className="mt-1 text-xs leading-relaxed text-[#625C54]">
-          数据已实时保存至服务端与当前手机浏览器，无需登录第三方账号。你可以随时导出 JSON 备份文件。
+          {shouldUseBackendApi()
+            ? '数据已实时保存至服务端与当前手机浏览器，无需登录第三方账号。你可以随时导出 JSON 备份文件。'
+            : '数据已实时保存至当前浏览器本地存储，无需登录第三方账号。建议定期导出 JSON 备份文件以防清理缓存丢失。'}
         </p>
         <button
           type="button"

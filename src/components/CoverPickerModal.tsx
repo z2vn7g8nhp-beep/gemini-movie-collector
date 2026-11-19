@@ -10,6 +10,7 @@ import {
   X,
 } from 'lucide-react';
 import type { ArchiveItem } from '../types/archive';
+import { apiSearchCovers } from '../services/apiClient';
 import { buildProxyImageUrl } from '../utils/archive';
 import {
   computeCoverResizeDimensions,
@@ -107,21 +108,11 @@ export function CoverPickerModal({
     setLoading(true);
     setSearchError('');
     try {
-      const params = new URLSearchParams({
-        q: trimmed,
+      const data = await apiSearchCovers({
+        query: trimmed,
+        originalTitle: originalTitle?.trim() || undefined,
         category: item.category,
       });
-      if (originalTitle && originalTitle.trim()) {
-        params.set('originalTitle', originalTitle.trim());
-      }
-      const res = await fetch(`/api/cover-search?${params.toString()}`);
-      const data = (await res.json()) as {
-        candidates?: CoverCandidate[];
-        error?: string;
-      };
-      if (!res.ok) {
-        throw new Error(data.error || '拉取候选封面失败');
-      }
       setCandidates(Array.isArray(data.candidates) ? data.candidates : []);
     } catch (err) {
       setSearchError(

@@ -7,6 +7,8 @@ import type {
   CollectionStatus,
   ValidationErrors,
 } from '../types/archive';
+import { getApiBaseUrl, isStaticAppMode } from '../services/apiClient';
+import { unwrapProxyImageUrl } from './coverPicker';
 
 export const CATEGORY_LABELS: Record<ArchiveCategory, string> = {
   film: '影视',
@@ -28,6 +30,22 @@ export function buildProxyImageUrl(rawUrl?: string): string | undefined {
   if (!rawUrl) return undefined;
   const trimmed = rawUrl.trim();
   if (!trimmed) return undefined;
+
+  const staticOnly = isStaticAppMode() && !getApiBaseUrl();
+  if (staticOnly) {
+    if (trimmed.startsWith('/api/img-proxy')) {
+      return unwrapProxyImageUrl(trimmed);
+    }
+    if (
+      trimmed.startsWith('/src/assets/') ||
+      trimmed.startsWith('data:image/') ||
+      /^https?:\/\//i.test(trimmed)
+    ) {
+      return trimmed;
+    }
+    return trimmed;
+  }
+
   if (
     trimmed.startsWith('/src/assets/') ||
     trimmed.startsWith('/api/img-proxy') ||
@@ -93,8 +111,17 @@ export function validateArchiveInput(input: ArchiveDraftInput): ValidationErrors
 
   if (input.coverUrl && input.coverUrl.trim()) {
     const url = input.coverUrl.trim();
+    const envBase =
+      typeof import.meta !== 'undefined' &&
+      typeof (import.meta as unknown as { env?: { BASE_URL?: string } }).env
+        ?.BASE_URL === 'string'
+        ? (import.meta as unknown as { env: { BASE_URL: string } }).env.BASE_URL
+        : '/';
+    const normalizedBase = envBase.endsWith('/') ? envBase : `${envBase}/`;
     const isValidLocal =
       url.startsWith('/src/assets/') ||
+      url.startsWith('src/assets/') ||
+      url.startsWith(`${normalizedBase}src/assets/`) ||
       url.startsWith('/api/img-proxy') ||
       url.startsWith('data:image/');
     const isValidHttp = /^https?:\/\/.+/i.test(url);

@@ -25,6 +25,10 @@ import type {
   OnlineSearchResult,
 } from '../types/archive';
 import {
+  apiFetchCharacterProfile,
+  apiFetchRelations,
+} from '../services/apiClient';
+import {
   buildProxyImageUrl,
   CATEGORY_LABELS,
   findExistingItemByTitle,
@@ -205,25 +209,13 @@ export function DetailDrawer({
       setDossierLoading(true);
       setDossierError('');
       try {
-        const params = new URLSearchParams({ title: currentItem.title });
-        if (currentItem.originalTitle) {
-          params.set('originalTitle', currentItem.originalTitle);
-        }
-        if (currentItem.relatedWorkTitle) {
-          params.set('relatedWorkTitle', currentItem.relatedWorkTitle);
-        }
-        if (currentItem.sourceUrl) {
-          params.set('sourceUrl', currentItem.sourceUrl);
-        }
-
-        const res = await fetch(`/api/character-profile?${params.toString()}`, {
+        const data = await apiFetchCharacterProfile({
+          title: currentItem.title,
+          originalTitle: currentItem.originalTitle,
+          relatedWorkTitle: currentItem.relatedWorkTitle,
+          sourceUrl: currentItem.sourceUrl,
           signal: controller.signal,
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = (await res.json()) as {
-          profile?: Partial<CharacterProfile>;
-          sources?: string[];
-        };
         if (cancelled) return;
 
         const fetched = data.profile || {};
@@ -292,24 +284,13 @@ export function DetailDrawer({
       setOnlineRelations(EMPTY_RELATIONS);
 
       try {
-        const params = new URLSearchParams({
+        const data = await apiFetchRelations({
           category: item!.category,
           title: item!.title,
-        });
-        if (item!.originalTitle) {
-          params.set('originalTitle', item!.originalTitle);
-        }
-        if (item!.sourceUrl) {
-          params.set('sourceUrl', item!.sourceUrl);
-        }
-
-        const res = await fetch(`/api/relations?${params.toString()}`, {
+          originalTitle: item!.originalTitle,
+          sourceUrl: item!.sourceUrl,
           signal: controller.signal,
         });
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}`);
-        }
-        const data = (await res.json()) as Partial<OnlineRelationsPayload>;
         if (cancelled) return;
 
         const next: OnlineRelationsPayload = {

@@ -19,6 +19,7 @@ interface ArchiveGridProps {
   onJumpToSearch: (query?: string) => void;
   onJumpToCreate: () => void;
   onResetFilters: () => void;
+  onLoadSampleCollection?: () => void;
 }
 
 export function ArchiveGrid({
@@ -31,6 +32,7 @@ export function ArchiveGrid({
   onJumpToSearch,
   onJumpToCreate,
   onResetFilters,
+  onLoadSampleCollection,
 }: ArchiveGridProps) {
   if (allItems.length === 0) {
     return (
@@ -61,6 +63,15 @@ export function ArchiveGrid({
               手动建档
             </button>
           </div>
+          {onLoadSampleCollection && (
+            <button
+              type="button"
+              onClick={onLoadSampleCollection}
+              className="mt-3 inline-flex min-h-[36px] items-center justify-center rounded-lg px-3 text-xs font-medium text-[#625C54] underline decoration-[#D4CDC0] underline-offset-4 cursor-pointer hover:text-[#1A1816] hover:decoration-[#1A1816]"
+            >
+              载入 6 件精选示例馆藏
+            </button>
+          )}
         </div>
       </section>
     );
