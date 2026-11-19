@@ -4,7 +4,6 @@ import type {
   ArchiveCategory,
   ArchiveItem,
   OnlineSearchResult,
-  SearchSourceOption,
 } from '../types/archive';
 import { searchOnline } from '../services/archiveApi';
 import { CATEGORY_LABELS, isAlreadyCollected } from '../utils/archive';
@@ -19,19 +18,6 @@ interface OnlineSearchSectionProps {
   onOpenManualCreate: (prefillTitle?: string, category?: ArchiveCategory) => void;
 }
 
-const SOURCE_OPTIONS: Array<{ id: SearchSourceOption; label: string }> = [
-  { id: 'imdb', label: 'IMDb（豆瓣辅助）' },
-  { id: 'all', label: '全网直连聚合（IMDb + 豆瓣优先）' },
-  { id: 'douban', label: '豆瓣影视' },
-  { id: 'bangumi', label: '番组计划 Bangumi' },
-  { id: 'wiki', label: '中文维基百科' },
-  { id: 'itunes', label: 'iTunes 影视库' },
-  { id: 'tvmaze', label: 'TVMaze 剧集库' },
-  { id: 'baike', label: '百度百科' },
-  { id: 'iqiyi', label: '爱奇艺影视库' },
-  { id: 'moegirl', label: '萌娘百科' },
-];
-
 export function OnlineSearchSection({
   existingItems,
   preferredCategory,
@@ -42,7 +28,6 @@ export function OnlineSearchSection({
 }: OnlineSearchSectionProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [category, setCategory] = useState<ArchiveCategory>(preferredCategory);
-  const [source, setSource] = useState<SearchSourceOption>('imdb');
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -53,12 +38,6 @@ export function OnlineSearchSection({
 
   useEffect(() => {
     setCategory(preferredCategory);
-    if (
-      preferredCategory === 'character' &&
-      (source === 'itunes' || source === 'iqiyi')
-    ) {
-      setSource('all');
-    }
   }, [preferredCategory]);
 
   useEffect(() => {
@@ -71,14 +50,13 @@ export function OnlineSearchSection({
   useEffect(() => {
     if (externalQuery && externalQuery.trim()) {
       setQuery(externalQuery.trim());
-      void runSearch(externalQuery.trim(), category, source);
+      void runSearch(externalQuery.trim(), category);
     }
   }, [externalQuery]);
 
   const runSearch = async (
     q: string,
-    cat: ArchiveCategory = category,
-    src: SearchSourceOption = source
+    cat: ArchiveCategory = category
   ) => {
     const trimmed = q.trim();
     if (!trimmed) {
@@ -91,7 +69,7 @@ export function OnlineSearchSection({
     setError('');
     setHasSearched(true);
     try {
-      const data = await searchOnline(trimmed, cat, src);
+      const data = await searchOnline(trimmed, cat, 'imdb');
       if (data.error) {
         setError(data.error);
         setResults([]);
@@ -109,7 +87,7 @@ export function OnlineSearchSection({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    void runSearch(query, category, source);
+    void runSearch(query, category);
   };
 
   const handleCollect = async (item: OnlineSearchResult) => {
@@ -130,7 +108,7 @@ export function OnlineSearchSection({
 
   return (
     <div className="mt-7 border border-[#DCD6CB] bg-white p-4 sm:p-5">
-      {/* Top Row: Category Switcher + Source Selector */}
+      {/* Top Row: Category Switcher + fixed IMDb/Douban label */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div
           role="group"
@@ -142,12 +120,7 @@ export function OnlineSearchSection({
               key={cat}
               type="button"
               aria-pressed={category === cat}
-              onClick={() => {
-                setCategory(cat);
-                if (cat === 'character' && source === 'itunes') {
-                  setSource('all');
-                }
-              }}
+              onClick={() => setCategory(cat)}
               className={`min-h-[34px] rounded px-3.5 py-1 text-xs font-medium whitespace-nowrap cursor-pointer transition-colors ${
                 category === cat
                   ? 'bg-white text-[#1A1816] shadow-xs'
@@ -159,28 +132,9 @@ export function OnlineSearchSection({
           ))}
         </div>
 
-        <div className="flex items-center gap-2">
-          <label
-            htmlFor="hero-online-source"
-            className="text-xs text-[#625C54] whitespace-nowrap"
-          >
-            数据源
-          </label>
-          <select
-            id="hero-online-source"
-            value={source}
-            onChange={(e) => setSource(e.target.value as SearchSourceOption)}
-            className="h-9 rounded-md border border-[#DCD6CB] bg-[#FAF9F6] px-2.5 text-xs text-[#1A1816] cursor-pointer focus:border-[#1A1816] focus:outline-none"
-          >
-            {SOURCE_OPTIONS.filter(
-              (opt) => !(category === 'character' && opt.id === 'itunes')
-            ).map((opt) => (
-              <option key={opt.id} value={opt.id}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </div>
+        <span className="text-xs text-[#625C54] whitespace-nowrap">
+          IMDb 直连 · 豆瓣辅助
+        </span>
       </div>
 
       {/* Main Search Input Form */}
@@ -260,7 +214,7 @@ export function OnlineSearchSection({
           {query.trim() && (
             <button
               type="button"
-              onClick={() => void runSearch(query, category, source)}
+              onClick={() => void runSearch(query, category)}
               className="font-medium underline underline-offset-2 whitespace-nowrap cursor-pointer"
             >
               重试

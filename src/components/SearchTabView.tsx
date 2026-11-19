@@ -4,7 +4,6 @@ import type {
   ArchiveCategory,
   ArchiveItem,
   OnlineSearchResult,
-  SearchSourceOption,
 } from '../types/archive';
 import { searchOnline } from '../services/archiveApi';
 import { CATEGORY_LABELS, isAlreadyCollected } from '../utils/archive';
@@ -19,19 +18,6 @@ interface SearchTabViewProps {
   onJumpToManual: (prefillTitle: string, category: ArchiveCategory) => void;
 }
 
-const SOURCE_OPTIONS: Array<{ id: SearchSourceOption; label: string }> = [
-  { id: 'imdb', label: 'IMDb（豆瓣辅助）' },
-  { id: 'all', label: '全网直连聚合（IMDb + 豆瓣优先）' },
-  { id: 'douban', label: '豆瓣影视' },
-  { id: 'bangumi', label: '番组计划 Bangumi' },
-  { id: 'wiki', label: '中文维基百科' },
-  { id: 'itunes', label: 'iTunes 影视库' },
-  { id: 'tvmaze', label: 'TVMaze 剧集库' },
-  { id: 'baike', label: '百度百科' },
-  { id: 'iqiyi', label: '爱奇艺影视库' },
-  { id: 'moegirl', label: '萌娘百科' },
-];
-
 export function SearchTabView({
   existingItems,
   initialQuery = '',
@@ -42,7 +28,6 @@ export function SearchTabView({
 }: SearchTabViewProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [category, setCategory] = useState<ArchiveCategory>(initialCategory);
-  const [source, setSource] = useState<SearchSourceOption>('imdb');
   const [query, setQuery] = useState(initialQuery);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -53,8 +38,7 @@ export function SearchTabView({
 
   const runSearch = async (
     q: string,
-    cat: ArchiveCategory = category,
-    src: SearchSourceOption = source
+    cat: ArchiveCategory = category
   ) => {
     const trimmed = q.trim();
     if (!trimmed) {
@@ -67,7 +51,7 @@ export function SearchTabView({
     setError('');
     setHasSearched(true);
     try {
-      const data = await searchOnline(trimmed, cat, src);
+      const data = await searchOnline(trimmed, cat, 'imdb');
       if (data.error) {
         setError(data.error);
         setResults([]);
@@ -87,7 +71,7 @@ export function SearchTabView({
     setCategory(initialCategory);
     if (initialQuery && initialQuery.trim()) {
       setQuery(initialQuery.trim());
-      void runSearch(initialQuery.trim(), initialCategory, source);
+      void runSearch(initialQuery.trim(), initialCategory);
       onConsumeInitialQuery?.();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -95,7 +79,7 @@ export function SearchTabView({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    void runSearch(query, category, source);
+    void runSearch(query, category);
   };
 
   const handleCollect = async (item: OnlineSearchResult) => {
@@ -124,15 +108,7 @@ export function SearchTabView({
                 key={cat}
                 type="button"
                 aria-pressed={active}
-                onClick={() => {
-                  setCategory(cat);
-                  if (
-                    cat === 'character' &&
-                    (source === 'itunes' || source === 'iqiyi')
-                  ) {
-                    setSource('all');
-                  }
-                }}
+                onClick={() => setCategory(cat)}
                 className={`min-h-[40px] rounded-lg text-sm font-medium whitespace-nowrap cursor-pointer transition-colors ${
                   active
                     ? 'bg-white text-[#1A1816] shadow-xs'
@@ -146,8 +122,11 @@ export function SearchTabView({
         </div>
 
         {/* Search Form */}
-        <form onSubmit={handleSubmit} className="mt-3.5 space-y-3">
-          <div className="relative">
+        <form
+          onSubmit={handleSubmit}
+          className="mt-3.5 flex flex-col gap-2.5 sm:flex-row sm:items-center"
+        >
+          <div className="relative flex-1">
             <label htmlFor="mobile-online-search-input" className="sr-only">
               直连联网搜索影视、影人或角色
             </label>
@@ -192,46 +171,20 @@ export function SearchTabView({
             )}
           </div>
 
-          <div className="flex items-center gap-2.5">
-            <div className="flex-1">
-              <label htmlFor="mobile-source-select" className="sr-only">
-                选择数据源
-              </label>
-              <select
-                id="mobile-source-select"
-                value={source}
-                onChange={(e) => setSource(e.target.value as SearchSourceOption)}
-                className="h-11 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3 text-xs font-medium text-[#1A1816] focus:border-[#1A1816] focus:outline-none"
-              >
-                {SOURCE_OPTIONS.filter(
-                  (opt) =>
-                    !(
-                      category === 'character' &&
-                      (opt.id === 'itunes' || opt.id === 'iqiyi')
-                    )
-                ).map((opt) => (
-                  <option key={opt.id} value={opt.id}>
-                    来源：{opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="inline-flex h-11 min-w-[112px] items-center justify-center gap-1.5 rounded-xl bg-[#B43B2B] px-5 text-sm font-medium text-white whitespace-nowrap shrink-0 cursor-pointer active:scale-[0.98] transition-transform hover:bg-[#932D20] disabled:opacity-60"
-            >
-              {loading && (
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-              )}
-              直连搜索
-            </button>
-          </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="inline-flex h-12 w-full sm:w-auto sm:min-w-[120px] items-center justify-center gap-1.5 rounded-xl bg-[#B43B2B] px-5 text-sm font-medium text-white whitespace-nowrap shrink-0 cursor-pointer active:scale-[0.98] transition-transform hover:bg-[#932D20] disabled:opacity-60"
+          >
+            {loading && (
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            )}
+            直连搜索
+          </button>
         </form>
 
         <p className="mt-3 text-[12px] text-[#7A7268]">
-          默认直连 IMDb 资料库（评分 · 奖项 · 高清海报与主创）并自动融合豆瓣中文片名、评分与简介，支持直接粘贴 IMDb / 豆瓣链接建档。
+          直连 IMDb 资料库（评分 · 奖项 · 高清海报与主创）并自动融合豆瓣中文片名、评分与简介，支持直接粘贴 IMDb / 豆瓣链接建档。
         </p>
       </div>
 
@@ -245,7 +198,7 @@ export function SearchTabView({
           {query.trim() && (
             <button
               type="button"
-              onClick={() => void runSearch(query, category, source)}
+              onClick={() => void runSearch(query, category)}
               className="min-h-[36px] px-2 font-medium underline underline-offset-2 whitespace-nowrap cursor-pointer"
             >
               重试

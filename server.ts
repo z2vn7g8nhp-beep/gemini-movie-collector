@@ -281,11 +281,10 @@ async function createServer() {
     res.json(next);
   });
 
-  // 3. Direct Online Multi-Source Search (delegated to shared isomorphic engine)
+  // 3. Direct Online Search (IMDb Primary + Douban Assist)
   app.get('/api/search', async (req: Request, res: Response) => {
     const query = String(req.query.q || '').trim();
     const category = String(req.query.category || 'film');
-    const source = String(req.query.source || 'all');
 
     if (!query) {
       res.status(400).json({ error: '请输入搜索关键词', results: [] });
@@ -295,7 +294,7 @@ async function createServer() {
     const payload = await searchOnlineMedia({
       query,
       category,
-      source,
+      source: 'imdb',
       mode: 'server',
     });
     res.json(payload);

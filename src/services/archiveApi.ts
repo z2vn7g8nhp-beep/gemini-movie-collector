@@ -843,16 +843,15 @@ function deduplicateSearchResults(
 }
 
 /**
- * Dual-mode online search:
- * - `'server'` mode: queries Express `/api/search` (or China-native browser fallback for `baike`/`iqiyi`/`moegirl`)
- * - `'static'` mode (GitHub Pages / mobile PWA): queries China-accessible zero-VPN APIs
- *   (Baidu Baike JSONP, iQIYI CORS, Moegirl CORS) alongside Bangumi, zh.Wikipedia, iTunes,
- *   and TVMaze with fast-window settlement so blocked overseas hosts never stall mobile search.
+ * Dual-mode online search (IMDb Primary + Douban Chinese Info Assist):
+ * - `'server'` mode: queries Express `/api/search?source=imdb`
+ * - `'static'` mode (GitHub Pages / mobile PWA): queries CORS-open IMDb Cinemeta +
+ *   IMDb Suggest JSONP + Wikidata bridge with non-blocking Douban Chinese assist.
  */
 export async function searchOnline(
   query: string,
   category: ArchiveCategory,
-  source: SearchSourceOption
+  _source: SearchSourceOption = 'imdb'
 ): Promise<OnlineSearchResponse> {
   const trimmed = query.trim();
   if (!trimmed) {
@@ -865,12 +864,7 @@ export async function searchOnline(
   }
 
   const isExplicitStatic = detectInitialStaticHint(getInitialSignals());
-  const useBackendSearch =
-    !isExplicitStatic &&
-    cachedMode !== 'static' &&
-    source !== 'baike' &&
-    source !== 'iqiyi' &&
-    source !== 'moegirl';
+  const useBackendSearch = !isExplicitStatic && cachedMode !== 'static';
 
   if (useBackendSearch) {
     const controller = new AbortController();
@@ -879,7 +873,7 @@ export async function searchOnline(
       const res = await fetch(
         `/api/search?q=${encodeURIComponent(trimmed)}&category=${encodeURIComponent(
           category
-        )}&source=${encodeURIComponent(source)}`,
+        )}&source=imdb`,
         {
           signal: controller.signal,
           cache: 'no-store',
@@ -924,114 +918,17 @@ export async function searchOnline(
     ? ({ transport: 'relay', relayBaseUrl: relayUrl } as const)
     : ({ transport: 'static-direct' } as const);
 
-  // Primary IMDb direct path in static/browser mode (CORS-open Cinemeta + IMDb JSONP + non-blocking Douban assist!)
-  if (source === 'imdb') {
-    const bundle = await searchImdbMedia(trimmed, category, {
-      mode: 'browser',
-      doubanOptions: doubanOpts,
-      enableDoubanAssist: true,
-    });
-    const activeSources: string[] = [];
-    if (bundle.results.length > 0) {
-      activeSources.push(bundle.hasDoubanAssist ? 'IMDb · 豆瓣辅助' : 'IMDb');
-    }
-    return {
-      results: deduplicateSearchResults(bundle.results).slice(0, 16),
-      activeSources,
-      mode,
-    };
+  const bundle = await searchImdbMedia(trimmed, category, {
+    mode: 'browser',
+    doubanOptions: doubanOpts,
+    enableDoubanAssist: true,
+  });
+  const activeSources: string[] = [];
+  if (bundle.results.length > 0) {
+    activeSources.push(bundle.hasDoubanAssist ? 'IMDb · 豆瓣辅助' : 'IMDb');
   }
-
-  // Pure Douban direct path in static / relay mode: preserve real errors instead of
-  // misleadingly displaying "未检索到" when the bridge times out or hits rate limits.
-  if (source === 'douban') {
-    try {
-      const doubanResults = await searchDoubanMedia(trimmed, category, doubanOpts);
-      return {
-        results: deduplicateSearchResults(doubanResults).slice(0, 16),
-        activeSources: doubanResults.length > 0 ? ['豆瓣影视'] : [],
-        mode,
-      };
-    } catch (err) {
-      const reason = err instanceof DoubanBridgeError ? err.reason : 'network';
-      const errorMsg =
-        reason === 'rate-limit'
-          ? '豆瓣公开直连通道当前请求繁忙（限流），建议优先切回「IMDb（豆瓣辅助）」直连，或等待几秒后点「重试」。'
-          : '当前网络暂无法连通豆瓣直连节点（超时或网络受限），建议优先切回「IMDb（豆瓣辅助）」直连，或在「我的」中绑定个人中转。';
-      return {
-        results: [],
-        activeSources: [],
-        mode,
-        error: errorMsg,
-      };
-    }
-  }
-
-  const tasks: Array<NamedSourceTask<OnlineSearchResult>> = [];
-
-  if (source === 'all') {
-    tasks.push({
-      name: 'IMDb · 豆瓣辅助',
-      promise: searchImdbMedia(trimmed, category, {
-        mode: 'browser',
-        doubanOptions: doubanOpts,
-        enableDoubanAssist: true,
-      })
-        .then((b) => b.results)
-        .catch(() => []),
-    });
-  }
-
-  if ((source === 'all' || source === 'iqiyi') && category !== 'character') {
-    tasks.push({
-      name: '爱奇艺影视库',
-      promise: searchIqiyiBrowser(trimmed, category),
-    });
-  }
-  if (source === 'all' || source === 'baike') {
-    tasks.push({
-      name: '百度百科',
-      promise: searchBaiduBaikeBrowser(trimmed, category),
-    });
-  }
-  if (source === 'all' || source === 'moegirl') {
-    tasks.push({
-      name: '萌娘百科',
-      promise: searchMoegirlBrowser(trimmed, category),
-    });
-  }
-  if (source === 'all' || source === 'bangumi') {
-    tasks.push({
-      name: '番组计划 Bangumi',
-      promise: searchBangumiBrowser(trimmed, category),
-    });
-  }
-  if (source === 'all' || source === 'wiki') {
-    tasks.push({
-      name: '中文维基百科',
-      promise: searchZhWikiBrowser(trimmed, category),
-    });
-  }
-  if ((source === 'all' || source === 'itunes') && category !== 'character') {
-    tasks.push({
-      name: 'iTunes 影视库',
-      promise: searchITunesBrowser(trimmed, category),
-    });
-  }
-  if (source === 'all' || source === 'tvmaze') {
-    tasks.push({
-      name: 'TVMaze 剧集库',
-      promise: searchTVMazeBrowser(trimmed, category),
-    });
-  }
-
-  const { items, activeSources } = await settleSourcesWithFastWindow(
-    tasks,
-    source === 'all' ? 3200 : 4800
-  );
-
   return {
-    results: deduplicateSearchResults(items).slice(0, 22),
+    results: deduplicateSearchResults(bundle.results).slice(0, 16),
     activeSources,
     mode,
   };

@@ -674,7 +674,6 @@ export async function searchOnlineMedia(params: {
 }): Promise<MediaSearchResponse> {
   const query = params.query.trim();
   const category = normalizeCategory(params.category);
-  const source = (params.source || 'all').trim() || 'all';
   const { mode, signal } = params;
 
   if (!query) {
@@ -687,98 +686,23 @@ export async function searchOnlineMedia(params: {
     };
   }
 
-  const tasks: Array<{ name: string; promise: Promise<OnlineSearchResult[]> }> =
-    [];
-
-  // Dedicated IMDb primary + Douban Chinese info assist path
-  if (source === 'imdb') {
-    const bundle = await searchImdbMedia(query, category, {
-      mode,
-      doubanOptions: mode === 'server' ? { transport: 'server', signal } : undefined,
-      enableDoubanAssist: mode === 'server',
-      signal,
-    });
-    const activeSources: string[] = [];
-    if (bundle.results.length > 0) {
-      activeSources.push(bundle.hasDoubanAssist ? 'IMDb · 豆瓣辅助' : 'IMDb');
-    }
-    return {
-      query,
-      category,
-      results: deduplicateResults(bundle.results).slice(0, 22),
-      activeSources,
-      failedSources: [],
-    };
-  }
-
-  if (source === 'all') {
-    tasks.push({
-      name: 'IMDb · 豆瓣辅助',
-      promise: searchImdbMedia(query, category, {
-        mode,
-        doubanOptions: mode === 'server' ? { transport: 'server', signal } : undefined,
-        enableDoubanAssist: mode === 'server',
-        signal,
-      }).then((b) => b.results),
-    });
-  }
-  if (mode === 'server' && source === 'douban') {
-    tasks.push({
-      name: '豆瓣影视',
-      promise: searchDoubanMedia(query, category, {
-        transport: 'server',
-        signal,
-      }),
-    });
-  }
-  if (source === 'all' || source === 'bangumi') {
-    tasks.push({
-      name: '番组计划 Bangumi',
-      promise: searchBangumi(query, category, mode, signal),
-    });
-  }
-  if (source === 'all' || source === 'wiki') {
-    tasks.push({
-      name: '中文维基百科',
-      promise: searchZhWikipedia(query, category, mode, signal),
-    });
-  }
-  if ((source === 'all' || source === 'itunes') && category !== 'character') {
-    tasks.push({
-      name: 'iTunes 影视库',
-      promise: searchITunesCN(query, category, mode, signal),
-    });
-  }
-  if (source === 'all' || source === 'tvmaze') {
-    tasks.push({
-      name: 'TVMaze 剧集库',
-      promise: searchTVMaze(query, category, mode, signal),
-    });
-  }
-
-  const settled = await Promise.allSettled(tasks.map((t) => t.promise));
-  const combined: OnlineSearchResult[] = [];
-  const activeSources: string[] = [];
-  const failedSources: string[] = [];
-
-  settled.forEach((outcome, idx) => {
-    const name = tasks[idx].name;
-    if (outcome.status === 'fulfilled') {
-      if (outcome.value.length > 0) {
-        activeSources.push(name);
-        combined.push(...outcome.value);
-      }
-    } else {
-      failedSources.push(name);
-    }
+  // Unified IMDb primary + Douban Chinese info assist search pipeline
+  const bundle = await searchImdbMedia(query, category, {
+    mode,
+    doubanOptions: mode === 'server' ? { transport: 'server', signal } : undefined,
+    enableDoubanAssist: mode === 'server',
+    signal,
   });
-
+  const activeSources: string[] = [];
+  if (bundle.results.length > 0) {
+    activeSources.push(bundle.hasDoubanAssist ? 'IMDb · 豆瓣辅助' : 'IMDb');
+  }
   return {
     query,
     category,
-    results: deduplicateResults(combined).slice(0, 22),
+    results: deduplicateResults(bundle.results).slice(0, 22),
     activeSources,
-    failedSources,
+    failedSources: [],
   };
 }
 

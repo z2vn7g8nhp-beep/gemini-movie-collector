@@ -6,7 +6,6 @@ import type {
   ArchiveItem,
   CollectionStatus,
   OnlineSearchResult,
-  SearchSourceOption,
   ValidationErrors,
 } from '../types/archive';
 import { searchOnline } from '../services/archiveApi';
@@ -37,19 +36,6 @@ const PRESETS: Record<ArchiveCategory, string[]> = {
   character: ['绫波丽', '甄嬛', '小丑', '夏洛克·福尔摩斯', '孙悟空'],
 };
 
-const SOURCE_OPTIONS: Array<{ id: SearchSourceOption; label: string }> = [
-  { id: 'imdb', label: 'IMDb（豆瓣辅助）' },
-  { id: 'all', label: '全网直连聚合（IMDb + 豆瓣优先）' },
-  { id: 'douban', label: '豆瓣影视' },
-  { id: 'bangumi', label: '番组计划 Bangumi' },
-  { id: 'wiki', label: '中文维基百科' },
-  { id: 'itunes', label: 'iTunes 影视库' },
-  { id: 'tvmaze', label: 'TVMaze 剧集库' },
-  { id: 'baike', label: '百度百科' },
-  { id: 'iqiyi', label: '爱奇艺影视库' },
-  { id: 'moegirl', label: '萌娘百科' },
-];
-
 export function OnlineSearchModal({
   open,
   initialTab = 'online',
@@ -64,7 +50,6 @@ export function OnlineSearchModal({
 
   // Online search state
   const [category, setCategory] = useState<ArchiveCategory>(initialCategory);
-  const [source, setSource] = useState<SearchSourceOption>('imdb');
   const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [loading, setLoading] = useState(false);
   const [searchError, setSearchError] = useState('');
@@ -118,8 +103,7 @@ export function OnlineSearchModal({
 
   const executeOnlineSearch = async (
     q: string,
-    cat: ArchiveCategory = category,
-    src: SearchSourceOption = source
+    cat: ArchiveCategory = category
   ) => {
     const trimmed = q.trim();
     if (!trimmed) {
@@ -131,7 +115,7 @@ export function OnlineSearchModal({
     setSearchError('');
     setHasSearched(true);
     try {
-      const data = await searchOnline(trimmed, cat, src);
+      const data = await searchOnline(trimmed, cat, 'imdb');
       if (data.error) {
         setSearchError(data.error);
         setResults([]);
@@ -149,7 +133,7 @@ export function OnlineSearchModal({
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    void executeOnlineSearch(searchQuery, category, source);
+    void executeOnlineSearch(searchQuery, category);
   };
 
   const handleCollect = async (result: OnlineSearchResult) => {
@@ -308,7 +292,7 @@ export function OnlineSearchModal({
         <div className="flex-1 overflow-y-auto px-6 py-6">
           {activeTab === 'online' ? (
             <div>
-              {/* Category + Source controls */}
+              {/* Category controls + fixed data source note */}
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div
                   role="group"
@@ -321,12 +305,7 @@ export function OnlineSearchModal({
                         key={cat}
                         type="button"
                         aria-pressed={category === cat}
-                        onClick={() => {
-                          setCategory(cat);
-                          if (cat === 'character' && source === 'itunes') {
-                            setSource('all');
-                          }
-                        }}
+                        onClick={() => setCategory(cat)}
                         className={`min-h-[34px] rounded px-3.5 py-1 text-xs font-medium whitespace-nowrap cursor-pointer transition-colors ${
                           category === cat
                             ? 'bg-white text-[#1A1816] shadow-xs'
@@ -339,31 +318,9 @@ export function OnlineSearchModal({
                   )}
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <label
-                    htmlFor="online-source-select"
-                    className="text-xs text-[#625C54] whitespace-nowrap"
-                  >
-                    数据源
-                  </label>
-                  <select
-                    id="online-source-select"
-                    value={source}
-                    onChange={(e) =>
-                      setSource(e.target.value as SearchSourceOption)
-                    }
-                    className="h-9 rounded-md border border-[#DCD6CB] bg-white px-3 text-xs text-[#1A1816] focus:border-[#1A1816] focus:outline-none"
-                  >
-                    {SOURCE_OPTIONS.filter(
-                      (opt) =>
-                        !(category === 'character' && opt.id === 'itunes')
-                    ).map((opt) => (
-                      <option key={opt.id} value={opt.id}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <span className="text-xs text-[#625C54] whitespace-nowrap">
+                  IMDb 直连 · 豆瓣辅助
+                </span>
               </div>
 
               {/* Search Input Form */}
@@ -418,7 +375,7 @@ export function OnlineSearchModal({
                     type="button"
                     onClick={() => {
                       setSearchQuery(preset);
-                      void executeOnlineSearch(preset, category, source);
+                      void executeOnlineSearch(preset, category);
                     }}
                     className="underline decoration-[#D2C9BA] underline-offset-4 hover:text-[#B43B2B] hover:decoration-[#B43B2B] cursor-pointer"
                   >
@@ -438,7 +395,7 @@ export function OnlineSearchModal({
                     <button
                       type="button"
                       onClick={() =>
-                        void executeOnlineSearch(searchQuery, category, source)
+                        void executeOnlineSearch(searchQuery, category)
                       }
                       className="font-medium underline underline-offset-2 whitespace-nowrap cursor-pointer"
                     >

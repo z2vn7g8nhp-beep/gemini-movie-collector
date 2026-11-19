@@ -4,17 +4,7 @@ export type CollectionStatus = 'favorite' | 'watched' | 'watching' | 'watchlist'
 
 export type SortOption = 'recent' | 'rating' | 'year' | 'title';
 
-export type SearchSourceOption =
-  | 'all'
-  | 'imdb'
-  | 'douban'
-  | 'baike'
-  | 'iqiyi'
-  | 'moegirl'
-  | 'bangumi'
-  | 'wiki'
-  | 'itunes'
-  | 'tvmaze';
+export type SearchSourceOption = 'imdb';
 
 export interface CharacterProfile {
   alias?: string;
