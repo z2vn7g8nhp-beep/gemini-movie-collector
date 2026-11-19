@@ -1,0 +1,13 @@
+{
+  "updatedAt": "2026-11-19T06:11:31.304Z",
+  "checkInDates": [],
+  "albums": [
+    {
+      "id": "alb-1795064732764-gah9",
+      "name": "漫威专题图鉴",
+      "tag": "漫威",
+      "targetCount": 5,
+      "createdAt": "2026-11-19T05:05:32.764Z"
+    }
+  ]
+}

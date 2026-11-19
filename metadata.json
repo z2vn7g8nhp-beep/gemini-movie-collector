@@ -1,0 +1,6 @@
+{
+  "name": "光影志",
+  "description": "无需梯子、服务器直连联网检索的个人影视、影人与角色收藏档案馆",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
