@@ -10,6 +10,18 @@ import {
   parseZhWikiCharacterInfobox,
 } from '../utils/characterProfile';
 import {
+  parseBaiduBaikeCard,
+  parseBangumiLegacySubjects,
+  parseIqiyiSuggestData,
+  parseMoegirlPages,
+  settleSourcesWithFastWindow,
+  stripBaikeHtml,
+  upgradeToHttpsUrl,
+  type NamedSourceTask,
+  type ParsedBaikeBundle,
+  type ParsedIqiyiBundle,
+} from '../utils/chinaSearchParsers';
+import {
   rankAndFilterCoverCandidates,
   type CoverCandidate,
 } from '../utils/coverPicker';
@@ -48,6 +60,43 @@ export interface CharacterDossierResponse {
 
 let cachedMode: RuntimeMode | null = null;
 let modeProbePromise: Promise<RuntimeMode> | null = null;
+
+// Adaptive per-host slow/blocked tracking so GFW-blocked hosts do not stall
+// repeated searches on Chinese mobile networks.
+const SLOW_HOST_TTL_MS = 5 * 60 * 1000;
+const slowHostUntil = new Map<string, number>();
+
+function getHostKey(url: string): string {
+  try {
+    return new URL(url).hostname.toLowerCase();
+  } catch {
+    return '';
+  }
+}
+
+function getEffectiveTimeout(url: string, defaultMs: number): number {
+  const host = getHostKey(url);
+  if (!host) return defaultMs;
+  const until = slowHostUntil.get(host);
+  if (until && until > Date.now()) {
+    return Math.min(defaultMs, 1800);
+  }
+  return defaultMs;
+}
+
+function markHostSlow(url: string): void {
+  const host = getHostKey(url);
+  if (host) {
+    slowHostUntil.set(host, Date.now() + SLOW_HOST_TTL_MS);
+  }
+}
+
+function markHostHealthy(url: string): void {
+  const host = getHostKey(url);
+  if (host) {
+    slowHostUntil.delete(host);
+  }
+}
 
 function getInitialSignals() {
   const envFlag =
@@ -121,8 +170,9 @@ export async function detectRuntimeMode(): Promise<RuntimeMode> {
 async function fetchJsonWithTimeout<T>(
   url: string,
   init: RequestInit = {},
-  timeoutMs = 7000
+  timeoutMs = 5500
 ): Promise<T | null> {
+  const effectiveTimeout = getEffectiveTimeout(url, timeoutMs);
   const controller = new AbortController();
   const externalSignal = init.signal;
   const onExternalAbort = () => controller.abort();
@@ -130,12 +180,20 @@ async function fetchJsonWithTimeout<T>(
     if (externalSignal.aborted) return null;
     externalSignal.addEventListener('abort', onExternalAbort, { once: true });
   }
-  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  let timedOut = false;
+  const timer = window.setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, effectiveTimeout);
   try {
     const res = await fetch(url, { ...init, signal: controller.signal });
     if (!res.ok) return null;
+    markHostHealthy(url);
     return (await res.json()) as T;
   } catch {
+    if (timedOut || !externalSignal?.aborted) {
+      markHostSlow(url);
+    }
     return null;
   } finally {
     window.clearTimeout(timer);
@@ -145,15 +203,80 @@ async function fetchJsonWithTimeout<T>(
   }
 }
 
+let jsonpSeq = 0;
+
+/**
+ * Safe browser JSONP helper for China-native public APIs (such as Baidu Baike
+ * OpenAPI and Baidu Search Suggest) that work without VPN or CORS headers.
+ */
+function fetchJsonpWithTimeout<T>(
+  rawUrl: string,
+  callbackParam = 'callback',
+  timeoutMs = 5000,
+  signal?: AbortSignal
+): Promise<T | null> {
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    return Promise.resolve(null);
+  }
+  if (signal?.aborted) {
+    return Promise.resolve(null);
+  }
+
+  return new Promise((resolve) => {
+    jsonpSeq += 1;
+    const cbName = `__cineArchiveJsonp_${Date.now()}_${jsonpSeq}`;
+    const win = window as unknown as Record<string, unknown>;
+    const script = document.createElement('script');
+    let settled = false;
+
+    const cleanup = () => {
+      if (timer !== null) {
+        window.clearTimeout(timer);
+      }
+      if (signal) {
+        signal.removeEventListener('abort', onAbort);
+      }
+      try {
+        delete win[cbName];
+      } catch {
+        win[cbName] = undefined;
+      }
+      if (script.parentNode) {
+        script.parentNode.removeChild(script);
+      }
+    };
+
+    const done = (val: T | null) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(val);
+    };
+
+    const onAbort = () => done(null);
+    if (signal) {
+      signal.addEventListener('abort', onAbort, { once: true });
+    }
+
+    const timer = window.setTimeout(() => done(null), timeoutMs);
+
+    win[cbName] = (data: T) => {
+      done(data ?? null);
+    };
+
+    const sep = rawUrl.includes('?') ? '&' : '?';
+    script.src = `${rawUrl}${sep}${encodeURIComponent(callbackParam)}=${encodeURIComponent(cbName)}`;
+    script.async = true;
+    script.referrerPolicy = 'no-referrer';
+    script.onerror = () => done(null);
+    (document.head || document.body || document.documentElement).appendChild(
+      script
+    );
+  });
+}
+
 function cleanText(raw?: string | null, maxLen = 220): string {
-  if (!raw) return '';
-  const stripped = raw
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\r?\n+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  if (stripped.length <= maxLen) return stripped;
-  return `${stripped.slice(0, maxLen).trim()}…`;
+  return stripBaikeHtml(raw, maxLen);
 }
 
 function extractYear(raw?: string | null): string | undefined {
@@ -162,19 +285,135 @@ function extractYear(raw?: string | null): string | undefined {
   return match ? match[1] : undefined;
 }
 
-function toDirectHttps(raw?: string | null): string | undefined {
-  if (!raw || typeof raw !== 'string') return undefined;
-  const trimmed = raw.trim();
-  if (!trimmed) return undefined;
-  const normalized = trimmed.startsWith('//') ? `https:${trimmed}` : trimmed;
-  return /^https?:\/\//i.test(normalized) ? normalized : undefined;
+// ---------- China-Native Zero-VPN Browser Sources ----------
+
+async function fetchBaikeCardBrowser(
+  keyword: string,
+  category: ArchiveCategory,
+  signal?: AbortSignal
+): Promise<ParsedBaikeBundle> {
+  const url = `https://baike.baidu.com/api/openapi/BaikeLemmaCardApi?scope=103&format=json&appid=379020&bk_key=${encodeURIComponent(
+    keyword.trim()
+  )}`;
+  const payload = await fetchJsonpWithTimeout<Record<string, any>>(
+    url,
+    'callback',
+    4500,
+    signal
+  );
+  return parseBaiduBaikeCard(payload, category);
 }
 
-// ---------- Direct Browser CORS Sources (GitHub Pages Static Mode) ----------
+async function fetchBaiduSuggestTerms(
+  query: string,
+  signal?: AbortSignal
+): Promise<string[]> {
+  const url = `https://www.baidu.com/sugrec?prod=pc&wd=${encodeURIComponent(
+    query.trim()
+  )}`;
+  const payload = await fetchJsonpWithTimeout<{
+    g?: Array<{ q?: string }>;
+  }>(url, 'cb', 3000, signal);
+  const rawList = Array.isArray(payload?.g) ? payload.g : [];
+  const cleaned: string[] = [];
+  for (const row of rawList) {
+    const q = typeof row?.q === 'string' ? row.q.trim() : '';
+    if (!q || q.length > 24) continue;
+    // Skip obvious noisy search phrases
+    if (/(在线观看|免费观看|百度网盘|下载|剧情介绍|演员表|豆瓣|预告片|高清|完整版|资源)/.test(q)) {
+      continue;
+    }
+    if (!cleaned.includes(q)) {
+      cleaned.push(q);
+    }
+    if (cleaned.length >= 3) break;
+  }
+  return cleaned;
+}
+
+async function searchBaiduBaikeBrowser(
+  query: string,
+  category: ArchiveCategory,
+  signal?: AbortSignal
+): Promise<OnlineSearchResult[]> {
+  const direct = await fetchBaikeCardBrowser(query, category, signal);
+  const out: OnlineSearchResult[] = [];
+  if (direct.searchResult) {
+    out.push(direct.searchResult);
+  }
+
+  // If the exact lemma missed (e.g. partial query like "漫长的" or "复仇者"),
+  // use Baidu Search Suggest JSONP to resolve the top 2 exact entity names.
+  if (out.length === 0) {
+    const suggestions = await fetchBaiduSuggestTerms(query, signal);
+    const candidates = suggestions
+      .filter((term) => term !== query.trim())
+      .slice(0, 2);
+    if (candidates.length > 0) {
+      const resolved = await Promise.all(
+        candidates.map((term) => fetchBaikeCardBrowser(term, category, signal))
+      );
+      for (const bundle of resolved) {
+        if (bundle.searchResult) {
+          out.push(bundle.searchResult);
+        }
+      }
+    }
+  }
+
+  return out;
+}
+
+async function fetchIqiyiSuggestBrowser(
+  query: string,
+  category: ArchiveCategory,
+  signal?: AbortSignal
+): Promise<ParsedIqiyiBundle> {
+  const url = `https://suggest.video.iqiyi.com/?key=${encodeURIComponent(
+    query.trim()
+  )}&rltnum=10`;
+  const payload = await fetchJsonWithTimeout<Record<string, any>>(
+    url,
+    { signal },
+    4500
+  );
+  return parseIqiyiSuggestData(payload, category);
+}
+
+async function searchIqiyiBrowser(
+  query: string,
+  category: ArchiveCategory,
+  signal?: AbortSignal
+): Promise<OnlineSearchResult[]> {
+  if (category === 'character') return [];
+  const bundle = await fetchIqiyiSuggestBrowser(query, category, signal);
+  return bundle.searchResults;
+}
+
+async function searchMoegirlBrowser(
+  query: string,
+  category: ArchiveCategory,
+  signal?: AbortSignal
+): Promise<OnlineSearchResult[]> {
+  const url =
+    `https://zh.moegirl.org.cn/api.php?action=query&format=json&origin=*` +
+    `&generator=search&gsrsearch=${encodeURIComponent(query.trim())}&gsrlimit=6` +
+    `&prop=pageimages|extracts|info&inprop=url` +
+    `&piprop=thumbnail&pithumbsize=480&exintro=1&explaintext=1&exsentences=2`;
+  const payload = await fetchJsonWithTimeout<Record<string, any>>(
+    url,
+    { signal },
+    4800
+  );
+  return parseMoegirlPages(payload, category, query);
+}
+
+// ---------- Global / Overseas CORS Sources ----------
 
 async function searchBangumiBrowser(
   query: string,
-  category: ArchiveCategory
+  category: ArchiveCategory,
+  signal?: AbortSignal
 ): Promise<OnlineSearchResult[]> {
   const headers = {
     'Content-Type': 'application/json',
@@ -182,15 +421,28 @@ async function searchBangumiBrowser(
   };
 
   if (category === 'film') {
-    const json = await fetchJsonWithTimeout<{ data?: Array<Record<string, any>> }>(
-      'https://api.bgm.tv/v0/search/subjects?limit=8&offset=0',
-      {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ keyword: query, filter: { type: [6, 2] } }),
-      }
-    );
-    return (json?.data || []).map((item) => {
+    // Run simple GET (no CORS preflight!) alongside v0 POST for mobile reliability
+    const [v0Json, legacyJson] = await Promise.all([
+      fetchJsonWithTimeout<{ data?: Array<Record<string, any>> }>(
+        'https://api.bgm.tv/v0/search/subjects?limit=8&offset=0',
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ keyword: query, filter: { type: [6, 2] } }),
+          signal,
+        },
+        4800
+      ),
+      fetchJsonWithTimeout<Record<string, any>>(
+        `https://api.bgm.tv/search/subject/${encodeURIComponent(
+          query
+        )}?responseGroup=large&max_results=8`,
+        { signal },
+        4800
+      ),
+    ]);
+
+    const v0Results: OnlineSearchResult[] = (v0Json?.data || []).map((item) => {
       const title = String(item.name_cn || item.name || '').trim();
       const originalTitle =
         item.name && item.name !== title ? String(item.name) : undefined;
@@ -216,13 +468,16 @@ async function searchBangumiBrowser(
           ? `${typeLabel} · Bangumi ${Number(item.score).toFixed(1)}`
           : typeLabel,
         year: extractYear(item.date),
-        coverUrl: toDirectHttps(img),
+        coverUrl: upgradeToHttpsUrl(img),
         summary: cleanText(item.summary || `${title}（${typeLabel}作品）`),
         sourceName: '番组计划 Bangumi',
         sourceUrl: `https://bgm.tv/subject/${item.id}`,
         tags,
       };
     });
+
+    if (v0Results.length > 0) return v0Results;
+    return parseBangumiLegacySubjects(legacyJson);
   }
 
   if (category === 'person') {
@@ -232,7 +487,9 @@ async function searchBangumiBrowser(
         method: 'POST',
         headers,
         body: JSON.stringify({ keyword: query }),
-      }
+        signal,
+      },
+      4800
     );
     const careerMap: Record<string, string> = {
       actor: '演员 / 声优',
@@ -265,7 +522,7 @@ async function searchBangumiBrowser(
         originalTitle,
         subtitle: careers.length > 0 ? careers.join(' · ') : '影视人物',
         year: extractYear(item.birth_year ? String(item.birth_year) : undefined),
-        coverUrl: toDirectHttps(img),
+        coverUrl: upgradeToHttpsUrl(img),
         summary: cleanText(
           item.short_summary || item.summary || `${title} 人物档案`
         ),
@@ -282,7 +539,9 @@ async function searchBangumiBrowser(
       method: 'POST',
       headers,
       body: JSON.stringify({ keyword: query }),
-    }
+      signal,
+    },
+    4800
   );
   return (json?.data || []).map((item) => {
     const infoboxCn = Array.isArray(item.infobox)
@@ -302,7 +561,7 @@ async function searchBangumiBrowser(
       title,
       originalTitle,
       subtitle: item.gender ? `角色 · ${item.gender}` : '虚构角色',
-      coverUrl: toDirectHttps(img),
+      coverUrl: upgradeToHttpsUrl(img),
       summary: cleanText(item.summary || `${title} 角色档案`),
       sourceName: '番组计划 Bangumi',
       sourceUrl: `https://bgm.tv/character/${item.id}`,
@@ -313,7 +572,8 @@ async function searchBangumiBrowser(
 
 async function searchZhWikiBrowser(
   query: string,
-  category: ArchiveCategory
+  category: ArchiveCategory,
+  signal?: AbortSignal
 ): Promise<OnlineSearchResult[]> {
   const hint =
     category === 'film'
@@ -330,7 +590,7 @@ async function searchZhWikiBrowser(
 
   const data = await fetchJsonWithTimeout<{
     query?: { pages?: Record<string, Record<string, any>> };
-  }>(url);
+  }>(url, { signal }, 4500);
   const pages = Object.values(data?.query?.pages || {});
   pages.sort((a, b) => (a.index || 99) - (b.index || 99));
 
@@ -352,7 +612,7 @@ async function searchZhWikiBrowser(
           50
         ),
         year: extractYear(summary),
-        coverUrl: toDirectHttps(page.thumbnail?.source),
+        coverUrl: upgradeToHttpsUrl(page.thumbnail?.source),
         summary: summary || `${page.title}（中文维基百科词条）`,
         sourceName: '中文维基百科',
         sourceUrl:
@@ -365,14 +625,79 @@ async function searchZhWikiBrowser(
     });
 }
 
+async function searchITunesBrowser(
+  query: string,
+  category: ArchiveCategory,
+  signal?: AbortSignal
+): Promise<OnlineSearchResult[]> {
+  if (category === 'character') return [];
+  const entity = category === 'film' ? 'movie' : 'movieArtist';
+  // Apple iTunes Search supports Access-Control-Allow-Origin: * directly.
+  // Use US/HK storefronts because CN storefront closed its movie catalog.
+  const url = `https://itunes.apple.com/search?term=${encodeURIComponent(
+    query
+  )}&country=us&lang=zh_cn&media=movie&entity=${entity}&limit=6`;
+
+  const data = await fetchJsonWithTimeout<{
+    results?: Array<Record<string, any>>;
+  }>(url, { signal }, 4500);
+  const results = data?.results || [];
+
+  if (category === 'person') {
+    return results
+      .filter((r) => r.artistName)
+      .map((r) => ({
+        externalId: `itunes-artist-${r.artistId || r.artistName}`,
+        category: 'person',
+        title: String(r.artistName),
+        subtitle: r.primaryGenreName
+          ? `影人 · ${r.primaryGenreName}`
+          : '影视创作者',
+        summary: `${r.artistName} — 收录自 iTunes 影视资料库。`,
+        sourceName: 'iTunes 影视库',
+        sourceUrl: upgradeToHttpsUrl(r.artistLinkUrl),
+        tags: r.primaryGenreName ? [String(r.primaryGenreName)] : ['影人'],
+      }));
+  }
+
+  return results
+    .filter((r) => r.trackName)
+    .map((r) => {
+      const highResPoster =
+        typeof r.artworkUrl100 === 'string'
+          ? r.artworkUrl100.replace('100x100bb', '600x900bb')
+          : undefined;
+      return {
+        externalId: `itunes-movie-${r.trackId}`,
+        category: 'film',
+        title: String(r.trackName),
+        subtitle: [r.artistName, r.primaryGenreName].filter(Boolean).join(' · '),
+        year: extractYear(r.releaseDate),
+        region: r.country === 'CHN' ? '中国' : r.country,
+        coverUrl: upgradeToHttpsUrl(highResPoster),
+        summary: cleanText(
+          r.longDescription || r.shortDescription || `${r.trackName}`
+        ),
+        sourceName: 'iTunes 影视库',
+        sourceUrl: upgradeToHttpsUrl(r.trackViewUrl),
+        tags: r.primaryGenreName ? [String(r.primaryGenreName)] : ['电影'],
+      };
+    });
+}
+
 async function searchTVMazeBrowser(
   query: string,
-  category: ArchiveCategory
+  category: ArchiveCategory,
+  signal?: AbortSignal
 ): Promise<OnlineSearchResult[]> {
   if (category === 'person') {
     const data = await fetchJsonWithTimeout<
       Array<{ person?: Record<string, any> }>
-    >(`https://api.tvmaze.com/search/people?q=${encodeURIComponent(query)}`);
+    >(
+      `https://api.tvmaze.com/search/people?q=${encodeURIComponent(query)}`,
+      { signal },
+      4500
+    );
     return (data || []).slice(0, 6).flatMap((entry) => {
       const p = entry.person;
       if (!p?.name) return [];
@@ -384,14 +709,14 @@ async function searchTVMazeBrowser(
           subtitle: p.country?.name ? `演员 · ${p.country.name}` : '剧集演员',
           year: extractYear(p.birthday),
           region: p.country?.name,
-          coverUrl: toDirectHttps(p.image?.original || p.image?.medium),
+          coverUrl: upgradeToHttpsUrl(p.image?.original || p.image?.medium),
           summary: cleanText(
             `${p.name}${p.country?.name ? `，来自 ${p.country.name}` : ''}${
               p.birthday ? `，生于 ${p.birthday}` : ''
             }。`
           ),
           sourceName: 'TVMaze 剧集库',
-          sourceUrl: p.url,
+          sourceUrl: upgradeToHttpsUrl(p.url),
           tags: ['剧集演员'],
         },
       ];
@@ -400,7 +725,11 @@ async function searchTVMazeBrowser(
 
   const data = await fetchJsonWithTimeout<
     Array<{ show?: Record<string, any> }>
-  >(`https://api.tvmaze.com/search/shows?q=${encodeURIComponent(query)}`);
+  >(
+    `https://api.tvmaze.com/search/shows?q=${encodeURIComponent(query)}`,
+    { signal },
+    4500
+  );
   if (!data || data.length === 0) return [];
 
   if (category === 'character') {
@@ -408,7 +737,11 @@ async function searchTVMazeBrowser(
     if (!topShow?.id) return [];
     const cast = await fetchJsonWithTimeout<
       Array<{ person?: Record<string, any>; character?: Record<string, any> }>
-    >(`https://api.tvmaze.com/shows/${topShow.id}/cast`);
+    >(
+      `https://api.tvmaze.com/shows/${topShow.id}/cast`,
+      { signal },
+      4500
+    );
     return (cast || []).slice(0, 6).flatMap((entry) => {
       const ch = entry.character;
       const actor = entry.person;
@@ -420,7 +753,7 @@ async function searchTVMazeBrowser(
           title: String(ch.name),
           subtitle: `出自《${topShow.name}》${actor?.name ? ` · 饰演者 ${actor.name}` : ''}`,
           year: extractYear(topShow.premiered),
-          coverUrl: toDirectHttps(
+          coverUrl: upgradeToHttpsUrl(
             ch.image?.original || ch.image?.medium || actor?.image?.medium
           ),
           summary: cleanText(
@@ -429,7 +762,7 @@ async function searchTVMazeBrowser(
           relatedWorkTitle: String(topShow.name),
           portrayedBy: actor?.name ? String(actor.name) : undefined,
           sourceName: 'TVMaze 剧集库',
-          sourceUrl: ch.url || topShow.url,
+          sourceUrl: upgradeToHttpsUrl(ch.url || topShow.url),
           tags: ['剧集角色'],
         },
       ];
@@ -448,10 +781,10 @@ async function searchTVMazeBrowser(
         subtitle: genres.length > 0 ? `剧集 · ${genres.join(' / ')}` : '剧集',
         year: extractYear(s.premiered),
         region: s.network?.country?.name || s.webChannel?.country?.name,
-        coverUrl: toDirectHttps(s.image?.original || s.image?.medium),
+        coverUrl: upgradeToHttpsUrl(s.image?.original || s.image?.medium),
         summary: cleanText(s.summary || `${s.name} 剧集资料`),
         sourceName: 'TVMaze 剧集库',
-        sourceUrl: s.url,
+        sourceUrl: upgradeToHttpsUrl(s.url),
         tags: genres.length > 0 ? genres : ['剧集'],
       },
     ];
@@ -474,8 +807,11 @@ function deduplicateSearchResults(
 }
 
 /**
- * Dual-mode online search: uses Express `/api/search` when backend is live,
- * or directly queries CORS-enabled public APIs from the browser on GitHub Pages.
+ * Dual-mode online search:
+ * - `'server'` mode: queries Express `/api/search` (or China-native browser fallback for `baike`/`iqiyi`/`moegirl`)
+ * - `'static'` mode (GitHub Pages / mobile PWA): queries China-accessible zero-VPN APIs
+ *   (Baidu Baike JSONP, iQIYI CORS, Moegirl CORS) alongside Bangumi, zh.Wikipedia, iTunes,
+ *   and TVMaze with fast-window settlement so blocked overseas hosts never stall mobile search.
  */
 export async function searchOnline(
   query: string,
@@ -493,7 +829,12 @@ export async function searchOnline(
   }
 
   const mode = await detectRuntimeMode();
-  if (mode === 'server') {
+  if (
+    mode === 'server' &&
+    source !== 'baike' &&
+    source !== 'iqiyi' &&
+    source !== 'moegirl'
+  ) {
     try {
       const res = await fetch(
         `/api/search?q=${encodeURIComponent(trimmed)}&category=${encodeURIComponent(
@@ -520,8 +861,26 @@ export async function searchOnline(
     }
   }
 
-  const tasks: Array<{ name: string; promise: Promise<OnlineSearchResult[]> }> =
-    [];
+  const tasks: Array<NamedSourceTask<OnlineSearchResult>> = [];
+
+  if ((source === 'all' || source === 'iqiyi') && category !== 'character') {
+    tasks.push({
+      name: '爱奇艺影视库',
+      promise: searchIqiyiBrowser(trimmed, category),
+    });
+  }
+  if (source === 'all' || source === 'baike') {
+    tasks.push({
+      name: '百度百科',
+      promise: searchBaiduBaikeBrowser(trimmed, category),
+    });
+  }
+  if (source === 'all' || source === 'moegirl') {
+    tasks.push({
+      name: '萌娘百科',
+      promise: searchMoegirlBrowser(trimmed, category),
+    });
+  }
   if (source === 'all' || source === 'bangumi') {
     tasks.push({
       name: '番组计划 Bangumi',
@@ -534,28 +893,28 @@ export async function searchOnline(
       promise: searchZhWikiBrowser(trimmed, category),
     });
   }
-  if (source === 'all' || source === 'tvmaze' || source === 'itunes') {
+  if ((source === 'all' || source === 'itunes') && category !== 'character') {
+    tasks.push({
+      name: 'iTunes 影视库',
+      promise: searchITunesBrowser(trimmed, category),
+    });
+  }
+  if (source === 'all' || source === 'tvmaze') {
     tasks.push({
       name: 'TVMaze 剧集库',
       promise: searchTVMazeBrowser(trimmed, category),
     });
   }
 
-  const settled = await Promise.allSettled(tasks.map((t) => t.promise));
-  const combined: OnlineSearchResult[] = [];
-  const activeSources: string[] = [];
-
-  settled.forEach((outcome, idx) => {
-    if (outcome.status === 'fulfilled' && outcome.value.length > 0) {
-      activeSources.push(tasks[idx].name);
-      combined.push(...outcome.value);
-    }
-  });
+  const { items, activeSources } = await settleSourcesWithFastWindow(
+    tasks,
+    source === 'all' ? 1600 : 4500
+  );
 
   return {
-    results: deduplicateSearchResults(combined).slice(0, 18),
+    results: deduplicateSearchResults(items).slice(0, 20),
     activeSources,
-    mode: 'static',
+    mode,
   };
 }
 
@@ -570,7 +929,7 @@ async function searchCommonsCoversBrowser(
     `&prop=imageinfo&iiprop=url|size|mime&iiurlwidth=640&format=json&origin=*`;
   const data = await fetchJsonWithTimeout<{
     query?: { pages?: Record<string, any> };
-  }>(url);
+  }>(url, {}, 4500);
   const pages = Object.values(data?.query?.pages || {});
   const out: CoverCandidate[] = [];
   for (const page of pages) {
@@ -581,7 +940,7 @@ async function searchCommonsCoversBrowser(
       continue;
     }
     if ((info.width || 0) < 200 || (info.height || 0) < 200) continue;
-    const src = toDirectHttps(info.thumburl || info.url);
+    const src = upgradeToHttpsUrl(info.thumburl || info.url);
     if (!src || !isAcceptablePhoto(src)) continue;
     const cleanTitle = String(page.title || '')
       .replace(/^File:/i, '')
@@ -607,11 +966,11 @@ async function searchEnWikiCoversBrowser(
     `&prop=pageimages&piprop=thumbnail&pithumbsize=640&format=json&origin=*`;
   const data = await fetchJsonWithTimeout<{
     query?: { pages?: Record<string, any> };
-  }>(url);
+  }>(url, {}, 4500);
   const pages = Object.values(data?.query?.pages || {});
   const out: CoverCandidate[] = [];
   for (const page of pages) {
-    const src = toDirectHttps(page.thumbnail?.source);
+    const src = upgradeToHttpsUrl(page.thumbnail?.source);
     if (!src || !isAcceptablePhoto(src)) continue;
     out.push({
       id: `enwiki-${out.length}-${page.title || 'img'}`,
@@ -649,46 +1008,96 @@ export async function searchCovers(
   }
 
   const globalQuery = (originalTitle || '').trim() || trimmed;
-  const tasks: Array<Promise<CoverCandidate[]>> = [
-    searchCommonsCoversBrowser(globalQuery),
-    searchEnWikiCoversBrowser(globalQuery),
-    searchBangumiBrowser(trimmed, category).then((items) =>
-      items
-        .filter((it) => Boolean(it.coverUrl))
-        .map((it, idx) => ({
-          id: `bgm-${idx}-${it.title}`,
-          url: it.coverUrl!,
-          source: '番组计划',
-          caption: it.title,
-        }))
-    ),
-    searchZhWikiBrowser(trimmed, category).then((items) =>
-      items
-        .filter((it) => Boolean(it.coverUrl))
-        .map((it, idx) => ({
-          id: `zhwiki-${idx}-${it.title}`,
-          url: it.coverUrl!,
-          source: '中文维基',
-          caption: it.title,
-        }))
-    ),
-    searchTVMazeBrowser(trimmed, category).then((items) =>
-      items
-        .filter((it) => Boolean(it.coverUrl))
-        .map((it, idx) => ({
-          id: `tvmaze-${idx}-${it.title}`,
-          url: it.coverUrl!,
-          source: 'TVMaze 图库',
-          caption: it.title,
-        }))
-    ),
+  const tasks: Array<NamedSourceTask<CoverCandidate>> = [
+    {
+      name: '百度百科',
+      promise: searchBaiduBaikeBrowser(trimmed, category).then((items) =>
+        items
+          .filter((it) => Boolean(it.coverUrl))
+          .map((it, idx) => ({
+            id: `baike-${idx}-${it.title}`,
+            url: it.coverUrl!,
+            source: '百度百科',
+            caption: it.title,
+          }))
+      ),
+    },
+    {
+      name: '爱奇艺影视库',
+      promise: searchIqiyiBrowser(trimmed, category).then((items) =>
+        items
+          .filter((it) => Boolean(it.coverUrl))
+          .map((it, idx) => ({
+            id: `iqiyi-${idx}-${it.title}`,
+            url: it.coverUrl!,
+            source: '爱奇艺图库',
+            caption: it.title,
+          }))
+      ),
+    },
+    {
+      name: '萌娘百科',
+      promise: searchMoegirlBrowser(trimmed, category).then((items) =>
+        items
+          .filter((it) => Boolean(it.coverUrl))
+          .map((it, idx) => ({
+            id: `moegirl-${idx}-${it.title}`,
+            url: it.coverUrl!,
+            source: '萌娘百科',
+            caption: it.title,
+          }))
+      ),
+    },
+    {
+      name: '番组计划',
+      promise: searchBangumiBrowser(trimmed, category).then((items) =>
+        items
+          .filter((it) => Boolean(it.coverUrl))
+          .map((it, idx) => ({
+            id: `bgm-${idx}-${it.title}`,
+            url: it.coverUrl!,
+            source: '番组计划',
+            caption: it.title,
+          }))
+      ),
+    },
+    {
+      name: '维基媒体',
+      promise: searchCommonsCoversBrowser(globalQuery),
+    },
+    {
+      name: '英文维基',
+      promise: searchEnWikiCoversBrowser(globalQuery),
+    },
+    {
+      name: '中文维基',
+      promise: searchZhWikiBrowser(trimmed, category).then((items) =>
+        items
+          .filter((it) => Boolean(it.coverUrl))
+          .map((it, idx) => ({
+            id: `zhwiki-${idx}-${it.title}`,
+            url: it.coverUrl!,
+            source: '中文维基',
+            caption: it.title,
+          }))
+      ),
+    },
+    {
+      name: 'TVMaze 图库',
+      promise: searchTVMazeBrowser(trimmed, category).then((items) =>
+        items
+          .filter((it) => Boolean(it.coverUrl))
+          .map((it, idx) => ({
+            id: `tvmaze-${idx}-${it.title}`,
+            url: it.coverUrl!,
+            source: 'TVMaze 图库',
+            caption: it.title,
+          }))
+      ),
+    },
   ];
 
-  const settled = await Promise.allSettled(tasks);
-  const raw: CoverCandidate[] = [];
-  for (const outcome of settled) {
-    if (outcome.status === 'fulfilled') raw.push(...outcome.value);
-  }
+  const { items: raw } = await settleSourcesWithFastWindow(tasks, 1800);
   return rankAndFilterCoverCandidates(
     raw,
     trimmed,
@@ -728,226 +1137,293 @@ export async function fetchOnlineRelations(
     }
   }
 
-  // Browser-direct static discovery (Bangumi + Chinese Wikipedia CORS APIs)
+  // Browser-direct static discovery: China-native (Baidu Baike + iQIYI) + Global (Bangumi + zh.Wikipedia)
   const films: OnlineSearchResult[] = [];
   const people: OnlineSearchResult[] = [];
   const characters: OnlineSearchResult[] = [];
   const sources: string[] = [];
+
+  const pushUnique = (
+    target: OnlineSearchResult[],
+    incoming: OnlineSearchResult[]
+  ) => {
+    const seen = new Set(target.map((x) => normalizeEntityKey(x.title)));
+    for (const item of incoming) {
+      const k = normalizeEntityKey(item.title);
+      if (!k || seen.has(k)) continue;
+      seen.add(k);
+      target.push(item);
+    }
+  };
 
   const bgmMatch = params.sourceUrl
     ? /bgm\.tv\/(subject|person)\/(\d+)/.exec(params.sourceUrl)
     : null;
 
   if (params.category === 'film') {
-    // 1. Try Bangumi subject persons/characters if ID resolvable
-    let subjectId = bgmMatch?.[1] === 'subject' ? Number(bgmMatch[2]) : null;
-    if (!subjectId) {
-      const searchRes = await fetchJsonWithTimeout<{
-        data?: Array<{ id: number; name?: string; name_cn?: string }>;
-      }>(
-        'https://api.bgm.tv/v0/search/subjects?limit=3',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body: JSON.stringify({ keyword: params.title, filter: { type: [6, 2] } }),
-          signal,
-        },
-        5500
-      );
-      const exact = searchRes?.data?.find(
-        (d) =>
-          String(d.name_cn || '').trim() === params.title ||
-          String(d.name || '').trim() === params.title
-      );
-      subjectId = (exact || searchRes?.data?.[0])?.id ?? null;
-    }
-
-    if (subjectId) {
-      const [bgmPersons, bgmChars] = await Promise.all([
-        fetchJsonWithTimeout<Array<Record<string, any>>>(
-          `https://api.bgm.tv/v0/subjects/${subjectId}/persons`,
+    const [baikeOutcome, iqiyiOutcome, wikiOutcome, bgmOutcome] =
+      await Promise.allSettled([
+        fetchBaikeCardBrowser(params.title, 'film', signal),
+        fetchIqiyiSuggestBrowser(params.title, 'film', signal),
+        fetchJsonWithTimeout<{ parse?: { text?: { '*'?: string } } }>(
+          `https://zh.wikipedia.org/w/api.php?action=parse&format=json&origin=*&redirects=1&prop=text&page=${encodeURIComponent(
+            params.title
+          )}`,
           { signal },
-          5500
+          4500
         ),
-        fetchJsonWithTimeout<Array<Record<string, any>>>(
-          `https://api.bgm.tv/v0/subjects/${subjectId}/characters`,
-          { signal },
-          5500
-        ),
-      ]);
-      if (bgmPersons?.length) {
-        sources.push('番组计划 Bangumi');
-        const seen = new Set<string>();
-        for (const p of bgmPersons) {
-          if (p.type && p.type !== 1) continue;
-          const name = String(p.name || '').trim();
-          if (!name || seen.has(name)) continue;
-          seen.add(name);
-          const rel = String(p.relation || '演职员');
-          people.push({
-            externalId: `bgm-person-${p.id}`,
-            category: 'person',
-            title: name,
-            subtitle: rel,
-            coverUrl: toDirectHttps(p.images?.large || p.images?.medium),
-            summary: `在《${params.title}》中担任${rel}。`,
-            relatedWorkTitle: params.title,
-            sourceName: '番组计划 Bangumi',
-            sourceUrl: `https://bgm.tv/person/${p.id}`,
-            tags: [rel],
-          });
-          if (people.length >= 20) break;
-        }
-      }
-      if (bgmChars?.length) {
-        if (!sources.includes('番组计划 Bangumi')) sources.push('番组计划 Bangumi');
-        for (const c of bgmChars.slice(0, 24)) {
-          const name = String(c.name || '').trim();
-          if (!name) continue;
-          const actorName = Array.isArray(c.actors)
-            ? String(c.actors[0]?.name || '').trim() || undefined
-            : undefined;
-          const rel = String(c.relation || '角色');
-          characters.push({
-            externalId: `bgm-char-${c.id}`,
-            category: 'character',
-            title: name,
-            subtitle: actorName ? `${rel} · ${actorName}` : rel,
-            coverUrl: toDirectHttps(c.images?.large || c.images?.medium),
-            summary: `《${params.title}》中的${rel}${actorName ? `，由 ${actorName} 饰演/配音` : ''}。`,
-            relatedWorkTitle: params.title,
-            portrayedBy: actorName,
-            sourceName: '番组计划 Bangumi',
-            sourceUrl: `https://bgm.tv/character/${c.id}`,
-            tags: [rel],
-          });
-        }
-      }
-    }
-
-    // 2. Chinese Wikipedia cast section parser (CORS native with origin=*)
-    const wikiParse = await fetchJsonWithTimeout<{
-      parse?: { text?: { '*'?: string } };
-    }>(
-      `https://zh.wikipedia.org/w/api.php?action=parse&format=json&origin=*&redirects=1&prop=text&page=${encodeURIComponent(
-        params.title
-      )}`,
-      { signal },
-      6500
-    );
-    const html = wikiParse?.parse?.text?.['*'];
-    if (html) {
-      const parsedCast = parseZhWikiCastHtml(html);
-      if (parsedCast.length > 0) {
-        sources.push('中文维基百科');
-        const seenPeople = new Set(people.map((p) => normalizeEntityKey(p.title)));
-        const seenChars = new Set(characters.map((c) => normalizeEntityKey(c.title)));
-        for (const entry of parsedCast.slice(0, 30)) {
-          if (entry.actorName && !seenPeople.has(normalizeEntityKey(entry.actorName))) {
-            seenPeople.add(normalizeEntityKey(entry.actorName));
-            people.push({
-              externalId: `zhwiki-actor-${entry.actorName}`,
+        (async () => {
+          let subjectId =
+            bgmMatch?.[1] === 'subject' ? Number(bgmMatch[2]) : null;
+          if (!subjectId) {
+            const searchRes = await fetchJsonWithTimeout<{
+              data?: Array<{ id: number; name?: string; name_cn?: string }>;
+            }>(
+              'https://api.bgm.tv/v0/search/subjects?limit=3',
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Accept: 'application/json',
+                },
+                body: JSON.stringify({
+                  keyword: params.title,
+                  filter: { type: [6, 2] },
+                }),
+                signal,
+              },
+              4500
+            );
+            const exact = searchRes?.data?.find(
+              (d) =>
+                String(d.name_cn || '').trim() === params.title ||
+                String(d.name || '').trim() === params.title
+            );
+            subjectId = (exact || searchRes?.data?.[0])?.id ?? null;
+          }
+          if (!subjectId) return { people: [], characters: [] };
+          const [bgmPersons, bgmChars] = await Promise.all([
+            fetchJsonWithTimeout<Array<Record<string, any>>>(
+              `https://api.bgm.tv/v0/subjects/${subjectId}/persons`,
+              { signal },
+              4500
+            ),
+            fetchJsonWithTimeout<Array<Record<string, any>>>(
+              `https://api.bgm.tv/v0/subjects/${subjectId}/characters`,
+              { signal },
+              4500
+            ),
+          ]);
+          const bgmPeople: OnlineSearchResult[] = [];
+          const seen = new Set<string>();
+          for (const p of bgmPersons || []) {
+            if (p.type && p.type !== 1) continue;
+            const name = String(p.name || '').trim();
+            if (!name || seen.has(name)) continue;
+            seen.add(name);
+            const rel = String(p.relation || '演职员');
+            bgmPeople.push({
+              externalId: `bgm-person-${p.id}`,
               category: 'person',
-              title: entry.actorName,
-              subtitle: entry.characterName ? `饰演 ${entry.characterName}` : '演员',
-              summary: `在《${params.title}》中饰演${entry.characterName || '角色'}。`,
+              title: name,
+              subtitle: rel,
+              coverUrl: upgradeToHttpsUrl(p.images?.large || p.images?.medium),
+              summary: `在《${params.title}》中担任${rel}。`,
               relatedWorkTitle: params.title,
-              sourceName: '中文维基百科',
-              sourceUrl: entry.actorWikiTitle
-                ? `https://zh.wikipedia.org/wiki/${encodeURIComponent(entry.actorWikiTitle)}`
-                : undefined,
-              tags: ['演员'],
+              sourceName: '番组计划 Bangumi',
+              sourceUrl: `https://bgm.tv/person/${p.id}`,
+              tags: [rel],
             });
+            if (bgmPeople.length >= 20) break;
           }
-          if (entry.characterName && !seenChars.has(normalizeEntityKey(entry.characterName))) {
-            seenChars.add(normalizeEntityKey(entry.characterName));
-            characters.push({
-              externalId: `zhwiki-char-${entry.characterName}`,
+          const bgmCharacters: OnlineSearchResult[] = [];
+          for (const c of (bgmChars || []).slice(0, 24)) {
+            const name = String(c.name || '').trim();
+            if (!name) continue;
+            const actorName = Array.isArray(c.actors)
+              ? String(c.actors[0]?.name || '').trim() || undefined
+              : undefined;
+            const rel = String(c.relation || '角色');
+            bgmCharacters.push({
+              externalId: `bgm-char-${c.id}`,
               category: 'character',
-              title: entry.characterName,
-              subtitle: entry.actorName ? `角色 · ${entry.actorName}` : '影视角色',
-              summary: `《${params.title}》中的角色${entry.actorName ? `，由 ${entry.actorName} 饰演` : ''}。`,
+              title: name,
+              subtitle: actorName ? `${rel} · ${actorName}` : rel,
+              coverUrl: upgradeToHttpsUrl(c.images?.large || c.images?.medium),
+              summary: `《${params.title}》中的${rel}${actorName ? `，由 ${actorName} 饰演/配音` : ''}。`,
               relatedWorkTitle: params.title,
-              portrayedBy: entry.actorName || undefined,
-              sourceName: '中文维基百科',
-              sourceUrl: entry.characterWikiTitle
-                ? `https://zh.wikipedia.org/wiki/${encodeURIComponent(entry.characterWikiTitle)}`
-                : undefined,
-              tags: ['角色'],
+              portrayedBy: actorName,
+              sourceName: '番组计划 Bangumi',
+              sourceUrl: `https://bgm.tv/character/${c.id}`,
+              tags: [rel],
             });
           }
+          return { people: bgmPeople, characters: bgmCharacters };
+        })(),
+      ]);
+
+    if (bgmOutcome.status === 'fulfilled') {
+      if (bgmOutcome.value.people.length > 0 || bgmOutcome.value.characters.length > 0) {
+        sources.push('番组计划 Bangumi');
+        pushUnique(people, bgmOutcome.value.people);
+        pushUnique(characters, bgmOutcome.value.characters);
+      }
+    }
+
+    if (wikiOutcome.status === 'fulfilled') {
+      const html = wikiOutcome.value?.parse?.text?.['*'];
+      if (html) {
+        const parsedCast = parseZhWikiCastHtml(html);
+        if (parsedCast.length > 0) {
+          sources.push('中文维基百科');
+          pushUnique(
+            people,
+            parsedCast.slice(0, 30).flatMap((entry) =>
+              entry.actorName
+                ? [
+                    {
+                      externalId: `zhwiki-actor-${entry.actorName}`,
+                      category: 'person' as const,
+                      title: entry.actorName,
+                      subtitle: entry.characterName
+                        ? `饰演 ${entry.characterName}`
+                        : '演员',
+                      summary: `在《${params.title}》中饰演${entry.characterName || '角色'}。`,
+                      relatedWorkTitle: params.title,
+                      sourceName: '中文维基百科',
+                      sourceUrl: entry.actorWikiTitle
+                        ? `https://zh.wikipedia.org/wiki/${encodeURIComponent(entry.actorWikiTitle)}`
+                        : undefined,
+                      tags: ['演员'],
+                    },
+                  ]
+                : []
+            )
+          );
+          pushUnique(
+            characters,
+            parsedCast.slice(0, 30).flatMap((entry) =>
+              entry.characterName
+                ? [
+                    {
+                      externalId: `zhwiki-char-${entry.characterName}`,
+                      category: 'character' as const,
+                      title: entry.characterName,
+                      subtitle: entry.actorName
+                        ? `角色 · ${entry.actorName}`
+                        : '影视角色',
+                      summary: `《${params.title}》中的角色${entry.actorName ? `，由 ${entry.actorName} 饰演` : ''}。`,
+                      relatedWorkTitle: params.title,
+                      portrayedBy: entry.actorName || undefined,
+                      sourceName: '中文维基百科',
+                      sourceUrl: entry.characterWikiTitle
+                        ? `https://zh.wikipedia.org/wiki/${encodeURIComponent(entry.characterWikiTitle)}`
+                        : undefined,
+                      tags: ['角色'],
+                    },
+                  ]
+                : []
+            )
+          );
         }
       }
+    }
+
+    if (baikeOutcome.status === 'fulfilled' && baikeOutcome.value.relatedPeople.length > 0) {
+      sources.push('百度百科');
+      pushUnique(people, baikeOutcome.value.relatedPeople);
+    }
+
+    if (iqiyiOutcome.status === 'fulfilled' && iqiyiOutcome.value.relatedPeople.length > 0) {
+      sources.push('爱奇艺影视库');
+      pushUnique(people, iqiyiOutcome.value.relatedPeople);
     }
   } else {
-    // Person filmography & characters from Chinese Wikipedia (CORS native)
-    const wikiParse = await fetchJsonWithTimeout<{
-      parse?: { text?: { '*'?: string } };
-    }>(
-      `https://zh.wikipedia.org/w/api.php?action=parse&format=json&origin=*&redirects=1&prop=text&page=${encodeURIComponent(
-        params.title
-      )}`,
-      { signal },
-      6500
-    );
-    const html = wikiParse?.parse?.text?.['*'];
-    if (html) {
-      const filmography = parseZhWikiFilmographyHtml(html);
-      if (filmography.length > 0) {
-        sources.push('中文维基百科');
-        const seenFilms = new Set<string>();
-        for (const row of filmography) {
-          const key = normalizeEntityKey(row.filmTitle);
-          if (!key || seenFilms.has(key)) continue;
-          seenFilms.add(key);
-          films.push({
-            externalId: `zhwiki-work-${row.filmTitle}-${row.year || ''}`,
-            category: 'film',
-            title: row.filmTitle,
-            originalTitle: row.filmOriginalTitle,
-            year: row.year,
-            subtitle: row.characterName
-              ? `${params.title} 饰演 ${row.characterName}`
-              : row.mediaType === 'tv'
-                ? '电视剧'
-                : '电影',
-            summary: `${row.year ? `${row.year}年` : ''}作品《${row.filmTitle}》，${params.title}参演。`,
-            sourceName: '中文维基百科',
-            sourceUrl: row.filmWikiTitle
-              ? `https://zh.wikipedia.org/wiki/${encodeURIComponent(row.filmWikiTitle)}`
-              : undefined,
-            tags: [row.mediaType === 'tv' ? '电视剧' : '电影'],
-          });
-          if (films.length >= 30) break;
-        }
+    // Person -> Representative films & characters
+    const [baikeOutcome, iqiyiOutcome, wikiOutcome] = await Promise.allSettled([
+      fetchBaikeCardBrowser(params.title, 'person', signal),
+      fetchIqiyiSuggestBrowser(params.title, 'person', signal),
+      fetchJsonWithTimeout<{ parse?: { text?: { '*'?: string } } }>(
+        `https://zh.wikipedia.org/w/api.php?action=parse&format=json&origin=*&redirects=1&prop=text&page=${encodeURIComponent(
+          params.title
+        )}`,
+        { signal },
+        4500
+      ),
+    ]);
 
-        const aggregatedChars = aggregatePersonCharacters(filmography);
-        for (const ch of aggregatedChars.slice(0, 24)) {
-          characters.push({
-            externalId: `zhwiki-pchar-${ch.characterName}`,
-            category: 'character',
-            title: ch.characterName,
-            originalTitle: ch.characterOriginalName,
-            year: ch.latestYear,
-            subtitle:
-              ch.filmTitles.length > 1
-                ? `出自《${ch.primaryFilmTitle}》等 ${ch.filmTitles.length} 部作品`
-                : `出自《${ch.primaryFilmTitle}》`,
-            summary: `由 ${params.title} 在《${ch.primaryFilmTitle}》中饰演的角色。`,
-            relatedWorkTitle: ch.primaryFilmTitle,
-            portrayedBy: params.title,
-            sourceName: '中文维基百科',
-            sourceUrl: ch.characterWikiTitle
-              ? `https://zh.wikipedia.org/wiki/${encodeURIComponent(ch.characterWikiTitle)}`
-              : undefined,
-            tags: ['角色'],
-          });
+    if (wikiOutcome.status === 'fulfilled') {
+      const html = wikiOutcome.value?.parse?.text?.['*'];
+      if (html) {
+        const filmography = parseZhWikiFilmographyHtml(html);
+        if (filmography.length > 0) {
+          sources.push('中文维基百科');
+          pushUnique(
+            films,
+            filmography.slice(0, 30).map((row) => ({
+              externalId: `zhwiki-work-${row.filmTitle}-${row.year || ''}`,
+              category: 'film' as const,
+              title: row.filmTitle,
+              originalTitle: row.filmOriginalTitle,
+              year: row.year,
+              subtitle: row.characterName
+                ? `${params.title} 饰演 ${row.characterName}`
+                : row.mediaType === 'tv'
+                  ? '电视剧'
+                  : '电影',
+              summary: `${row.year ? `${row.year}年` : ''}作品《${row.filmTitle}》，${params.title}参演。`,
+              sourceName: '中文维基百科',
+              sourceUrl: row.filmWikiTitle
+                ? `https://zh.wikipedia.org/wiki/${encodeURIComponent(row.filmWikiTitle)}`
+                : undefined,
+              tags: [row.mediaType === 'tv' ? '电视剧' : '电影'],
+            }))
+          );
+
+          const aggregatedChars = aggregatePersonCharacters(filmography);
+          pushUnique(
+            characters,
+            aggregatedChars.slice(0, 24).map((ch) => ({
+              externalId: `zhwiki-pchar-${ch.characterName}`,
+              category: 'character' as const,
+              title: ch.characterName,
+              originalTitle: ch.characterOriginalName,
+              year: ch.latestYear,
+              subtitle:
+                ch.filmTitles.length > 1
+                  ? `出自《${ch.primaryFilmTitle}》等 ${ch.filmTitles.length} 部作品`
+                  : `出自《${ch.primaryFilmTitle}》`,
+              summary: `由 ${params.title} 在《${ch.primaryFilmTitle}》中饰演的角色。`,
+              relatedWorkTitle: ch.primaryFilmTitle,
+              portrayedBy: params.title,
+              sourceName: '中文维基百科',
+              sourceUrl: ch.characterWikiTitle
+                ? `https://zh.wikipedia.org/wiki/${encodeURIComponent(ch.characterWikiTitle)}`
+                : undefined,
+              tags: ['角色'],
+            }))
+          );
         }
       }
+    }
+
+    if (baikeOutcome.status === 'fulfilled' && baikeOutcome.value.relatedFilms.length > 0) {
+      sources.push('百度百科');
+      pushUnique(films, baikeOutcome.value.relatedFilms);
+    }
+
+    if (iqiyiOutcome.status === 'fulfilled' && iqiyiOutcome.value.relatedFilms.length > 0) {
+      sources.push('爱奇艺影视库');
+      pushUnique(films, iqiyiOutcome.value.relatedFilms);
     }
   }
 
-  return { films, people, characters, sources };
+  return {
+    films,
+    people,
+    characters,
+    sources: Array.from(new Set(sources)),
+  };
 }
 
 // ---------- Character Dossier Auto-Enrichment ----------
@@ -977,73 +1453,103 @@ export async function fetchCharacterDossier(
     }
   }
 
-  // Direct browser-side enrichment via Chinese Wikipedia + Bangumi
+  // Direct browser-side enrichment: China-native (Baidu Baike + Moegirl) + Bangumi + zh.Wikipedia
   const profile: Partial<CharacterProfile> = {};
   const sources: string[] = [];
 
-  const bgmCharMatch = params.sourceUrl
-    ? /bgm\.tv\/character\/(\d+)/.exec(params.sourceUrl)
-    : null;
-  if (bgmCharMatch) {
-    const bgmChar = await fetchJsonWithTimeout<Record<string, any>>(
-      `https://api.bgm.tv/v0/characters/${bgmCharMatch[1]}`,
-      { signal },
-      5500
-    );
-    if (bgmChar) {
-      const parsedBgm = parseBangumiCharacterInfobox(
-        Array.isArray(bgmChar.infobox) ? bgmChar.infobox : []
-      );
-      Object.assign(profile, parsedBgm);
-      if (typeof bgmChar.summary === 'string' && bgmChar.summary.trim() && !profile.bio) {
-        profile.bio = cleanWikiExtract(bgmChar.summary);
-      }
-      sources.push('番组计划 Bangumi');
-    }
-  }
-
-  const [wikiParse, wikiExtract] = await Promise.all([
-    fetchJsonWithTimeout<{ parse?: { text?: { '*'?: string } } }>(
-      `https://zh.wikipedia.org/w/api.php?action=parse&format=json&origin=*&redirects=1&prop=text&page=${encodeURIComponent(
-        params.title
-      )}`,
-      { signal },
-      6000
-    ),
-    fetchJsonWithTimeout<{
-      query?: { pages?: Record<string, { extract?: string }> };
-    }>(
-      `https://zh.wikipedia.org/w/api.php?action=query&format=json&origin=*&redirects=1&prop=extracts&exintro=1&explaintext=1&titles=${encodeURIComponent(
-        params.title
-      )}`,
-      { signal },
-      6000
-    ),
-  ]);
-
-  const html = wikiParse?.parse?.text?.['*'];
-  if (html) {
-    const parsedInfo = parseZhWikiCharacterInfobox(html);
-    for (const [k, v] of Object.entries(parsedInfo)) {
+  const mergeMissing = (incoming: Partial<CharacterProfile>) => {
+    for (const [k, v] of Object.entries(incoming)) {
       if (v && !(profile as Record<string, unknown>)[k]) {
         (profile as Record<string, unknown>)[k] = v;
       }
     }
-    if (Object.keys(parsedInfo).length > 0) {
-      sources.push('中文维基百科');
+  };
+
+  const bgmCharMatch = params.sourceUrl
+    ? /bgm\.tv\/character\/(\d+)/.exec(params.sourceUrl)
+    : null;
+
+  const [bgmOutcome, baikeOutcome, moegirlOutcome, wikiParseOutcome, wikiExtractOutcome] =
+    await Promise.allSettled([
+      bgmCharMatch
+        ? fetchJsonWithTimeout<Record<string, any>>(
+            `https://api.bgm.tv/v0/characters/${bgmCharMatch[1]}`,
+            { signal },
+            4500
+          )
+        : Promise.resolve(null),
+      fetchBaikeCardBrowser(params.title, 'character', signal),
+      searchMoegirlBrowser(params.title, 'character', signal),
+      fetchJsonWithTimeout<{ parse?: { text?: { '*'?: string } } }>(
+        `https://zh.wikipedia.org/w/api.php?action=parse&format=json&origin=*&redirects=1&prop=text&page=${encodeURIComponent(
+          params.title
+        )}`,
+        { signal },
+        4500
+      ),
+      fetchJsonWithTimeout<{
+        query?: { pages?: Record<string, { extract?: string }> };
+      }>(
+        `https://zh.wikipedia.org/w/api.php?action=query&format=json&origin=*&redirects=1&prop=extracts&exintro=1&explaintext=1&titles=${encodeURIComponent(
+          params.title
+        )}`,
+        { signal },
+        4500
+      ),
+    ]);
+
+  if (bgmOutcome.status === 'fulfilled' && bgmOutcome.value) {
+    const bgmChar = bgmOutcome.value;
+    const parsedBgm = parseBangumiCharacterInfobox(
+      Array.isArray(bgmChar.infobox) ? bgmChar.infobox : []
+    );
+    mergeMissing(parsedBgm);
+    if (typeof bgmChar.summary === 'string' && bgmChar.summary.trim() && !profile.bio) {
+      profile.bio = cleanWikiExtract(bgmChar.summary);
+    }
+    sources.push('番组计划 Bangumi');
+  }
+
+  if (wikiParseOutcome.status === 'fulfilled') {
+    const html = wikiParseOutcome.value?.parse?.text?.['*'];
+    if (html) {
+      const parsedInfo = parseZhWikiCharacterInfobox(html);
+      mergeMissing(parsedInfo);
+      if (Object.keys(parsedInfo).length > 0) {
+        sources.push('中文维基百科');
+      }
     }
   }
 
-  const pages = Object.values(wikiExtract?.query?.pages || {});
-  const extract = cleanWikiExtract(pages[0]?.extract || '');
-  if (extract && !profile.bio) {
-    profile.bio = extract;
-    if (!sources.includes('中文维基百科')) sources.push('中文维基百科');
+  if (wikiExtractOutcome.status === 'fulfilled') {
+    const pages = Object.values(wikiExtractOutcome.value?.query?.pages || {});
+    const extract = cleanWikiExtract(pages[0]?.extract || '');
+    if (extract && !profile.bio) {
+      profile.bio = extract;
+      if (!sources.includes('中文维基百科')) sources.push('中文维基百科');
+    }
   }
 
-  if (sources.length > 0) {
-    profile.dossierSource = sources.join(' · ');
+  if (baikeOutcome.status === 'fulfilled') {
+    const baikeProfile = baikeOutcome.value.characterProfile;
+    if (Object.keys(baikeProfile).length > 0) {
+      mergeMissing(baikeProfile);
+      sources.push('百度百科');
+    }
   }
 
-  return { profile, sources };
+  if (moegirlOutcome.status === 'fulfilled' && moegirlOutcome.value.length > 0) {
+    const topMoe = moegirlOutcome.value[0];
+    if (topMoe.summary && !profile.bio) {
+      profile.bio = topMoe.summary;
+      sources.push('萌娘百科');
+    }
+  }
+
+  const uniqueSources = Array.from(new Set(sources));
+  if (uniqueSources.length > 0) {
+    profile.dossierSource = uniqueSources.join(' · ');
+  }
+
+  return { profile, sources: uniqueSources };
 }

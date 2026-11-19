@@ -21,6 +21,9 @@ interface SearchTabViewProps {
 
 const SOURCE_OPTIONS: Array<{ id: SearchSourceOption; label: string }> = [
   { id: 'all', label: '全网直连聚合' },
+  { id: 'baike', label: '百度百科' },
+  { id: 'iqiyi', label: '爱奇艺影视库' },
+  { id: 'moegirl', label: '萌娘百科' },
   { id: 'bangumi', label: '番组计划 Bangumi' },
   { id: 'wiki', label: '中文维基百科' },
   { id: 'itunes', label: 'iTunes 影视库' },
@@ -121,7 +124,10 @@ export function SearchTabView({
                 aria-pressed={active}
                 onClick={() => {
                   setCategory(cat);
-                  if (cat === 'character' && source === 'itunes') {
+                  if (
+                    cat === 'character' &&
+                    (source === 'itunes' || source === 'iqiyi')
+                  ) {
                     setSource('all');
                   }
                 }}
@@ -196,7 +202,11 @@ export function SearchTabView({
                 className="h-11 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3 text-xs font-medium text-[#1A1816] focus:border-[#1A1816] focus:outline-none"
               >
                 {SOURCE_OPTIONS.filter(
-                  (opt) => !(category === 'character' && opt.id === 'itunes')
+                  (opt) =>
+                    !(
+                      category === 'character' &&
+                      (opt.id === 'itunes' || opt.id === 'iqiyi')
+                    )
                 ).map((opt) => (
                   <option key={opt.id} value={opt.id}>
                     来源：{opt.label}
@@ -219,7 +229,7 @@ export function SearchTabView({
         </form>
 
         <p className="mt-3 text-[12px] text-[#7A7268]">
-          自动适配服务端直连与 GitHub Pages 纯浏览器模式，检索后可一键收录建档。
+          已内置国内免梯直连（百度百科 · 爱奇艺 · 萌娘百科）与全网聚合，检索后可一键收录建档。
         </p>
       </div>
 

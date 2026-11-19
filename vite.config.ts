@@ -90,7 +90,8 @@ export default defineConfig(() => {
               },
             },
             {
-              urlPattern: /^https:\/\/(upload\.wikimedia\.org|lain\.bgm\.tv|static\.tvmaze\.com)\/.*/i,
+              urlPattern:
+                /^https:\/\/(upload\.wikimedia\.org|lain\.bgm\.tv|static\.tvmaze\.com|bkimg\.cdn\.bcebos\.com|pic\d*\.iqiyipic\.com|storage\.moegirl\.org\.cn)\/.*/i,
               handler: 'CacheFirst',
               options: {
                 cacheName: 'archival-posters-cache',

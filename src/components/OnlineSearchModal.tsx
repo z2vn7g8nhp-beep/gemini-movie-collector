@@ -39,6 +39,9 @@ const PRESETS: Record<ArchiveCategory, string[]> = {
 
 const SOURCE_OPTIONS: Array<{ id: SearchSourceOption; label: string }> = [
   { id: 'all', label: '全网直连聚合' },
+  { id: 'baike', label: '百度百科' },
+  { id: 'iqiyi', label: '爱奇艺影视库' },
+  { id: 'moegirl', label: '萌娘百科' },
   { id: 'bangumi', label: '番组计划 Bangumi' },
   { id: 'wiki', label: '中文维基百科' },
   { id: 'itunes', label: 'iTunes 影视库' },
