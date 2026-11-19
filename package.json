@@ -8,9 +8,11 @@
     "start": "node server.ts",
     "build": "vite build",
     "build:gh-pages": "VITE_STATIC_MODE=true vite build",
+    "build:pages": "VITE_STATIC_MODE=true vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test": "tsx --test src/utils/*.test.ts src/services/*.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
