@@ -38,6 +38,13 @@ import {
   aggregatePersonCharacters,
   parseZhWikiFilmographyHtml,
 } from '../utils/wikiFilmography';
+import { getConfiguredDoubanRelayUrl } from '../utils/doubanRelay';
+import {
+  fetchDoubanFilmRelations,
+  fetchDoubanPersonRelations,
+  searchDoubanCoverCandidates,
+  searchDoubanMedia,
+} from './doubanClient';
 
 export interface OnlineSearchResponse {
   results: OnlineSearchResult[];
@@ -862,6 +869,27 @@ export async function searchOnline(
   }
 
   const tasks: Array<NamedSourceTask<OnlineSearchResult>> = [];
+  const relayUrl = getConfiguredDoubanRelayUrl();
+
+  if (source === 'douban' && !relayUrl) {
+    return {
+      results: [],
+      activeSources: [],
+      mode,
+      error:
+        '当前处于纯静态页面模式，直连豆瓣需先在「我的 → 豆瓣直连桥接」配置 Cloudflare Worker 或后端地址，或切换「全网直连聚合」。',
+    };
+  }
+
+  if ((source === 'all' || source === 'douban') && relayUrl) {
+    tasks.push({
+      name: '豆瓣影视',
+      promise: searchDoubanMedia(trimmed, category, {
+        transport: 'relay',
+        relayBaseUrl: relayUrl,
+      }),
+    });
+  }
 
   if ((source === 'all' || source === 'iqiyi') && category !== 'character') {
     tasks.push({
@@ -908,11 +936,11 @@ export async function searchOnline(
 
   const { items, activeSources } = await settleSourcesWithFastWindow(
     tasks,
-    source === 'all' ? 1600 : 4500
+    source === 'all' ? 1800 : 4800
   );
 
   return {
-    results: deduplicateSearchResults(items).slice(0, 20),
+    results: deduplicateSearchResults(items).slice(0, 22),
     activeSources,
     mode,
   };
@@ -1008,7 +1036,21 @@ export async function searchCovers(
   }
 
   const globalQuery = (originalTitle || '').trim() || trimmed;
+  const relayUrl = getConfiguredDoubanRelayUrl();
   const tasks: Array<NamedSourceTask<CoverCandidate>> = [
+    ...(relayUrl
+      ? [
+          {
+            name: '豆瓣图库',
+            promise: searchDoubanCoverCandidates(
+              trimmed,
+              category,
+              originalTitle?.trim() || undefined,
+              { transport: 'relay', relayBaseUrl: relayUrl }
+            ),
+          },
+        ]
+      : []),
     {
       name: '百度百科',
       promise: searchBaiduBaikeBrowser(trimmed, category).then((items) =>
@@ -1160,7 +1202,23 @@ export async function fetchOnlineRelations(
     ? /bgm\.tv\/(subject|person)\/(\d+)/.exec(params.sourceUrl)
     : null;
 
+  const relayUrl = getConfiguredDoubanRelayUrl();
+
   if (params.category === 'film') {
+    if (relayUrl) {
+      const doubanRel = await fetchDoubanFilmRelations(
+        params.title,
+        params.originalTitle,
+        params.sourceUrl,
+        { transport: 'relay', relayBaseUrl: relayUrl, signal }
+      ).catch(() => ({ people: [], characters: [] }));
+      if (doubanRel.people.length > 0 || doubanRel.characters.length > 0) {
+        sources.push('豆瓣影视');
+        pushUnique(people, doubanRel.people);
+        pushUnique(characters, doubanRel.characters);
+      }
+    }
+
     const [baikeOutcome, iqiyiOutcome, wikiOutcome, bgmOutcome] =
       await Promise.allSettled([
         fetchBaikeCardBrowser(params.title, 'film', signal),
@@ -1415,6 +1473,23 @@ export async function fetchOnlineRelations(
     if (iqiyiOutcome.status === 'fulfilled' && iqiyiOutcome.value.relatedFilms.length > 0) {
       sources.push('爱奇艺影视库');
       pushUnique(films, iqiyiOutcome.value.relatedFilms);
+    }
+    if (relayUrl) {
+      const doubanRel = await fetchDoubanPersonRelations(
+        params.title,
+        params.originalTitle,
+        params.sourceUrl,
+        { transport: 'relay', relayBaseUrl: relayUrl, signal }
+      ).catch(() => ({ films: [], characters: [] }));
+      if (doubanRel.films.length > 0 || doubanRel.characters.length > 0) {
+        sources.unshift('豆瓣影视');
+        const nextFilms = [...doubanRel.films, ...films];
+        const nextChars = [...doubanRel.characters, ...characters];
+        films.length = 0;
+        characters.length = 0;
+        pushUnique(films, nextFilms);
+        pushUnique(characters, nextChars);
+      }
     }
   }
 

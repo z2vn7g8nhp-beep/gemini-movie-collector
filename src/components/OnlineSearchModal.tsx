@@ -38,7 +38,8 @@ const PRESETS: Record<ArchiveCategory, string[]> = {
 };
 
 const SOURCE_OPTIONS: Array<{ id: SearchSourceOption; label: string }> = [
-  { id: 'all', label: '全网直连聚合' },
+  { id: 'all', label: '全网直连聚合（豆瓣优先）' },
+  { id: 'douban', label: '豆瓣影视' },
   { id: 'baike', label: '百度百科' },
   { id: 'iqiyi', label: '爱奇艺影视库' },
   { id: 'moegirl', label: '萌娘百科' },
@@ -243,7 +244,7 @@ export function OnlineSearchModal({
               收录新藏品
             </h2>
             <p className="mt-0.5 text-xs text-[#625C54]">
-              服务端直连全网公开影视资料库并代理封面图片，无需梯子即可快速建档
+              直连豆瓣影视资料库（评分、简介、演职员表与高清海报）及全网公开库，支持粘贴豆瓣链接快速建档
             </p>
           </div>
           <button

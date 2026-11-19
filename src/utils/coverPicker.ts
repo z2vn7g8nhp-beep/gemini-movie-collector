@@ -127,11 +127,25 @@ export function rankAndFilterCoverCandidates(
   limit = 18
 ): CoverCandidate[] {
   const deduped = deduplicateCoverCandidates(candidates, limit * 2);
-  const scored = deduped.map((cand, index) => ({
-    cand,
-    index,
-    score: scoreCoverCandidateRelevance(cand.caption, query, originalTitle),
-  }));
+  const scored = deduped.map((cand, index) => {
+    const isDouban = cand.source.startsWith('豆瓣');
+    const baseScore = scoreCoverCandidateRelevance(
+      cand.caption,
+      query,
+      originalTitle
+    );
+    const boost =
+      cand.source === '豆瓣海报' || cand.source === '豆瓣影人'
+        ? 4
+        : isDouban
+          ? 2
+          : 0;
+    return {
+      cand,
+      index,
+      score: Math.max(baseScore, isDouban ? 8 : 0) + boost,
+    };
+  });
 
   const relevant = scored.filter((entry) => entry.score >= 3);
   const pool = relevant.length >= 2 ? relevant : scored.filter((e) => e.score > 0);

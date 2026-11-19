@@ -20,7 +20,8 @@ interface SearchTabViewProps {
 }
 
 const SOURCE_OPTIONS: Array<{ id: SearchSourceOption; label: string }> = [
-  { id: 'all', label: '全网直连聚合' },
+  { id: 'all', label: '全网直连聚合（豆瓣优先）' },
+  { id: 'douban', label: '豆瓣影视' },
   { id: 'baike', label: '百度百科' },
   { id: 'iqiyi', label: '爱奇艺影视库' },
   { id: 'moegirl', label: '萌娘百科' },
@@ -165,12 +166,12 @@ export function SearchTabView({
               }}
               placeholder={
                 category === 'film'
-                  ? '搜索电影、剧集或动画名称…'
+                  ? '搜索片名、剧集，或直接粘贴豆瓣条目链接…'
                   : category === 'person'
-                    ? '搜索导演、演员或声优姓名…'
-                    : '搜索影视或动画角色名…'
+                    ? '搜索导演、演员，或粘贴豆瓣影人链接…'
+                    : '搜索影视角色名（如：甄嬛、苏丽珍、小丑）…'
               }
-              className="h-12 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] pl-10 pr-10 text-[15px] text-[#1A1816] placeholder:text-[#8C857B] focus:border-[#1A1816] focus:bg-white focus:outline-none"
+              className="h-12 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] pl-10 pr-10 text-[15px] text-[#1A1816] placeholder:text-[#8C857B] focus:border-[#1A1816] focus:bg-white focus:outline-none [&::-webkit-search-cancel-button]:hidden"
             />
             {query && (
               <button
@@ -229,7 +230,7 @@ export function SearchTabView({
         </form>
 
         <p className="mt-3 text-[12px] text-[#7A7268]">
-          已内置国内免梯直连（百度百科 · 爱奇艺 · 萌娘百科）与全网聚合，检索后可一键收录建档。
+          已直连豆瓣影视（评分 · 简介 · 演职员与角色 · 剧照）及全网资料库，支持直接粘贴豆瓣链接建档。
         </p>
       </div>
 
@@ -322,6 +323,7 @@ export function SearchTabView({
                         {[
                           CATEGORY_LABELS[item.category],
                           item.year,
+                          item.subtitle,
                           item.sourceName,
                         ]
                           .filter(Boolean)

@@ -3,7 +3,9 @@ import {
   Award,
   CalendarCheck2,
   Check,
+  Copy,
   Download,
+  Link2,
   Trash2,
   Upload,
 } from 'lucide-react';
@@ -27,6 +29,11 @@ import {
   type MedalCategory,
 } from '../utils/medals';
 import type { RuntimeMode } from '../utils/runtimeEnv';
+import {
+  CLOUDFLARE_WORKER_SNIPPET,
+  getConfiguredDoubanRelayUrl,
+  saveDoubanRelayUrl,
+} from '../utils/doubanRelay';
 import { ArchivalSealStamp } from './ArchivalSealStamp';
 import { CinemaMedalSvg } from './CinemaMedalSvg';
 import { MedalInspectModal } from './MedalInspectModal';
@@ -62,6 +69,14 @@ export function ProfileBackupView({
     type: 'success' | 'error';
     message: string;
   } | null>(null);
+  const [relayInput, setRelayInput] = useState(() =>
+    getConfiguredDoubanRelayUrl()
+  );
+  const [relayExpanded, setRelayExpanded] = useState(
+    () => runtimeMode === 'static'
+  );
+  const [workerCopied, setWorkerCopied] = useState(false);
+  const [relayStatus, setRelayStatus] = useState<string>('');
 
   const todayKey = useMemo(() => formatLocalDateKey(), []);
   const rank = useMemo(
@@ -565,6 +580,122 @@ export function ProfileBackupView({
         <div className="mt-4">
           <PWAInstallButton variant="card" />
         </div>
+      </div>
+
+      {/* Douban Direct / Static Relay Bridge Card */}
+      <div
+        data-testid="douban-relay-card"
+        className="rounded-2xl border border-[#E4DFD5] bg-white p-5"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Link2 className="h-4 w-4 text-[#B43B2B]" aria-hidden="true" />
+            <h2 className="font-editorial text-lg font-medium text-[#1A1816]">
+              豆瓣影视直连通道
+            </h2>
+          </div>
+          <span className="font-mono text-[11px] text-[#2A6B46]">
+            {runtimeMode === 'server'
+              ? '服务端已内置直连'
+              : relayInput
+                ? '已配置桥接中转'
+                : '静态模式需配置中转'}
+          </span>
+        </div>
+
+        <p className="mt-1.5 text-xs leading-relaxed text-[#625C54]">
+          {runtimeMode === 'server'
+            ? '当前服务端已原生直连豆瓣影视（评分、简介、演职员与角色表、官方海报与剧照），开箱即用。若需将本应用部署到纯静态 GitHub Pages，可展开下方配置免费的 Cloudflare Worker 桥接地址。'
+            : '豆瓣接口与图床受浏览器跨域和防盗链限制。粘贴你部署的 Cloudflare Worker 或本应用服务端地址，即可在 GitHub Pages 纯静态页面同样完整直连豆瓣。'}
+        </p>
+
+        <button
+          type="button"
+          onClick={() => setRelayExpanded((prev) => !prev)}
+          aria-expanded={relayExpanded}
+          className="mt-3 text-xs font-medium text-[#1A1816] underline underline-offset-4 hover:text-[#B43B2B] cursor-pointer"
+        >
+          {relayExpanded ? '收起豆瓣桥接配置' : '配置静态模式豆瓣桥接 / 获取 Worker 代码'}
+        </button>
+
+        {relayExpanded && (
+          <div className="mt-3.5 space-y-3 border-t border-[#ECE7DD] pt-3.5">
+            <div>
+              <label
+                htmlFor="douban-relay-url-input"
+                className="block text-xs font-medium text-[#4B453E]"
+              >
+                豆瓣桥接地址（Cloudflare Worker 或本应用后端 URL）
+              </label>
+              <div className="mt-1.5 flex flex-col gap-2 sm:flex-row">
+                <input
+                  id="douban-relay-url-input"
+                  type="url"
+                  value={relayInput}
+                  onChange={(e) => {
+                    setRelayInput(e.target.value);
+                    if (relayStatus) setRelayStatus('');
+                  }}
+                  placeholder="https://your-douban-relay.workers.dev"
+                  className="h-10 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3 font-mono text-xs text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none sm:flex-1"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const saved = saveDoubanRelayUrl(relayInput);
+                    setRelayInput(saved);
+                    setRelayStatus(
+                      saved
+                        ? `已保存豆瓣桥接地址：${saved}`
+                        : '已清空自定义豆瓣桥接地址。'
+                    );
+                  }}
+                  className="h-10 rounded-xl bg-[#1A1816] px-4 text-xs font-medium text-white whitespace-nowrap cursor-pointer hover:bg-[#B43B2B]"
+                >
+                  保存地址
+                </button>
+              </div>
+              {relayStatus && (
+                <p role="status" className="mt-1.5 text-xs text-[#2A6B46]">
+                  {relayStatus}
+                </p>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#ECE7DD] bg-[#FAF9F6] px-3.5 py-2.5">
+              <span className="text-xs text-[#625C54]">
+                零服务器成本：30 行 Cloudflare Worker 脚本（仓库路径 <code className="font-mono text-[#1A1816]">cloudflare-worker/douban-proxy.js</code>）
+              </span>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(
+                      CLOUDFLARE_WORKER_SNIPPET
+                    );
+                    setWorkerCopied(true);
+                    window.setTimeout(() => setWorkerCopied(false), 2200);
+                  } catch {
+                    setRelayStatus('请直接查看项目中的 cloudflare-worker/douban-proxy.js 文件。');
+                  }
+                }}
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#DCD6CB] bg-white px-3 text-xs font-medium text-[#1A1816] cursor-pointer hover:border-[#1A1816]"
+              >
+                {workerCopied ? (
+                  <>
+                    <Check className="h-3.5 w-3.5 text-[#2A6B46]" aria-hidden="true" />
+                    已复制 Worker 代码
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+                    复制 Worker 脚本
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Export Backup Card */}

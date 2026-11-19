@@ -7,6 +7,7 @@ import {
   getDirectImageFallbackUrl,
   resolveDisplayImageUrl,
 } from '../utils/runtimeEnv';
+import { getConfiguredDoubanRelayUrl } from '../utils/doubanRelay';
 
 interface ArchivalImageProps {
   src?: string;
@@ -63,8 +64,17 @@ export function ArchivalImage({
     typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL
       ? import.meta.env.BASE_URL
       : './';
-  const primarySrc = resolveDisplayImageUrl(src, getRuntimeModeSync(), baseUrl);
-  const directFallback = getDirectImageFallbackUrl(src);
+  const primarySrc = resolveDisplayImageUrl(
+    src,
+    getRuntimeModeSync(),
+    baseUrl,
+    getConfiguredDoubanRelayUrl() || undefined
+  );
+  const rawDirectFallback = getDirectImageFallbackUrl(src);
+  const directFallback =
+    rawDirectFallback && /doubanio\.com|douban\.com/i.test(rawDirectFallback)
+      ? ''
+      : rawDirectFallback;
   const effectiveSrc =
     usedDirectFallback && directFallback ? directFallback : primarySrc;
 

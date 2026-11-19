@@ -1,6 +1,7 @@
 import express from 'express';
 import type { Request, Response } from 'express';
 import fs from 'node:fs';
+import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -157,6 +158,7 @@ async function fetchWithTimeout(
 
 async function createServer() {
   const app = express();
+  const httpServer = http.createServer(app);
   app.use(express.json({ limit: '6mb' }));
 
   // 1. Health & direct-link info
@@ -366,8 +368,40 @@ async function createServer() {
     res.json(payload);
   });
 
-  // 4. Server-Side Image Proxy (So images from Bangumi/Wikipedia/TVMaze/iTunes load with zero VPN!)
-  app.get('/api/img-proxy', async (req: Request, res: Response) => {
+  // 4. Server-Side Image Proxy (Supports Douban CDN anti-hotlink Referer + mirror retries + Bangumi/Wikipedia/TVMaze/iTunes)
+  const imageProxyCache = new Map<
+    string,
+    { contentType: string; buffer: Buffer; expiresAt: number }
+  >();
+
+  const buildDoubanRetryUrls = (originalUrl: URL): string[] => {
+    const out: string[] = [];
+    const seen = new Set<string>([originalUrl.toString()]);
+    const add = (u: string) => {
+      if (!seen.has(u)) {
+        seen.add(u);
+        out.push(u);
+      }
+    };
+    const host = originalUrl.hostname.toLowerCase();
+    const path = originalUrl.pathname;
+    if (/^img\d\.doubanio\.com$/.test(host)) {
+      const altHosts = ['img9.doubanio.com', 'img1.doubanio.com', 'img2.doubanio.com'].filter(
+        (h) => h !== host
+      );
+      for (const altHost of altHosts.slice(0, 2)) {
+        add(`https://${altHost}${path}`);
+      }
+      if (path.includes('/view/photo/m_ratio_poster/public/')) {
+        add(
+          `https://img9.doubanio.com${path.replace('/m_ratio_poster/', '/s_ratio_poster/')}`
+        );
+      }
+    }
+    return out;
+  };
+
+  const handleImageProxy = async (req: Request, res: Response) => {
     const rawUrl = String(req.query.url || '').trim();
     if (!rawUrl) {
       res.status(400).send('Missing url');
@@ -389,42 +423,162 @@ async function createServer() {
       return;
     }
 
+    const cacheKey = parsed.toString();
+    const cached = imageProxyCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Content-Type', cached.contentType);
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      res.send(cached.buffer);
+      return;
+    }
+
+    const host = parsed.hostname.toLowerCase();
+    const isDoubanImg =
+      host.endsWith('doubanio.com') || host.endsWith('douban.com');
+
+    const fetchImgBuffer = async (
+      targetUrl: string,
+      headers: Record<string, string>
+    ) => {
+      try {
+        const upstream = await fetchWithTimeout(
+          targetUrl,
+          { headers, redirect: 'follow' },
+          8000
+        );
+        if (!upstream.ok) return null;
+        const contentType = upstream.headers.get('content-type') || '';
+        if (!contentType.startsWith('image/')) return null;
+        const buffer = Buffer.from(await upstream.arrayBuffer());
+        if (isDoubanImg && buffer.byteLength < 256) return null;
+        return { contentType, buffer };
+      } catch {
+        return null;
+      }
+    };
+
     try {
-      const upstream = await fetchWithTimeout(
-        parsed.toString(),
-        {
-          headers: {
-            'User-Agent':
-              'Mozilla/5.0 (compatible; CineArchive/1.0; +https://cinearchive.local)',
-            Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
-          },
-          redirect: 'follow',
-        },
-        7000
+      const doubanDesktopHeaders: Record<string, string> = {
+        'User-Agent':
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+        Referer: 'https://movie.douban.com/',
+        Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+      };
+      const doubanWechatHeaders: Record<string, string> = {
+        'User-Agent':
+          'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.40',
+        Referer:
+          'https://servicewechat.com/wx2f9b06c1de1ccfba/91/page-frame.html',
+        Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+      };
+      const genericHeaders: Record<string, string> = {
+        'User-Agent':
+          'Mozilla/5.0 (compatible; CineArchive/1.0; +https://cinearchive.local)',
+        Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+      };
+
+      let result = await fetchImgBuffer(
+        cacheKey,
+        isDoubanImg ? doubanDesktopHeaders : genericHeaders
       );
 
-      if (!upstream.ok) {
+      // Retry with WeChat MiniProgram Referer & mirror CDN shards if Douban throttles a burst connection
+      if (isDoubanImg && !result) {
+        result = await fetchImgBuffer(cacheKey, doubanWechatHeaders);
+      }
+      if (isDoubanImg && !result) {
+        for (const altUrl of buildDoubanRetryUrls(parsed)) {
+          result = await fetchImgBuffer(altUrl, doubanDesktopHeaders);
+          if (result) break;
+        }
+      }
+
+      if (!result) {
         res.status(404).send('Image unavailable');
         return;
       }
 
-      const contentType = upstream.headers.get('content-type') || '';
-      if (!contentType.startsWith('image/')) {
-        res.status(415).send('Not an image');
-        return;
-      }
-
-      const buffer = Buffer.from(await upstream.arrayBuffer());
-      if (buffer.byteLength > 8 * 1024 * 1024) {
+      if (result.buffer.byteLength > 8 * 1024 * 1024) {
         res.status(413).send('Image too large');
         return;
       }
 
-      res.setHeader('Content-Type', contentType);
+      if (imageProxyCache.size >= 150) {
+        const oldestKey = imageProxyCache.keys().next().value;
+        if (oldestKey) imageProxyCache.delete(oldestKey);
+      }
+      imageProxyCache.set(cacheKey, {
+        contentType: result.contentType,
+        buffer: result.buffer,
+        expiresAt: Date.now() + 10 * 60 * 1000,
+      });
+
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Content-Type', result.contentType);
       res.setHeader('Cache-Control', 'public, max-age=86400');
-      res.send(buffer);
+      res.send(result.buffer);
     } catch {
       res.status(404).send('Image fetch failed');
+    }
+  };
+
+  app.get('/api/img-proxy', handleImageProxy);
+  app.get('/img', handleImageProxy);
+
+  // 4.5. CORS-Enabled Douban Relay (Allows static GitHub Pages builds to use this server as a bridge)
+  app.get('/douban', async (req: Request, res: Response) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    const rawUrl = String(req.query.url || '').trim();
+    let parsed: URL;
+    try {
+      parsed = new URL(rawUrl);
+    } catch {
+      res.status(400).json({ error: 'Invalid url' });
+      return;
+    }
+    const allowedHosts = new Set([
+      'm.douban.com',
+      'movie.douban.com',
+      'www.douban.com',
+    ]);
+    if (!allowedHosts.has(parsed.hostname.toLowerCase())) {
+      res.status(403).json({ error: 'Host not allowed' });
+      return;
+    }
+    const isRexxar = parsed.hostname.toLowerCase() === 'm.douban.com';
+    try {
+      const upstream = await fetchWithTimeout(
+        parsed.toString(),
+        {
+          headers: isRexxar
+            ? {
+                'User-Agent':
+                  'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.40',
+                Referer:
+                  'https://servicewechat.com/wx2f9b06c1de1ccfba/91/page-frame.html',
+                Accept: 'application/json, text/plain, */*',
+              }
+            : {
+                'User-Agent':
+                  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+                Referer: 'https://movie.douban.com/',
+                Accept: 'application/json, text/plain, */*',
+              },
+        },
+        6500
+      );
+      const body = await upstream.text();
+      res
+        .status(upstream.status)
+        .setHeader(
+          'Content-Type',
+          upstream.headers.get('content-type') ||
+            'application/json; charset=utf-8'
+        )
+        .send(body);
+    } catch {
+      res.status(502).json({ error: 'Douban upstream failed' });
     }
   });
 
@@ -432,7 +586,10 @@ async function createServer() {
   if (!IS_PROD) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        ws: { server: httpServer },
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);
@@ -444,7 +601,7 @@ async function createServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  httpServer.listen(PORT, '0.0.0.0', () => {
     console.log(`[CineArchive] Server listening on http://0.0.0.0:${PORT}`);
   });
 }

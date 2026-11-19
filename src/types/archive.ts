@@ -6,6 +6,7 @@ export type SortOption = 'recent' | 'rating' | 'year' | 'title';
 
 export type SearchSourceOption =
   | 'all'
+  | 'douban'
   | 'baike'
   | 'iqiyi'
   | 'moegirl'

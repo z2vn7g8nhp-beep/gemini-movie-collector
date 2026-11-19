@@ -27,6 +27,12 @@ import {
   unwrapProxyImageUrl,
   type CoverCandidate,
 } from '../utils/coverPicker';
+import {
+  fetchDoubanFilmRelations,
+  fetchDoubanPersonRelations,
+  searchDoubanCoverCandidates,
+  searchDoubanMedia,
+} from './doubanClient';
 
 export type MediaEngineMode = 'server' | 'browser';
 
@@ -678,6 +684,15 @@ export async function searchOnlineMedia(params: {
   const tasks: Array<{ name: string; promise: Promise<OnlineSearchResult[]> }> =
     [];
 
+  if (mode === 'server' && (source === 'all' || source === 'douban')) {
+    tasks.push({
+      name: '豆瓣影视',
+      promise: searchDoubanMedia(query, category, {
+        transport: 'server',
+        signal,
+      }),
+    });
+  }
   if (source === 'all' || source === 'bangumi') {
     tasks.push({
       name: '番组计划 Bangumi',
@@ -723,7 +738,7 @@ export async function searchOnlineMedia(params: {
   return {
     query,
     category,
-    results: deduplicateResults(combined).slice(0, 18),
+    results: deduplicateResults(combined).slice(0, 22),
     activeSources,
     failedSources,
   };
@@ -918,6 +933,16 @@ export async function searchCoverCandidates(params: {
 
   const globalQuery = originalTitle || query;
   const priorityTasks: Array<Promise<CoverCandidate[]>> = [
+    ...(mode === 'server'
+      ? [
+          searchDoubanCoverCandidates(
+            query,
+            category,
+            originalTitle || undefined,
+            { transport: 'server', signal }
+          ),
+        ]
+      : []),
     searchCommonsCovers(globalQuery, mode, signal),
     searchEnWikiCovers(globalQuery, mode, signal),
   ];
@@ -2091,8 +2116,14 @@ export async function fetchOnlineRelations(params: {
       mode,
       signal
     );
-    const [zhWikiOutcome, wdOutcome, bgmOutcome, tvOutcome] =
+    const [doubanOutcome, zhWikiOutcome, wdOutcome, bgmOutcome, tvOutcome] =
       await Promise.allSettled([
+        mode === 'server'
+          ? fetchDoubanFilmRelations(title, originalTitle, sourceUrl, {
+              transport: 'server',
+              signal,
+            })
+          : Promise.resolve({ people: [], characters: [] }),
         fetchZhWikiFilmRelations(title, originalTitle, mode, signal),
         fetchWikidataFilmRelations(title, originalTitle, mode, signal),
         bgmId
@@ -2104,6 +2135,16 @@ export async function fetchOnlineRelations(params: {
     const rawPeople: OnlineSearchResult[] = [];
     const rawChars: OnlineSearchResult[] = [];
 
+    if (doubanOutcome.status === 'fulfilled') {
+      if (
+        doubanOutcome.value.people.length ||
+        doubanOutcome.value.characters.length
+      ) {
+        sources.push('豆瓣影视');
+      }
+      rawPeople.push(...doubanOutcome.value.people);
+      rawChars.push(...doubanOutcome.value.characters);
+    }
     if (wdOutcome.status === 'fulfilled') {
       if (wdOutcome.value.people.length || wdOutcome.value.characters.length) {
         sources.push('维基数据 Wikidata');
@@ -2632,17 +2673,34 @@ export async function fetchOnlineRelations(params: {
       mode,
       signal
     );
-    const [zhWikiOutcome, bgmOutcome, tvOutcome] = await Promise.allSettled([
-      fetchZhWikiPersonRelations(),
-      bgmId
-        ? fetchBangumiPersonOrCharRelations('person', bgmId, title, mode, signal)
-        : Promise.resolve({ films: [], people: [], characters: [] }),
-      fetchTVMazePersonRelations(),
-    ]);
+    const [doubanOutcome, zhWikiOutcome, bgmOutcome, tvOutcome] =
+      await Promise.allSettled([
+        mode === 'server'
+          ? fetchDoubanPersonRelations(title, originalTitle, sourceUrl, {
+              transport: 'server',
+              signal,
+            })
+          : Promise.resolve({ films: [], characters: [] }),
+        fetchZhWikiPersonRelations(),
+        bgmId
+          ? fetchBangumiPersonOrCharRelations('person', bgmId, title, mode, signal)
+          : Promise.resolve({ films: [], people: [], characters: [] }),
+        fetchTVMazePersonRelations(),
+      ]);
 
     const rawFilms: OnlineSearchResult[] = [];
     const rawChars: OnlineSearchResult[] = [];
 
+    if (doubanOutcome.status === 'fulfilled') {
+      if (
+        doubanOutcome.value.films.length ||
+        doubanOutcome.value.characters.length
+      ) {
+        sources.push('豆瓣影视');
+      }
+      rawFilms.push(...doubanOutcome.value.films);
+      rawChars.push(...doubanOutcome.value.characters);
+    }
     if (zhWikiOutcome.status === 'fulfilled') {
       if (
         zhWikiOutcome.value.films.length ||

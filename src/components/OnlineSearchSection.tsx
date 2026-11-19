@@ -20,7 +20,8 @@ interface OnlineSearchSectionProps {
 }
 
 const SOURCE_OPTIONS: Array<{ id: SearchSourceOption; label: string }> = [
-  { id: 'all', label: '全网直连聚合' },
+  { id: 'all', label: '全网直连聚合（豆瓣优先）' },
+  { id: 'douban', label: '豆瓣影视' },
   { id: 'baike', label: '百度百科' },
   { id: 'iqiyi', label: '爱奇艺影视库' },
   { id: 'moegirl', label: '萌娘百科' },
@@ -205,10 +206,10 @@ export function OnlineSearchSection({
             }}
             placeholder={
               category === 'film'
-                ? '输入电影、电视剧或动画名称，回车直连联网搜索并收录…'
+                ? '输入电影、剧集名称或直接粘贴豆瓣链接，回车直连豆瓣搜索并收录…'
                 : category === 'person'
-                  ? '输入导演、演员或声优姓名，回车直连联网搜索并收录…'
-                  : '输入想收藏的影视或动画角色名，回车直连联网搜索并收录…'
+                  ? '输入导演、演员姓名或豆瓣影人链接，回车直连豆瓣搜索并收录…'
+                  : '输入想收藏的影视或动画角色名，回车直连检索并收录…'
             }
             className="h-12 w-full rounded-md border border-[#D4CDC0] bg-[#FAF9F6] pl-10 pr-9 text-sm text-[#1A1816] placeholder:text-[#8C857B] transition-colors focus:border-[#1A1816] focus:bg-white focus:outline-none"
           />

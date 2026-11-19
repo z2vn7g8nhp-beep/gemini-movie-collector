@@ -62,7 +62,8 @@ export function resolveBaseAssetUrl(rawPath: string, baseUrl = './'): string {
 export function resolveDisplayImageUrl(
   rawUrl: string | undefined,
   mode: RuntimeMode,
-  baseUrl = './'
+  baseUrl = './',
+  doubanRelayUrl?: string
 ): string {
   if (!rawUrl) return '';
   const trimmed = rawUrl.trim();
@@ -78,9 +79,17 @@ export function resolveDisplayImageUrl(
 
   if (trimmed.startsWith('/api/img-proxy?')) {
     if (mode === 'static') {
-      return unwrapProxyImageUrl(trimmed);
+      const unwrapped = unwrapProxyImageUrl(trimmed);
+      if (doubanRelayUrl && /doubanio\.com/i.test(unwrapped)) {
+        return `${doubanRelayUrl.replace(/\/+$/, '')}/img?url=${encodeURIComponent(unwrapped)}`;
+      }
+      return unwrapped;
     }
     return trimmed;
+  }
+
+  if (mode === 'static' && doubanRelayUrl && /doubanio\.com/i.test(trimmed)) {
+    return `${doubanRelayUrl.replace(/\/+$/, '')}/img?url=${encodeURIComponent(trimmed)}`;
   }
 
   return trimmed;
