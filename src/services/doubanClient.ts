@@ -1,6 +1,7 @@
 import type { ArchiveCategory, OnlineSearchResult } from '../types/archive';
 import type { CoverCandidate } from '../utils/coverPicker';
 import {
+  extractJsonFromJinaEnvelope,
   normalizeDoubanImageUrl,
   normalizeRelayBaseUrl,
   parseDoubanCelebrityDetail,
@@ -8,15 +9,22 @@ import {
   parseDoubanCredits,
   parseDoubanMovieSearch,
   parseDoubanPhotos,
+  parseDoubanSubjectAbstract,
   parseDoubanSubjectDetail,
   parseDoubanSuggest,
   parseDoubanUrlOrId,
+  parseWmdbMovieRecord,
+  parseWmdbSearchPayload,
 } from '../utils/doubanParsers';
 import { normalizeEntityKey } from '../utils/wikiCast';
 
 export interface DoubanClientOptions {
-  /** 'server' calls Douban directly with Referer headers; 'relay' routes through a CORS relay/Worker */
-  transport: 'server' | 'relay';
+  /**
+   * - 'server': calls Douban directly with Referer headers on Node/Express backend
+   * - 'relay': routes through an optional custom Cloudflare Worker / Express relay
+   * - 'static-direct': zero-config browser-direct mode for GitHub Pages / static mobile PWA
+   */
+  transport: 'server' | 'relay' | 'static-direct';
   /** Base URL of Cloudflare Worker or Express server when transport === 'relay' */
   relayBaseUrl?: string;
   signal?: AbortSignal;
@@ -83,7 +91,282 @@ export function formatDoubanImageForTransport(
   if (relay) {
     return `${relay}/img?url=${encodeURIComponent(trimmed)}`;
   }
+  // In zero-config static-direct mode, raw doubanio.com URLs return 418 anti-hotlink in browsers;
+  // allow direct anti-hotlink-free CDNs (such as img.wmdb.tv) and omit raw doubanio.com URLs.
+  if (options.transport === 'static-direct' && /doubanio\.com|douban\.com/i.test(trimmed)) {
+    return undefined;
+  }
   return trimmed;
+}
+
+/**
+ * Zero-config CORS-open JSON bridge for pure static pages (GitHub Pages / mobile PWA)
+ * using `https://r.jina.ai/<targetUrl>` with 15-minute caching & in-flight deduplication.
+ */
+async function fetchViaStaticBridgeJson<T>(
+  targetUrl: string,
+  options: DoubanClientOptions,
+  timeoutMs = 7500
+): Promise<T | null> {
+  const cacheKey = `static-direct:${targetUrl}`;
+  const cached = readCache<T>(cacheKey);
+  if (cached !== undefined) return cached;
+
+  const existing = inFlight.get(cacheKey);
+  if (existing) return (await existing) as T | null;
+
+  const task = (async (): Promise<T | null> => {
+    const controller = new AbortController();
+    const ext = options.signal;
+    const onAbort = () => controller.abort();
+    if (ext) {
+      if (ext.aborted) return null;
+      ext.addEventListener('abort', onAbort, { once: true });
+    }
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(`https://r.jina.ai/${targetUrl}`, {
+        headers: { Accept: 'application/json' },
+        signal: controller.signal,
+      });
+      if (!res.ok) return null;
+      const envelope = (await res.json()) as unknown;
+      const extracted = extractJsonFromJinaEnvelope(envelope) as T | null;
+      if (extracted !== null) {
+        writeCache(cacheKey, extracted);
+      }
+      return extracted;
+    } catch {
+      return null;
+    } finally {
+      clearTimeout(timer);
+      if (ext) ext.removeEventListener('abort', onAbort);
+      inFlight.delete(cacheKey);
+    }
+  })();
+
+  inFlight.set(cacheKey, task);
+  return task;
+}
+
+async function fetchStaticSubjectMerged(
+  id: string,
+  options: DoubanClientOptions
+): Promise<{ result: OnlineSearchResult; people: OnlineSearchResult[] } | null> {
+  const [wmdbRaw, absRaw] = await Promise.all([
+    fetchViaStaticBridgeJson<Record<string, any>>(
+      `https://api.wmdb.tv/movie/api?id=${encodeURIComponent(id)}`,
+      options,
+      6500
+    ),
+    fetchViaStaticBridgeJson<Record<string, any>>(
+      `https://movie.douban.com/j/subject_abstract?subject_id=${encodeURIComponent(id)}`,
+      options,
+      6500
+    ),
+  ]);
+
+  const wmdb = parseWmdbMovieRecord(wmdbRaw);
+  const abs = parseDoubanSubjectAbstract(absRaw);
+  if (!wmdb && !abs) return null;
+
+  if (wmdb && abs) {
+    const hasRatingInWmdb = /豆瓣\s*\d/.test(wmdb.result.subtitle || '');
+    return {
+      result: {
+        ...wmdb.result,
+        subtitle: hasRatingInWmdb ? wmdb.result.subtitle : abs.result.subtitle,
+        year: wmdb.result.year || abs.result.year,
+        region: wmdb.result.region || abs.result.region,
+        tags:
+          wmdb.result.tags && wmdb.result.tags.length > 0
+            ? wmdb.result.tags
+            : abs.result.tags,
+      },
+      people: wmdb.people.length >= abs.people.length ? wmdb.people : abs.people,
+    };
+  }
+  return wmdb || abs;
+}
+
+async function searchDoubanStaticDirect(
+  trimmed: string,
+  category: ArchiveCategory,
+  options: DoubanClientOptions
+): Promise<OnlineSearchResult[]> {
+  // 0. Direct Douban URL / ID paste
+  const directRef = parseDoubanUrlOrId(trimmed);
+  if (directRef) {
+    if (directRef.kind === 'subject') {
+      const merged = await fetchStaticSubjectMerged(directRef.id, options);
+      if (merged) {
+        return category === 'person' ? merged.people.slice(0, 10) : [merged.result];
+      }
+    }
+  }
+
+  // 1. Film & TV Search: parallel WMDB (Douban-indexed + direct img.wmdb.tv posters) + Douban Suggest
+  if (category === 'film') {
+    const [wmdbRaw, suggestRaw] = await Promise.all([
+      fetchViaStaticBridgeJson<Record<string, any>>(
+        `https://api.wmdb.tv/api/v1/movie/search?q=${encodeURIComponent(trimmed)}`,
+        options,
+        7000
+      ),
+      fetchViaStaticBridgeJson<unknown>(
+        `https://movie.douban.com/j/subject_suggest?q=${encodeURIComponent(trimmed)}`,
+        options,
+        6500
+      ),
+    ]);
+
+    const wmdbEntries = parseWmdbSearchPayload(wmdbRaw);
+    const suggestParsed = parseDoubanSuggest(suggestRaw, () => undefined);
+
+    const byId = new Map<string, OnlineSearchResult>();
+    const order: string[] = [];
+
+    const pushItem = (item: OnlineSearchResult) => {
+      const existing = byId.get(item.externalId);
+      if (!existing) {
+        byId.set(item.externalId, item);
+        order.push(item.externalId);
+      } else {
+        byId.set(item.externalId, {
+          ...existing,
+          originalTitle: existing.originalTitle || item.originalTitle,
+          year: existing.year || item.year,
+          coverUrl: existing.coverUrl || item.coverUrl,
+          subtitle:
+            /豆瓣\s*\d/.test(existing.subtitle || '')
+              ? existing.subtitle
+              : item.subtitle || existing.subtitle,
+        });
+      }
+    };
+
+    for (const entry of wmdbEntries) {
+      pushItem(entry.result);
+    }
+    for (const sm of suggestParsed.movies) {
+      pushItem(sm);
+    }
+
+    const merged = order.map((k) => byId.get(k)!).filter(Boolean);
+    if (merged.length === 0) return [];
+
+    // Hydrate up to top 2 hits missing live Douban score or poster via subject_abstract / wmdb-by-id
+    const needHydrate = merged
+      .slice(0, 2)
+      .filter(
+        (m) =>
+          !/豆瓣\s*\d/.test(m.subtitle || '') || !m.coverUrl
+      );
+
+    if (needHydrate.length > 0) {
+      const hydrated = await Promise.all(
+        needHydrate.map(async (item) => {
+          const sid = extractSubjectIdFromUrl(item.sourceUrl);
+          if (!sid) return null;
+          const rich = await fetchStaticSubjectMerged(sid, options);
+          return rich ? { externalId: item.externalId, rich: rich.result } : null;
+        })
+      );
+      const richMap = new Map<string, OnlineSearchResult>();
+      for (const h of hydrated) {
+        if (h) richMap.set(h.externalId, h.rich);
+      }
+      return merged.slice(0, 12).map((item) => {
+        const rich = richMap.get(item.externalId);
+        if (!rich) return item;
+        return {
+          ...item,
+          subtitle: /豆瓣\s*\d/.test(rich.subtitle || '')
+            ? rich.subtitle
+            : item.subtitle || rich.subtitle,
+          year: item.year || rich.year,
+          region: item.region || rich.region,
+          coverUrl: item.coverUrl || rich.coverUrl,
+          summary:
+            item.summary && item.summary.length > 35
+              ? item.summary
+              : rich.summary || item.summary,
+          tags:
+            item.tags && item.tags.length > 0 ? item.tags : rich.tags,
+        };
+      });
+    }
+
+    return merged.slice(0, 12);
+  }
+
+  // 2. Person Search via Douban Suggest celebrity hits + WMDB director/actor fallback
+  if (category === 'person') {
+    const [suggestRaw, wmdbRaw] = await Promise.all([
+      fetchViaStaticBridgeJson<unknown>(
+        `https://movie.douban.com/j/subject_suggest?q=${encodeURIComponent(trimmed)}`,
+        options,
+        6500
+      ),
+      fetchViaStaticBridgeJson<Record<string, any>>(
+        `https://api.wmdb.tv/api/v1/movie/search?q=${encodeURIComponent(trimmed)}`,
+        options,
+        6500
+      ),
+    ]);
+
+    const suggestParsed = parseDoubanSuggest(suggestRaw, () => undefined);
+    const out: OnlineSearchResult[] = [...suggestParsed.celebrities];
+    const seen = new Set(out.map((p) => normalizeEntityKey(p.title)));
+
+    if (out.length === 0) {
+      const entries = parseWmdbSearchPayload(wmdbRaw);
+      for (const entry of entries) {
+        for (const p of entry.people) {
+          if (!matchesPersonName(p.title, p.originalTitle, trimmed)) continue;
+          const key = normalizeEntityKey(p.title);
+          if (seen.has(key)) continue;
+          seen.add(key);
+          out.push(p);
+          if (out.length >= 4) break;
+        }
+        if (out.length >= 4) break;
+      }
+    }
+    return out.slice(0, 6);
+  }
+
+  // 3. Character Search: resolve matched movie/TV via WMDB + Douban suggest for cast/work context
+  const wmdbRaw = await fetchViaStaticBridgeJson<Record<string, any>>(
+    `https://api.wmdb.tv/api/v1/movie/search?q=${encodeURIComponent(trimmed)}`,
+    options,
+    6500
+  );
+  const entries = parseWmdbSearchPayload(wmdbRaw);
+  if (entries.length === 0) return [];
+  const lead = entries[0];
+  const actorNames = lead.people
+    .filter((p) => p.subtitle === '主演')
+    .map((p) => p.title)
+    .slice(0, 3);
+  return [
+    {
+      externalId: `douban-static-char-${trimmed}-${lead.result.externalId}`,
+      category: 'character',
+      title: trimmed,
+      subtitle: actorNames[0]
+        ? `出自《${lead.result.title}》 · ${actorNames[0]} 等主演`
+        : `出自《${lead.result.title}》`,
+      year: lead.result.year,
+      coverUrl: lead.result.coverUrl,
+      summary: `出自豆瓣条目《${lead.result.title}》${lead.result.year ? `（${lead.result.year}）` : ''}。${lead.result.summary}`,
+      relatedWorkTitle: lead.result.title,
+      portrayedBy: actorNames[0],
+      sourceName: '豆瓣影视',
+      sourceUrl: lead.result.sourceUrl,
+      tags: ['影视角色', lead.result.title],
+    },
+  ];
 }
 
 async function fetchDoubanJson<T>(
@@ -355,6 +638,10 @@ export async function searchDoubanMedia(
   const trimmed = query.trim();
   if (!trimmed) return [];
 
+  if (options.transport === 'static-direct') {
+    return searchDoubanStaticDirect(trimmed, category, options);
+  }
+
   const formatImg = (u?: string | null) =>
     formatDoubanImageForTransport(u, options);
 
@@ -568,6 +855,32 @@ export async function fetchDoubanFilmRelations(
   options: DoubanClientOptions
 ): Promise<{ people: OnlineSearchResult[]; characters: OnlineSearchResult[] }> {
   const empty = { people: [], characters: [] };
+
+  if (options.transport === 'static-direct') {
+    let sid = extractSubjectIdFromUrl(sourceUrl);
+    if (!sid) {
+      const wmdbRaw = await fetchViaStaticBridgeJson<Record<string, any>>(
+        `https://api.wmdb.tv/api/v1/movie/search?q=${encodeURIComponent(title.trim())}`,
+        options,
+        6500
+      );
+      const entries = parseWmdbSearchPayload(wmdbRaw);
+      const exact =
+        entries.find(
+          (e) => normalizeEntityKey(e.result.title) === normalizeEntityKey(title)
+        ) || entries[0];
+      if (exact) {
+        if (exact.people.length > 0) {
+          return { people: exact.people, characters: [] };
+        }
+        sid = extractSubjectIdFromUrl(exact.result.sourceUrl);
+      }
+    }
+    if (!sid) return empty;
+    const merged = await fetchStaticSubjectMerged(sid, options);
+    return merged ? { people: merged.people, characters: [] } : empty;
+  }
+
   const subjectId = await resolveDoubanSubjectId(
     title,
     originalTitle,
@@ -602,6 +915,21 @@ export async function fetchDoubanPersonRelations(
   options: DoubanClientOptions
 ): Promise<{ films: OnlineSearchResult[]; characters: OnlineSearchResult[] }> {
   const empty = { films: [], characters: [] };
+  if (options.transport === 'static-direct') {
+    const wmdbRaw = await fetchViaStaticBridgeJson<Record<string, any>>(
+      `https://api.wmdb.tv/api/v1/movie/search?q=${encodeURIComponent(title.trim())}`,
+      options,
+      6500
+    );
+    const entries = parseWmdbSearchPayload(wmdbRaw);
+    const matched = entries
+      .filter((e) =>
+        e.people.some((p) => matchesPersonName(p.title, p.originalTitle, title))
+      )
+      .map((e) => e.result);
+    return { films: matched.slice(0, 12), characters: [] };
+  }
+
   let celebId = extractCelebrityIdFromUrl(sourceUrl);
 
   if (!celebId) {
@@ -636,6 +964,29 @@ export async function searchDoubanCoverCandidates(
   originalTitle: string | undefined,
   options: DoubanClientOptions
 ): Promise<CoverCandidate[]> {
+  if (options.transport === 'static-direct') {
+    const wmdbRaw = await fetchViaStaticBridgeJson<Record<string, any>>(
+      `https://api.wmdb.tv/api/v1/movie/search?q=${encodeURIComponent(query.trim())}`,
+      options,
+      6500
+    );
+    const entries = parseWmdbSearchPayload(wmdbRaw);
+    const out: CoverCandidate[] = [];
+    const seen = new Set<string>();
+    for (let i = 0; i < entries.length; i += 1) {
+      const poster = entries[i].result.coverUrl;
+      if (!poster || seen.has(poster)) continue;
+      seen.add(poster);
+      out.push({
+        id: `douban-static-poster-${i}-${entries[i].result.externalId}`,
+        url: poster,
+        source: '豆瓣海报',
+        caption: `${entries[i].result.title} · 豆瓣官方海报`,
+      });
+    }
+    return out;
+  }
+
   const formatImg = (u?: string | null) =>
     formatDoubanImageForTransport(u, options);
 

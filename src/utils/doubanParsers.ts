@@ -798,3 +798,336 @@ export function normalizeRelayBaseUrl(raw?: string | null): string {
     return '';
   }
 }
+
+/**
+ * Extracts raw JSON from a `https://r.jina.ai/...` JSON envelope (`{ code: 200, data: { content } }`).
+ */
+export function extractJsonFromJinaEnvelope(envelope: unknown): unknown {
+  if (!envelope || typeof envelope !== 'object') return null;
+  const content = (envelope as { data?: { content?: unknown } })?.data?.content;
+  if (typeof content !== 'string') return null;
+  const trimmed = content.trim();
+  if (!trimmed) return null;
+
+  const tryParse = (s: string): unknown => {
+    try {
+      return JSON.parse(s);
+    } catch {
+      return null;
+    }
+  };
+
+  const direct = tryParse(trimmed);
+  if (direct !== null) return direct;
+
+  // Strip optional markdown code fences or leading metadata lines
+  const fenceMatch = /```(?:json)?\s*([\s\S]*?)```/i.exec(trimmed);
+  if (fenceMatch?.[1]) {
+    const inside = tryParse(fenceMatch[1].trim());
+    if (inside !== null) return inside;
+  }
+
+  const firstObj = trimmed.indexOf('{');
+  const firstArr = trimmed.indexOf('[');
+  const start =
+    firstObj === -1
+      ? firstArr
+      : firstArr === -1
+        ? firstObj
+        : Math.min(firstObj, firstArr);
+  if (start >= 0) {
+    const lastEnd = Math.max(trimmed.lastIndexOf('}'), trimmed.lastIndexOf(']'));
+    if (lastEnd > start) {
+      return tryParse(trimmed.slice(start, lastEnd + 1));
+    }
+  }
+  return null;
+}
+
+export interface ParsedStaticDoubanEntry {
+  result: OnlineSearchResult;
+  people: OnlineSearchResult[];
+}
+
+function pickWmdbLocaleData(entries: unknown): Record<string, any> | null {
+  if (!Array.isArray(entries) || entries.length === 0) return null;
+  const cn = entries.find(
+    (d) => d && typeof d === 'object' && String((d as any).lang || '').toLowerCase() === 'cn'
+  );
+  return (cn || entries[0]) as Record<string, any>;
+}
+
+function extractWmdbPersonNames(list: unknown, limit = 8): string[] {
+  if (!Array.isArray(list)) return [];
+  const names: string[] = [];
+  const seen = new Set<string>();
+  for (const row of list) {
+    const loc = pickWmdbLocaleData(row?.data);
+    const name = typeof loc?.name === 'string' ? loc.name.trim() : '';
+    if (!name || seen.has(name)) continue;
+    seen.add(name);
+    names.push(name);
+    if (names.length >= limit) break;
+  }
+  return names;
+}
+
+/**
+ * Parses a WMDB (Douban-indexed) movie/TV record into an OnlineSearchResult + cast people list.
+ * Uses direct anti-hotlink-free `img.wmdb.tv` posters so static mobile pages render crisp covers.
+ */
+export function parseWmdbMovieRecord(
+  item: Record<string, any> | null | undefined
+): ParsedStaticDoubanEntry | null {
+  if (!item || typeof item !== 'object') return null;
+  const doubanId = String(item.doubanId || '').trim();
+  const loc = pickWmdbLocaleData(item.data);
+  const title = cleanDoubanText(
+    String(loc?.name || item.originalName || ''),
+    80
+  );
+  if (!title) return null;
+
+  const aliasFirst =
+    typeof item.alias === 'string'
+      ? item.alias
+          .split('/')
+          .map((s: string) => s.trim())
+          .find((s: string) => s && s !== title)
+      : undefined;
+  const rawOrig =
+    item.originalName && String(item.originalName).trim() !== title
+      ? String(item.originalName).trim()
+      : aliasFirst;
+
+  const year = extractYear(String(item.year || item.dateReleased || ''));
+  const ratingStr =
+    typeof item.doubanRating === 'string' || typeof item.doubanRating === 'number'
+      ? String(item.doubanRating).trim()
+      : '';
+  const ratingNum = ratingStr ? Number(ratingStr) : 0;
+  const rating =
+    Number.isFinite(ratingNum) && ratingNum > 0
+      ? ratingNum.toFixed(1)
+      : undefined;
+
+  const isTv =
+    String(item.type || '').toLowerCase().includes('tv') ||
+    Number(item.episodes || 0) > 1;
+  const typeLabel = isTv ? '剧集' : '电影';
+
+  const directors = extractWmdbPersonNames(item.director, 3);
+  const actors = extractWmdbPersonNames(item.actor, 10);
+
+  const genres =
+    typeof loc?.genre === 'string'
+      ? loc.genre
+          .split(/[\/／、,，\s]+/)
+          .map((g: string) => g.trim())
+          .filter(Boolean)
+          .slice(0, 4)
+      : [];
+  const region =
+    typeof loc?.country === 'string' && loc.country.trim()
+      ? loc.country.split(/[\/／,，]+/)[0].trim()
+      : undefined;
+
+  const rawPoster =
+    typeof loc?.poster === 'string' && /^https?:\/\//i.test(loc.poster.trim())
+      ? loc.poster.trim().replace(/^http:\/\//i, 'https://')
+      : undefined;
+
+  const sourceUrl = doubanId
+    ? `https://movie.douban.com/subject/${doubanId}/`
+    : undefined;
+  const externalId = doubanId
+    ? `douban-subj-${doubanId}`
+    : `douban-wmdb-${title}`;
+
+  const subtitleParts: string[] = [typeLabel];
+  if (rating) subtitleParts.push(`豆瓣 ${rating}`);
+  if (directors.length > 0) subtitleParts.push(`导演 ${directors[0]}`);
+  else if (genres.length > 0) subtitleParts.push(genres.slice(0, 2).join(' / '));
+
+  const desc = cleanDoubanText(String(loc?.description || ''), 240);
+  const fallbackSummary = [
+    `${title}${year ? `（${year}）` : ''}`,
+    rating ? `豆瓣评分 ${rating}` : '',
+    directors.length > 0 ? `导演：${directors.join(' / ')}` : '',
+    actors.length > 0 ? `主演：${actors.slice(0, 4).join(' / ')}` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
+  const result: OnlineSearchResult = {
+    externalId,
+    category: 'film',
+    title,
+    originalTitle: rawOrig,
+    subtitle: subtitleParts.join(' · '),
+    year,
+    region,
+    coverUrl: rawPoster,
+    summary: desc || fallbackSummary,
+    sourceName: '豆瓣影视',
+    sourceUrl,
+    tags: genres.length > 0 ? genres : [typeLabel],
+  };
+
+  const people: OnlineSearchResult[] = [];
+  const seenNames = new Set<string>();
+  for (const d of directors) {
+    if (seenNames.has(d)) continue;
+    seenNames.add(d);
+    people.push({
+      externalId: `douban-static-dir-${doubanId || title}-${d}`,
+      category: 'person',
+      title: d,
+      subtitle: '导演',
+      summary: `《${title}》导演。`,
+      relatedWorkTitle: title,
+      sourceName: '豆瓣影视',
+      sourceUrl,
+      tags: ['导演'],
+    });
+  }
+  for (const a of actors) {
+    if (seenNames.has(a)) continue;
+    seenNames.add(a);
+    people.push({
+      externalId: `douban-static-act-${doubanId || title}-${a}`,
+      category: 'person',
+      title: a,
+      subtitle: '主演',
+      summary: `在《${title}》中担任主演。`,
+      relatedWorkTitle: title,
+      sourceName: '豆瓣影视',
+      sourceUrl,
+      tags: ['演员'],
+    });
+  }
+
+  return { result, people };
+}
+
+export function parseWmdbSearchPayload(
+  payload: Record<string, any> | null | undefined
+): ParsedStaticDoubanEntry[] {
+  const rows = Array.isArray(payload?.data) ? payload.data : [];
+  const out: ParsedStaticDoubanEntry[] = [];
+  for (const row of rows) {
+    const parsed = parseWmdbMovieRecord(row);
+    if (parsed) out.push(parsed);
+  }
+  return out;
+}
+
+/**
+ * Parses `movie.douban.com/j/subject_abstract?subject_id={id}` (live Douban rating, cast, genres).
+ */
+export function parseDoubanSubjectAbstract(
+  payload: Record<string, any> | null | undefined
+): ParsedStaticDoubanEntry | null {
+  const subj = payload?.subject;
+  if (!subj || typeof subj !== 'object') return null;
+
+  const id = String(subj.id || '').trim();
+  const rawTitle = String(subj.title || '')
+    .replace(/\u200e/g, '')
+    .replace(/\s*\(\d{4}\)\s*$/, '')
+    .trim();
+  if (!rawTitle) return null;
+
+  // Douban abstract titles sometimes concatenate Chinese + Original title with a space
+  const title = rawTitle;
+  const year = extractYear(String(subj.release_year || subj.title || ''));
+  const ratingNum = Number(subj.rate || 0);
+  const rating =
+    Number.isFinite(ratingNum) && ratingNum > 0
+      ? ratingNum.toFixed(1)
+      : undefined;
+  const typeLabel =
+    subj.is_tv || String(subj.subtype || '').toLowerCase() === 'tv'
+      ? '剧集'
+      : '电影';
+  const directors: string[] = Array.isArray(subj.directors)
+    ? subj.directors.map((d: unknown) => String(d || '').trim()).filter(Boolean)
+    : [];
+  const actors: string[] = Array.isArray(subj.actors)
+    ? subj.actors.map((a: unknown) => String(a || '').trim()).filter(Boolean)
+    : [];
+  const genres: string[] = Array.isArray(subj.types)
+    ? subj.types.map((g: unknown) => String(g || '').trim()).filter(Boolean)
+    : [];
+  const region =
+    typeof subj.region === 'string' && subj.region.trim()
+      ? subj.region.trim()
+      : undefined;
+  const sourceUrl =
+    typeof subj.url === 'string' && subj.url.trim()
+      ? subj.url.trim()
+      : id
+        ? `https://movie.douban.com/subject/${id}/`
+        : undefined;
+
+  const subtitleParts: string[] = [typeLabel];
+  if (rating) subtitleParts.push(`豆瓣 ${rating}`);
+  if (directors.length > 0) subtitleParts.push(`导演 ${directors[0]}`);
+
+  const summaryParts: string[] = [];
+  if (directors.length > 0) summaryParts.push(`导演：${directors.slice(0, 2).join(' / ')}`);
+  if (actors.length > 0) summaryParts.push(`主演：${actors.slice(0, 5).join(' / ')}`);
+  if (subj.short_comment?.content) {
+    summaryParts.push(`短评：「${cleanDoubanText(String(subj.short_comment.content), 90)}」`);
+  }
+
+  const result: OnlineSearchResult = {
+    externalId: id ? `douban-subj-${id}` : `douban-abs-${title}`,
+    category: 'film',
+    title,
+    subtitle: subtitleParts.join(' · '),
+    year,
+    region,
+    summary:
+      summaryParts.join(' · ') ||
+      `${title}${year ? `（${year}）` : ''} · 豆瓣影视条目`,
+    sourceName: '豆瓣影视',
+    sourceUrl,
+    tags: genres.length > 0 ? genres.slice(0, 4) : [typeLabel],
+  };
+
+  const people: OnlineSearchResult[] = [];
+  const seen = new Set<string>();
+  for (const d of directors.slice(0, 3)) {
+    if (seen.has(d)) continue;
+    seen.add(d);
+    people.push({
+      externalId: `douban-abs-dir-${id || title}-${d}`,
+      category: 'person',
+      title: d,
+      subtitle: '导演',
+      summary: `《${title}》导演。`,
+      relatedWorkTitle: title,
+      sourceName: '豆瓣影视',
+      sourceUrl,
+      tags: ['导演'],
+    });
+  }
+  for (const a of actors.slice(0, 12)) {
+    if (seen.has(a)) continue;
+    seen.add(a);
+    people.push({
+      externalId: `douban-abs-act-${id || title}-${a}`,
+      category: 'person',
+      title: a,
+      subtitle: '主演',
+      summary: `在《${title}》中担任主演。`,
+      relatedWorkTitle: title,
+      sourceName: '豆瓣影视',
+      sourceUrl,
+      tags: ['演员'],
+    });
+  }
+
+  return { result, people };
+}

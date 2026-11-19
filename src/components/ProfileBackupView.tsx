@@ -598,15 +598,15 @@ export function ProfileBackupView({
             {runtimeMode === 'server'
               ? '服务端已内置直连'
               : relayInput
-                ? '已配置桥接中转'
-                : '静态模式需配置中转'}
+                ? '已启用自建中转'
+                : '已内置免配置直连'}
           </span>
         </div>
 
         <p className="mt-1.5 text-xs leading-relaxed text-[#625C54]">
           {runtimeMode === 'server'
-            ? '当前服务端已原生直连豆瓣影视（评分、简介、演职员与角色表、官方海报与剧照），开箱即用。若需将本应用部署到纯静态 GitHub Pages，可展开下方配置免费的 Cloudflare Worker 桥接地址。'
-            : '豆瓣接口与图床受浏览器跨域和防盗链限制。粘贴你部署的 Cloudflare Worker 或本应用服务端地址，即可在 GitHub Pages 纯静态页面同样完整直连豆瓣。'}
+            ? '当前服务端已原生直连豆瓣影视（评分、简介、演职员与角色表、官方海报与剧照），开箱即用。'
+            : '当前纯静态/手机端已内置免配置豆瓣直连通道，无需任何设置即可直接搜豆瓣影视、查评分与海报。如需更多豆瓣原站高清剧照，可按需展开配置可选的自定义中转地址。'}
         </p>
 
         <button
@@ -615,7 +615,7 @@ export function ProfileBackupView({
           aria-expanded={relayExpanded}
           className="mt-3 text-xs font-medium text-[#1A1816] underline underline-offset-4 hover:text-[#B43B2B] cursor-pointer"
         >
-          {relayExpanded ? '收起豆瓣桥接配置' : '配置静态模式豆瓣桥接 / 获取 Worker 代码'}
+          {relayExpanded ? '收起高级中转配置' : '高级选项：绑定自建中转（可选）'}
         </button>
 
         {relayExpanded && (

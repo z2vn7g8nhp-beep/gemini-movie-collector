@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   extractDoubanCharacterName,
+  extractJsonFromJinaEnvelope,
   normalizeDoubanImageUrl,
   normalizeRelayBaseUrl,
   parseDoubanCardSubtitle,
@@ -10,9 +11,11 @@ import {
   parseDoubanCredits,
   parseDoubanMovieSearch,
   parseDoubanPhotos,
+  parseDoubanSubjectAbstract,
   parseDoubanSubjectDetail,
   parseDoubanSuggest,
   parseDoubanUrlOrId,
+  parseWmdbSearchPayload,
 } from './doubanParsers';
 
 test('parseDoubanUrlOrId recognizes movie, mobile, celebrity, personage, and shorthand IDs', () => {
@@ -309,4 +312,84 @@ test('parseDoubanPhotos & normalizeRelayBaseUrl behave safely', () => {
     'https://my-douban.workers.dev'
   );
   assert.equal(normalizeRelayBaseUrl('javascript:alert(1)'), '');
+});
+
+test('extractJsonFromJinaEnvelope parses raw, fenced, and prefixed JSON payloads', () => {
+  assert.deepEqual(
+    extractJsonFromJinaEnvelope({ data: { content: '[{"id":"123"}]' } }),
+    [{ id: '123' }]
+  );
+  assert.deepEqual(
+    extractJsonFromJinaEnvelope({
+      data: { content: '```json\n{"ok":true}\n```' },
+    }),
+    { ok: true }
+  );
+  assert.equal(extractJsonFromJinaEnvelope({ data: { content: 'not json' } }), null);
+});
+
+test('parseWmdbSearchPayload and parseDoubanSubjectAbstract parse zero-config static Douban data', () => {
+  const wmdbEntries = parseWmdbSearchPayload({
+    data: [
+      {
+        doubanId: '35588177',
+        originalName: '漫长的季节',
+        alias: 'The Long Season',
+        year: '2023',
+        type: 'TVSeries',
+        episodes: 12,
+        doubanRating: '',
+        data: [
+          {
+            lang: 'Cn',
+            name: '漫长的季节',
+            genre: '剧情/家庭/犯罪',
+            country: '中国大陆',
+            poster: 'https://img.wmdb.tv/movie/poster/1681986787702-a983ae.jpg',
+            description: '小城桦林，出租司机王响的故事。',
+          },
+        ],
+        director: [{ data: [{ lang: 'Cn', name: '辛爽' }] }],
+        actor: [
+          { data: [{ lang: 'Cn', name: '范伟' }] },
+          { data: [{ lang: 'Cn', name: '秦昊' }] },
+        ],
+      },
+    ],
+  });
+
+  assert.equal(wmdbEntries.length, 1);
+  assert.equal(wmdbEntries[0].result.title, '漫长的季节');
+  assert.equal(wmdbEntries[0].result.sourceName, '豆瓣影视');
+  assert.equal(
+    wmdbEntries[0].result.sourceUrl,
+    'https://movie.douban.com/subject/35588177/'
+  );
+  assert.equal(
+    wmdbEntries[0].result.coverUrl,
+    'https://img.wmdb.tv/movie/poster/1681986787702-a983ae.jpg'
+  );
+  assert.equal(wmdbEntries[0].people.length, 3);
+  assert.equal(wmdbEntries[0].people[0].title, '辛爽');
+
+  const abs = parseDoubanSubjectAbstract({
+    r: 0,
+    subject: {
+      id: '35588177',
+      title: '漫长的季节\u200e (2023)',
+      rate: '9.4',
+      is_tv: true,
+      directors: ['辛爽'],
+      actors: ['范伟', '秦昊'],
+      types: ['剧情', '犯罪'],
+      region: '中国大陆',
+      release_year: '2023',
+      url: 'https://movie.douban.com/subject/35588177/',
+    },
+  });
+
+  assert.ok(abs);
+  assert.equal(abs.result.title, '漫长的季节');
+  assert.match(abs.result.subtitle || '', /豆瓣 9\.4/);
+  assert.equal(abs.people.length, 3);
 });

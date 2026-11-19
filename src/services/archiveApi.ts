@@ -66,6 +66,7 @@ export interface CharacterDossierResponse {
 }
 
 let cachedMode: RuntimeMode | null = null;
+let softStaticUntil = 0;
 let modeProbePromise: Promise<RuntimeMode> | null = null;
 
 // Adaptive per-host slow/blocked tracking so GFW-blocked hosts do not stall
@@ -125,13 +126,18 @@ export function getRuntimeModeSync(): RuntimeMode {
     cachedMode = 'static';
     return 'static';
   }
+  if (softStaticUntil > Date.now()) {
+    return 'static';
+  }
   return 'server';
 }
 
 /**
- * Probes once whether the Express `/api/*` backend is available.
- * On GitHub Pages (`*.github.io`, `VITE_STATIC_MODE=true`, or `?static=1`),
- * resolves immediately to `'static'` without triggering a 404 network request.
+ * Probes whether the Express `/api/*` backend is available.
+ * - On GitHub Pages (`*.github.io`, `VITE_STATIC_MODE=true`, or `?static=1`),
+ *   resolves immediately to `'static'` without triggering a 404 request.
+ * - On mobile cellular / Cloud Run cold starts, uses a generous 6.5s timeout and
+ *   NEVER permanently locks into `'static'` on a transient network timeout.
  */
 export async function detectRuntimeMode(): Promise<RuntimeMode> {
   if (cachedMode) return cachedMode;
@@ -139,19 +145,27 @@ export async function detectRuntimeMode(): Promise<RuntimeMode> {
     cachedMode = 'static';
     return 'static';
   }
+  if (softStaticUntil > Date.now()) {
+    return 'static';
+  }
   if (modeProbePromise) return modeProbePromise;
 
   modeProbePromise = (async () => {
     try {
       const controller = new AbortController();
-      const timer = window.setTimeout(() => controller.abort(), 2200);
+      const timer = window.setTimeout(() => controller.abort(), 6500);
       try {
         const res = await fetch('/api/health', {
           signal: controller.signal,
+          cache: 'no-store',
           headers: { Accept: 'application/json' },
         });
-        if (!res.ok) {
+        if (res.status === 404 || res.status === 405) {
           cachedMode = 'static';
+          return 'static';
+        }
+        if (!res.ok) {
+          softStaticUntil = Date.now() + 15_000;
           return 'static';
         }
         const contentType = res.headers.get('content-type') || '';
@@ -160,14 +174,22 @@ export async function detectRuntimeMode(): Promise<RuntimeMode> {
           return 'static';
         }
         const json = (await res.json()) as { ok?: boolean };
-        cachedMode = json?.ok ? 'server' : 'static';
-        return cachedMode;
+        if (json?.ok) {
+          cachedMode = 'server';
+          softStaticUntil = 0;
+          return 'server';
+        }
+        cachedMode = 'static';
+        return 'static';
       } finally {
         window.clearTimeout(timer);
       }
     } catch {
-      cachedMode = 'static';
+      // Transient mobile timeout / cold start: fall back temporarily without permanently locking static mode
+      softStaticUntil = Date.now() + 15_000;
       return 'static';
+    } finally {
+      modeProbePromise = null;
     }
   })();
 
@@ -870,24 +892,14 @@ export async function searchOnline(
 
   const tasks: Array<NamedSourceTask<OnlineSearchResult>> = [];
   const relayUrl = getConfiguredDoubanRelayUrl();
+  const doubanOpts = relayUrl
+    ? ({ transport: 'relay', relayBaseUrl: relayUrl } as const)
+    : ({ transport: 'static-direct' } as const);
 
-  if (source === 'douban' && !relayUrl) {
-    return {
-      results: [],
-      activeSources: [],
-      mode,
-      error:
-        '当前处于纯静态页面模式，直连豆瓣需先在「我的 → 豆瓣直连桥接」配置 Cloudflare Worker 或后端地址，或切换「全网直连聚合」。',
-    };
-  }
-
-  if ((source === 'all' || source === 'douban') && relayUrl) {
+  if (source === 'all' || source === 'douban') {
     tasks.push({
       name: '豆瓣影视',
-      promise: searchDoubanMedia(trimmed, category, {
-        transport: 'relay',
-        relayBaseUrl: relayUrl,
-      }),
+      promise: searchDoubanMedia(trimmed, category, doubanOpts),
     });
   }
 
@@ -936,7 +948,7 @@ export async function searchOnline(
 
   const { items, activeSources } = await settleSourcesWithFastWindow(
     tasks,
-    source === 'all' ? 1800 : 4800
+    source === 'all' ? 2800 : source === 'douban' ? 7500 : 4800
   );
 
   return {
@@ -1037,20 +1049,19 @@ export async function searchCovers(
 
   const globalQuery = (originalTitle || '').trim() || trimmed;
   const relayUrl = getConfiguredDoubanRelayUrl();
+  const doubanCoverOpts = relayUrl
+    ? ({ transport: 'relay', relayBaseUrl: relayUrl } as const)
+    : ({ transport: 'static-direct' } as const);
   const tasks: Array<NamedSourceTask<CoverCandidate>> = [
-    ...(relayUrl
-      ? [
-          {
-            name: '豆瓣图库',
-            promise: searchDoubanCoverCandidates(
-              trimmed,
-              category,
-              originalTitle?.trim() || undefined,
-              { transport: 'relay', relayBaseUrl: relayUrl }
-            ),
-          },
-        ]
-      : []),
+    {
+      name: '豆瓣图库',
+      promise: searchDoubanCoverCandidates(
+        trimmed,
+        category,
+        originalTitle?.trim() || undefined,
+        doubanCoverOpts
+      ),
+    },
     {
       name: '百度百科',
       promise: searchBaiduBaikeBrowser(trimmed, category).then((items) =>
@@ -1203,20 +1214,21 @@ export async function fetchOnlineRelations(
     : null;
 
   const relayUrl = getConfiguredDoubanRelayUrl();
+  const doubanRelOpts = relayUrl
+    ? ({ transport: 'relay', relayBaseUrl: relayUrl, signal } as const)
+    : ({ transport: 'static-direct', signal } as const);
 
   if (params.category === 'film') {
-    if (relayUrl) {
-      const doubanRel = await fetchDoubanFilmRelations(
-        params.title,
-        params.originalTitle,
-        params.sourceUrl,
-        { transport: 'relay', relayBaseUrl: relayUrl, signal }
-      ).catch(() => ({ people: [], characters: [] }));
-      if (doubanRel.people.length > 0 || doubanRel.characters.length > 0) {
-        sources.push('豆瓣影视');
-        pushUnique(people, doubanRel.people);
-        pushUnique(characters, doubanRel.characters);
-      }
+    const doubanRel = await fetchDoubanFilmRelations(
+      params.title,
+      params.originalTitle,
+      params.sourceUrl,
+      doubanRelOpts
+    ).catch(() => ({ people: [], characters: [] }));
+    if (doubanRel.people.length > 0 || doubanRel.characters.length > 0) {
+      sources.push('豆瓣影视');
+      pushUnique(people, doubanRel.people);
+      pushUnique(characters, doubanRel.characters);
     }
 
     const [baikeOutcome, iqiyiOutcome, wikiOutcome, bgmOutcome] =
@@ -1474,22 +1486,20 @@ export async function fetchOnlineRelations(
       sources.push('爱奇艺影视库');
       pushUnique(films, iqiyiOutcome.value.relatedFilms);
     }
-    if (relayUrl) {
-      const doubanRel = await fetchDoubanPersonRelations(
-        params.title,
-        params.originalTitle,
-        params.sourceUrl,
-        { transport: 'relay', relayBaseUrl: relayUrl, signal }
-      ).catch(() => ({ films: [], characters: [] }));
-      if (doubanRel.films.length > 0 || doubanRel.characters.length > 0) {
-        sources.unshift('豆瓣影视');
-        const nextFilms = [...doubanRel.films, ...films];
-        const nextChars = [...doubanRel.characters, ...characters];
-        films.length = 0;
-        characters.length = 0;
-        pushUnique(films, nextFilms);
-        pushUnique(characters, nextChars);
-      }
+    const doubanRel = await fetchDoubanPersonRelations(
+      params.title,
+      params.originalTitle,
+      params.sourceUrl,
+      doubanRelOpts
+    ).catch(() => ({ films: [], characters: [] }));
+    if (doubanRel.films.length > 0 || doubanRel.characters.length > 0) {
+      sources.unshift('豆瓣影视');
+      const nextFilms = [...doubanRel.films, ...films];
+      const nextChars = [...doubanRel.characters, ...characters];
+      films.length = 0;
+      characters.length = 0;
+      pushUnique(films, nextFilms);
+      pushUnique(characters, nextChars);
     }
   }
 

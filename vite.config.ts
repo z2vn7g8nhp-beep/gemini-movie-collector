@@ -59,8 +59,12 @@ export default defineConfig(() => {
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,jpg,svg,woff,woff2}'],
           navigateFallback: 'index.html',
-          navigateFallbackDenylist: [/^\/api\//],
+          navigateFallbackDenylist: [/^\/api\//, /^\/douban/, /^\/img/],
           runtimeCaching: [
+            {
+              urlPattern: /^\/(api|douban|img)(\/|\?|$)/i,
+              handler: 'NetworkOnly',
+            },
             {
               urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
               handler: 'CacheFirst',
@@ -91,7 +95,7 @@ export default defineConfig(() => {
             },
             {
               urlPattern:
-                /^https:\/\/(upload\.wikimedia\.org|lain\.bgm\.tv|static\.tvmaze\.com|bkimg\.cdn\.bcebos\.com|pic\d*\.iqiyipic\.com|storage\.moegirl\.org\.cn)\/.*/i,
+                /^https:\/\/(img\.wmdb\.tv|upload\.wikimedia\.org|lain\.bgm\.tv|static\.tvmaze\.com|bkimg\.cdn\.bcebos\.com|pic\d*\.iqiyipic\.com|storage\.moegirl\.org\.cn)\/.*/i,
               handler: 'CacheFirst',
               options: {
                 cacheName: 'archival-posters-cache',
