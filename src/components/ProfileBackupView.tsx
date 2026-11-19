@@ -13,7 +13,6 @@ import type {
   CollectorState,
 } from '../types/archive';
 import { mergeImportedItems, parseImportPayload } from '../utils/archive';
-import { shouldUseBackendApi } from '../services/apiClient';
 import {
   buildCollectorRank,
   computeCheckInStreak,
@@ -27,14 +26,17 @@ import {
   type CinemaMedal,
   type MedalCategory,
 } from '../utils/medals';
+import type { RuntimeMode } from '../utils/runtimeEnv';
 import { ArchivalSealStamp } from './ArchivalSealStamp';
 import { CinemaMedalSvg } from './CinemaMedalSvg';
 import { MedalInspectModal } from './MedalInspectModal';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface ProfileBackupViewProps {
   items: ArchiveItem[];
   stats: ArchiveStats;
   collector: CollectorState;
+  runtimeMode?: RuntimeMode;
   onCheckInToday: () => Promise<void>;
   onReplaceAll: (items: ArchiveItem[]) => Promise<void>;
   onFilterByTag?: (tag: string) => void;
@@ -44,6 +46,7 @@ export function ProfileBackupView({
   items,
   stats,
   collector,
+  runtimeMode = 'static',
   onCheckInToday,
   onReplaceAll,
   onFilterByTag,
@@ -541,15 +544,38 @@ export function ProfileBackupView({
         </div>
       </div>
 
+      {/* Web App Installation & GitHub Pages Card */}
+      <div
+        data-testid="webapp-install-card"
+        className="rounded-2xl border border-[#E4DFD5] bg-white p-5"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-editorial text-lg font-medium text-[#1A1816]">
+            独立 Web App 与离线安装
+          </h2>
+          <span className="font-mono text-[11px] text-[#7A7268]">
+            {runtimeMode === 'static'
+              ? 'GitHub Pages 纯静态本地模式'
+              : '服务端直连 + 本地离线双模'}
+          </span>
+        </div>
+        <p className="mt-1.5 text-xs leading-relaxed text-[#625C54]">
+          支持将光影志添加到手机主屏幕或安装为桌面独立窗口，断网时仍可翻阅全部本地藏馆、手记与印记册；部署至 GitHub Pages 时无需后端服务器即可完整运行。
+        </p>
+        <div className="mt-4">
+          <PWAInstallButton variant="card" />
+        </div>
+      </div>
+
       {/* Export Backup Card */}
       <div className="rounded-2xl border border-[#E4DFD5] bg-white p-5">
         <h2 className="font-editorial text-lg font-medium text-[#1A1816]">
           备份与导出
         </h2>
         <p className="mt-1 text-xs leading-relaxed text-[#625C54]">
-          {shouldUseBackendApi()
-            ? '数据已实时保存至服务端与当前手机浏览器，无需登录第三方账号。你可以随时导出 JSON 备份文件。'
-            : '数据已实时保存至当前浏览器本地存储，无需登录第三方账号。建议定期导出 JSON 备份文件以防清理缓存丢失。'}
+          {runtimeMode === 'static'
+            ? '当前数据安全保存于浏览器本地存储（无需登录账号）。跨设备同步或长期归档建议定期导出 JSON 备份文件。'
+            : '数据已实时保存至服务端与当前浏览器，无需登录第三方账号。你可以随时导出 JSON 备份文件。'}
         </p>
         <button
           type="button"

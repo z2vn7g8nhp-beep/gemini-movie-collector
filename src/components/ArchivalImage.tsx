@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Film, Sparkles, User } from 'lucide-react';
 import type { ArchiveCategory } from '../types/archive';
-import { resolveAssetOrImageUrl } from '../services/apiClient';
+import { getRuntimeModeSync } from '../services/archiveApi';
 import { CATEGORY_LABELS } from '../utils/archive';
+import {
+  getDirectImageFallbackUrl,
+  resolveDisplayImageUrl,
+} from '../utils/runtimeEnv';
 
 interface ArchivalImageProps {
   src?: string;
@@ -53,20 +57,29 @@ export function ArchivalImage({
   const imgRef = useRef<HTMLImageElement | null>(null);
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [usedDirectFallback, setUsedDirectFallback] = useState(false);
 
-  const cleanSrc = resolveAssetOrImageUrl(src) || '';
+  const baseUrl =
+    typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL
+      ? import.meta.env.BASE_URL
+      : './';
+  const primarySrc = resolveDisplayImageUrl(src, getRuntimeModeSync(), baseUrl);
+  const directFallback = getDirectImageFallbackUrl(src);
+  const effectiveSrc =
+    usedDirectFallback && directFallback ? directFallback : primarySrc;
 
   useEffect(() => {
     setFailed(false);
+    setUsedDirectFallback(false);
     const el = imgRef.current;
     if (el && el.complete && el.naturalWidth > 0) {
       setLoaded(true);
     } else {
       setLoaded(false);
     }
-  }, [cleanSrc]);
+  }, [primarySrc]);
 
-  const showFallback = !cleanSrc || failed;
+  const showFallback = !effectiveSrc || failed;
   const monogram = (title.trim().charAt(0) || '影').toUpperCase();
   const theme = FALLBACK_THEMES[category];
 
@@ -84,11 +97,22 @@ export function ArchivalImage({
           )}
           <img
             ref={imgRef}
-            src={cleanSrc}
+            src={effectiveSrc}
             alt={alt}
             referrerPolicy="no-referrer"
             onLoad={() => setLoaded(true)}
-            onError={() => setFailed(true)}
+            onError={() => {
+              if (
+                !usedDirectFallback &&
+                directFallback &&
+                directFallback !== effectiveSrc
+              ) {
+                setUsedDirectFallback(true);
+                setLoaded(false);
+              } else {
+                setFailed(true);
+              }
+            }}
             className={`h-full w-full object-cover ${
               category === 'film' ? 'object-center' : 'object-top'
             } transition-[transform,opacity] duration-200 ease-out ${

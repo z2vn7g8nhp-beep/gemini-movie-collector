@@ -6,6 +6,7 @@ import {
   Stamp,
   UserRound,
 } from 'lucide-react';
+import { PWAInstallButton } from './PWAInstallButton';
 
 export type AppTab = 'library' | 'timeline' | 'search' | 'create' | 'profile';
 
@@ -104,6 +105,7 @@ export function AppTopBar({
         </button>
 
         <div className="flex shrink-0 items-center gap-2">
+          <PWAInstallButton variant="topbar" />
           {needsDailyCheckIn && onQuickCheckIn && (
             <button
               type="button"
@@ -172,6 +174,7 @@ export function AppTopBar({
         </nav>
 
         <div className="flex shrink-0 items-center gap-2.5">
+          <PWAInstallButton variant="topbar" />
           {needsDailyCheckIn && onQuickCheckIn && (
             <button
               type="button"

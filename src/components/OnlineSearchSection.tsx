@@ -6,8 +6,8 @@ import type {
   OnlineSearchResult,
   SearchSourceOption,
 } from '../types/archive';
+import { searchOnline } from '../services/archiveApi';
 import { CATEGORY_LABELS, isAlreadyCollected } from '../utils/archive';
-import { apiSearchMedia } from '../services/apiClient';
 import { ArchivalImage } from './ArchivalImage';
 
 interface OnlineSearchSectionProps {
@@ -83,21 +83,16 @@ export function OnlineSearchSection({
     setError('');
     setHasSearched(true);
     try {
-      const data = await apiSearchMedia({
-        query: trimmed,
-        category: cat,
-        source: src,
-      });
-      setResults(Array.isArray(data.results) ? data.results : []);
-      setActiveSources(
-        Array.isArray(data.activeSources) ? data.activeSources : []
-      );
-    } catch (err) {
-      setError(
-        err instanceof Error && err.message
-          ? err.message
-          : '网络连接中断，请稍后重试。'
-      );
+      const data = await searchOnline(trimmed, cat, src);
+      if (data.error) {
+        setError(data.error);
+        setResults([]);
+        return;
+      }
+      setResults(data.results);
+      setActiveSources(data.activeSources);
+    } catch {
+      setError('网络连接中断，请稍后重试。');
       setResults([]);
     } finally {
       setLoading(false);

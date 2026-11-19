@@ -7,13 +7,13 @@ import { DailyCheckInBanner } from './components/DailyCheckInBanner';
 import { DetailDrawer } from './components/DetailDrawer';
 import { ManualCreateView } from './components/ManualCreateView';
 import { MobileNavBar, AppTopBar, type AppTab } from './components/MobileNavBar';
+import { OfflineIndicator } from './components/OfflineIndicator';
 import { PostCollectLinkSheet } from './components/PostCollectLinkSheet';
 import { ProfileBackupView } from './components/ProfileBackupView';
 import { RandomEncounterModal } from './components/RandomEncounterModal';
 import { SearchTabView } from './components/SearchTabView';
 import { TimelineMemoriesView } from './components/TimelineMemoriesView';
-import { SEED_COLLECTION } from './data/seedCollection';
-import { getApiBaseUrl, shouldUseBackendApi } from './services/apiClient';
+import { detectRuntimeMode, getRuntimeModeSync } from './services/archiveApi';
 import type {
   ArchiveCategory,
   ArchiveDraftInput,
@@ -25,12 +25,12 @@ import type {
   SortOption,
 } from './types/archive';
 import {
-  buildProxyImageUrl,
   computeArchiveStats,
   filterAndSortItems,
   findExistingItemByTitle,
   nextAccessionNo,
 } from './utils/archive';
+import { formatCoverUrlForMode, type RuntimeMode } from './utils/runtimeEnv';
 import {
   findRecommendedUnlinkedItems,
   type LinkRecommendation,
@@ -153,6 +153,10 @@ export default function App() {
   } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [runtimeMode, setRuntimeMode] = useState<RuntimeMode>(() =>
+    getRuntimeModeSync()
+  );
+  const runtimeModeRef = useRef<RuntimeMode>(runtimeMode);
   const [todayKey, setTodayKey] = useState(() => formatLocalDateKey());
   const [reminderPrefs, setReminderPrefs] = useState<CheckInReminderPrefs>(() =>
     loadCheckInReminderPrefs()
@@ -165,19 +169,24 @@ export default function App() {
   const unlockedStampsRef = useRef<Set<string>>(new Set());
   const medalTiersRef = useRef<Map<string, MedalTier>>(new Map());
 
-  // Sync collection & collector rituals with server-side JSON store on mount (or localStorage in static mode)
+  // Sync collection & collector rituals with Express backend when available,
+  // or operate purely on browser localStorage when deployed statically (GitHub Pages).
   useEffect(() => {
     let cancelled = false;
     async function hydrate() {
       try {
+        const mode = await detectRuntimeMode();
+        if (cancelled) return;
+        runtimeModeRef.current = mode;
+        setRuntimeMode(mode);
+
         let loadedItems = loadLocalFallback() ?? [];
         let loadedCollector = loadLocalCollector();
 
-        if (shouldUseBackendApi()) {
-          const apiBase = getApiBaseUrl();
+        if (mode === 'server') {
           const [colRes, collectorRes] = await Promise.all([
-            fetch(`${apiBase}/api/collection`),
-            fetch(`${apiBase}/api/collector`),
+            fetch('/api/collection'),
+            fetch('/api/collector'),
           ]);
           if (cancelled) return;
 
@@ -193,7 +202,7 @@ export default function App() {
             } else {
               setItems(loadedItems);
               saveLocalFallback(loadedItems);
-              await fetch(`${apiBase}/api/collection/init`, {
+              await fetch('/api/collection/init', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ items: loadedItems }),
@@ -206,7 +215,9 @@ export default function App() {
             const serverDates = Array.isArray(cData.checkInDates)
               ? cData.checkInDates
               : [];
-            const serverAlbums = Array.isArray(cData.albums) ? cData.albums : [];
+            const serverAlbums = Array.isArray(cData.albums)
+              ? cData.albums
+              : [];
             if (serverDates.length > 0 || serverAlbums.length > 0) {
               loadedCollector = {
                 checkInDates: serverDates,
@@ -454,9 +465,9 @@ export default function App() {
   const persistCollector = async (nextState: CollectorState) => {
     setCollector(nextState);
     saveLocalCollector(nextState);
-    if (!shouldUseBackendApi()) return;
+    if (runtimeModeRef.current !== 'server') return;
     try {
-      const res = await fetch(`${getApiBaseUrl()}/api/collector`, {
+      const res = await fetch('/api/collector', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(nextState),
@@ -519,9 +530,9 @@ export default function App() {
   const persistSnapshot = async (nextItems: ArchiveItem[]) => {
     setItems(nextItems);
     saveLocalFallback(nextItems);
-    if (!shouldUseBackendApi()) return;
+    if (runtimeModeRef.current !== 'server') return;
     try {
-      const res = await fetch(`${getApiBaseUrl()}/api/collection/replace`, {
+      const res = await fetch('/api/collection/replace', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ items: nextItems }),
@@ -536,11 +547,6 @@ export default function App() {
     } catch {
       // Saved locally
     }
-  };
-
-  const handleLoadSampleCollection = async () => {
-    await persistSnapshot(SEED_COLLECTION);
-    setNotice('已载入 6 件精选示例馆藏');
   };
 
   const buildItemsWithNewAndBidirectionalLinks = (
@@ -584,7 +590,7 @@ export default function App() {
       subtitle: result.subtitle,
       year: result.year,
       region: result.region,
-      coverUrl: buildProxyImageUrl(result.coverUrl),
+      coverUrl: formatCoverUrlForMode(result.coverUrl, runtimeModeRef.current),
       summary: result.summary,
       notes: '',
       rating: 0,
@@ -624,7 +630,7 @@ export default function App() {
       year: draft.year?.trim() || undefined,
       region: draft.region?.trim() || undefined,
       coverUrl: draft.coverUrl?.trim()
-        ? buildProxyImageUrl(draft.coverUrl.trim())
+        ? formatCoverUrlForMode(draft.coverUrl.trim(), runtimeModeRef.current)
         : undefined,
       summary: draft.summary?.trim() || '',
       quote: draft.quote?.trim() || undefined,
@@ -742,7 +748,10 @@ export default function App() {
       subtitle: candidate.subtitle,
       year: candidate.year,
       region: candidate.region,
-      coverUrl: buildProxyImageUrl(candidate.coverUrl),
+      coverUrl: formatCoverUrlForMode(
+        candidate.coverUrl,
+        runtimeModeRef.current
+      ),
       summary: candidate.summary,
       notes: '',
       rating: 0,
@@ -770,22 +779,22 @@ export default function App() {
   const handleUpdateItem = async (id: string, patch: Partial<ArchiveItem>) => {
     const updatedAt = new Date().toISOString();
     setItems((prev) => {
-      const next = prev.map((it) =>
-        it.id === id ? { ...it, ...patch, updatedAt } : it
-      );
+      const next = prev.map((it) => {
+        if (it.id !== id) return it;
+        const merged = { ...it, ...patch, updatedAt };
+        if (patch.coverUrl === '') delete merged.coverUrl;
+        return merged;
+      });
       saveLocalFallback(next);
       return next;
     });
-    if (!shouldUseBackendApi()) return;
+    if (runtimeModeRef.current !== 'server') return;
     try {
-      const res = await fetch(
-        `${getApiBaseUrl()}/api/collection/${encodeURIComponent(id)}`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(patch),
-        }
-      );
+      const res = await fetch(`/api/collection/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data.items)) {
@@ -810,14 +819,11 @@ export default function App() {
       saveLocalFallback(next);
       return next;
     });
-    if (shouldUseBackendApi()) {
+    if (runtimeModeRef.current === 'server') {
       try {
-        const res = await fetch(
-          `${getApiBaseUrl()}/api/collection/${encodeURIComponent(id)}`,
-          {
-            method: 'DELETE',
-          }
-        );
+        const res = await fetch(`/api/collection/${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+        });
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data.items)) {
@@ -837,9 +843,9 @@ export default function App() {
   const handleReplaceAll = async (nextItems: ArchiveItem[]) => {
     setItems(nextItems);
     saveLocalFallback(nextItems);
-    if (!shouldUseBackendApi()) return;
+    if (runtimeModeRef.current !== 'server') return;
     try {
-      await fetch(`${getApiBaseUrl()}/api/collection/replace`, {
+      await fetch('/api/collection/replace', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ items: nextItems }),
@@ -1184,7 +1190,6 @@ export default function App() {
               onJumpToSearch={jumpToSearch}
               onJumpToCreate={() => jumpToCreate()}
               onResetFilters={handleResetFilters}
-              onLoadSampleCollection={() => void handleLoadSampleCollection()}
             />
           </>
         )}
@@ -1230,12 +1235,15 @@ export default function App() {
             items={items}
             stats={stats}
             collector={collector}
+            runtimeMode={runtimeMode}
             onCheckInToday={handleCheckInToday}
             onReplaceAll={handleReplaceAll}
             onFilterByTag={handleFilterByTag}
           />
         )}
       </main>
+
+      <OfflineIndicator />
 
       {/* Action Notice Toast (Shifts to top while PostCollectLinkSheet is open so it never covers sheet buttons) */}
       {notice && (

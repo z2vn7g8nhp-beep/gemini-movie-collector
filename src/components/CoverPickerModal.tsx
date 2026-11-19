@@ -10,13 +10,13 @@ import {
   X,
 } from 'lucide-react';
 import type { ArchiveItem } from '../types/archive';
-import { apiSearchCovers } from '../services/apiClient';
-import { buildProxyImageUrl } from '../utils/archive';
+import { getRuntimeModeSync, searchCovers } from '../services/archiveApi';
 import {
   computeCoverResizeDimensions,
   validateCustomCoverUrl,
   type CoverCandidate,
 } from '../utils/coverPicker';
+import { formatCoverUrlForMode } from '../utils/runtimeEnv';
 import { ArchivalImage } from './ArchivalImage';
 
 interface CoverPickerModalProps {
@@ -108,12 +108,8 @@ export function CoverPickerModal({
     setLoading(true);
     setSearchError('');
     try {
-      const data = await apiSearchCovers({
-        query: trimmed,
-        originalTitle: originalTitle?.trim() || undefined,
-        category: item.category,
-      });
-      setCandidates(Array.isArray(data.candidates) ? data.candidates : []);
+      const list = await searchCovers(trimmed, item.category, originalTitle);
+      setCandidates(list);
     } catch (err) {
       setSearchError(
         err instanceof Error ? err.message : '封面搜索暂不可用，可切换本地上传或粘贴链接'
@@ -178,7 +174,9 @@ export function CoverPickerModal({
     if (tab === 'upload') return uploadPreview;
     if (tab === 'url') {
       const check = validateCustomCoverUrl(customUrlInput);
-      return check.ok ? buildProxyImageUrl(check.url) || check.url : '';
+      return check.ok
+        ? formatCoverUrlForMode(check.url, getRuntimeModeSync()) || check.url
+        : '';
     }
     return selectedUrl;
   })();
@@ -192,7 +190,8 @@ export function CoverPickerModal({
       }
       setApplying(true);
       try {
-        const finalUrl = buildProxyImageUrl(check.url) || check.url;
+        const finalUrl =
+          formatCoverUrlForMode(check.url, getRuntimeModeSync()) || check.url;
         await onApplyCover(finalUrl);
         onClose();
       } finally {
@@ -226,7 +225,7 @@ export function CoverPickerModal({
     : null;
   const liveUrlPreview =
     urlCheck && urlCheck.ok
-      ? buildProxyImageUrl(urlCheck.url) || urlCheck.url
+      ? formatCoverUrlForMode(urlCheck.url, getRuntimeModeSync()) || urlCheck.url
       : '';
 
   return (

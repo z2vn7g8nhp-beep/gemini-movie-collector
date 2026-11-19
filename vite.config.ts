@@ -2,21 +2,116 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import fs from 'fs';
 import path from 'path';
-import {defineConfig} from 'vite';
+import { defineConfig } from 'vite';
+import { VitePWA } from 'vite-plugin-pwa';
 
-export default defineConfig(({mode}) => {
-  const isPages = mode === 'pages' || process.env.VITE_STATIC_MODE === 'true';
-  const base =
-    process.env.VITE_BASE_PATH || (isPages ? '/gemini-movie-collector/' : '/');
-
+export default defineConfig(() => {
   return {
-    base,
+    // Relative base ensures assets, manifest, and service worker work seamlessly
+    // both at root (`/`) and under GitHub Pages project subpaths (`/<repo>/`).
+    base: process.env.VITE_BASE_PATH || './',
     plugins: [
       react(),
       tailwindcss(),
-      // Copies src/assets into dist/ so root-relative URLs like
-      // "/src/assets/images/..." (e.g. generate_image output) still resolve
-      // in production builds. Do not remove.
+      VitePWA({
+        registerType: 'autoUpdate',
+        includeAssets: [
+          'favicon.ico',
+          'icon.svg',
+          'apple-touch-icon.png',
+          'pwa-192x192.png',
+          'pwa-512x512.png',
+          'pwa-maskable-512x512.png',
+        ],
+        manifest: {
+          id: './',
+          lang: 'zh-CN',
+          name: '光影志 · 个人影视收藏馆',
+          short_name: '光影志',
+          description:
+            '支持离线翻阅与 GitHub Pages 独立部署的个人影视、影人与角色收藏档案馆。',
+          theme_color: '#F7F5F0',
+          background_color: '#F7F5F0',
+          display: 'standalone',
+          start_url: './',
+          scope: './',
+          icons: [
+            {
+              src: 'pwa-192x192.png',
+              sizes: '192x192',
+              type: 'image/png',
+              purpose: 'any',
+            },
+            {
+              src: 'pwa-512x512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'any',
+            },
+            {
+              src: 'pwa-maskable-512x512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'maskable',
+            },
+          ],
+        },
+        workbox: {
+          globPatterns: ['**/*.{js,css,html,ico,png,jpg,svg,woff,woff2}'],
+          navigateFallback: 'index.html',
+          navigateFallbackDenylist: [/^\/api\//],
+          runtimeCaching: [
+            {
+              urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'google-fonts-cache',
+                expiration: {
+                  maxEntries: 10,
+                  maxAgeSeconds: 60 * 60 * 24 * 365,
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
+            {
+              urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'gstatic-fonts-cache',
+                expiration: {
+                  maxEntries: 10,
+                  maxAgeSeconds: 60 * 60 * 24 * 365,
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
+            {
+              urlPattern: /^https:\/\/(upload\.wikimedia\.org|lain\.bgm\.tv|static\.tvmaze\.com)\/.*/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'archival-posters-cache',
+                expiration: {
+                  maxEntries: 120,
+                  maxAgeSeconds: 60 * 60 * 24 * 30,
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
+          ],
+        },
+        devOptions: {
+          enabled: true,
+          type: 'module',
+        },
+      }),
+      // Copies src/assets into dist/ and emits GitHub Pages SPA fallback files
+      // (404.html & .nojekyll) so static GitHub Pages deployments resolve cleanly.
       {
         name: 'copy-unbundled-src-assets',
         apply: 'build',
@@ -24,17 +119,22 @@ export default defineConfig(({mode}) => {
           if (error) {
             return;
           }
-          const distDir = path.resolve(__dirname, 'dist');
-          const srcAssets = path.resolve(__dirname, 'src/assets');
+          const rootDir = import.meta.dirname;
+          const distDir = path.resolve(rootDir, 'dist');
+          const srcAssets = path.resolve(rootDir, 'src/assets');
           const distAssets = path.resolve(distDir, 'src/assets');
           if (fs.existsSync(distDir) && fs.existsSync(srcAssets)) {
-            fs.cpSync(srcAssets, distAssets, {recursive: true, force: true});
+            fs.cpSync(srcAssets, distAssets, { recursive: true, force: true });
           }
-          if (isPages && fs.existsSync(distDir)) {
-            fs.writeFileSync(path.join(distDir, '.nojekyll'), '');
+          if (fs.existsSync(distDir)) {
             const indexHtml = path.join(distDir, 'index.html');
+            const notFoundHtml = path.join(distDir, '404.html');
             if (fs.existsSync(indexHtml)) {
-              fs.copyFileSync(indexHtml, path.join(distDir, '404.html'));
+              fs.copyFileSync(indexHtml, notFoundHtml);
+            }
+            const nojekyll = path.join(distDir, '.nojekyll');
+            if (!fs.existsSync(nojekyll)) {
+              fs.writeFileSync(nojekyll, '');
             }
           }
         },
@@ -42,7 +142,7 @@ export default defineConfig(({mode}) => {
     ],
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
+        '@': path.resolve(import.meta.dirname, '.'),
       },
     },
     server: {

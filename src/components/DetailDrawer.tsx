@@ -25,15 +25,16 @@ import type {
   OnlineSearchResult,
 } from '../types/archive';
 import {
-  apiFetchCharacterProfile,
-  apiFetchRelations,
-} from '../services/apiClient';
+  fetchCharacterDossier,
+  fetchOnlineRelations,
+  getRuntimeModeSync,
+} from '../services/archiveApi';
 import {
-  buildProxyImageUrl,
   CATEGORY_LABELS,
   findExistingItemByTitle,
   getStatusLabel,
 } from '../utils/archive';
+import { formatCoverUrlForMode } from '../utils/runtimeEnv';
 import {
   mergeCharacterProfile,
   splitCharacterTitle,
@@ -209,13 +210,15 @@ export function DetailDrawer({
       setDossierLoading(true);
       setDossierError('');
       try {
-        const data = await apiFetchCharacterProfile({
-          title: currentItem.title,
-          originalTitle: currentItem.originalTitle,
-          relatedWorkTitle: currentItem.relatedWorkTitle,
-          sourceUrl: currentItem.sourceUrl,
-          signal: controller.signal,
-        });
+        const data = await fetchCharacterDossier(
+          {
+            title: currentItem.title,
+            originalTitle: currentItem.originalTitle,
+            relatedWorkTitle: currentItem.relatedWorkTitle,
+            sourceUrl: currentItem.sourceUrl,
+          },
+          controller.signal
+        );
         if (cancelled) return;
 
         const fetched = data.profile || {};
@@ -284,21 +287,16 @@ export function DetailDrawer({
       setOnlineRelations(EMPTY_RELATIONS);
 
       try {
-        const data = await apiFetchRelations({
-          category: item!.category,
-          title: item!.title,
-          originalTitle: item!.originalTitle,
-          sourceUrl: item!.sourceUrl,
-          signal: controller.signal,
-        });
+        const next = await fetchOnlineRelations(
+          {
+            category: item!.category === 'film' ? 'film' : 'person',
+            title: item!.title,
+            originalTitle: item!.originalTitle,
+            sourceUrl: item!.sourceUrl,
+          },
+          controller.signal
+        );
         if (cancelled) return;
-
-        const next: OnlineRelationsPayload = {
-          films: Array.isArray(data.films) ? data.films : [],
-          people: Array.isArray(data.people) ? data.people : [],
-          characters: Array.isArray(data.characters) ? data.characters : [],
-          sources: Array.isArray(data.sources) ? data.sources : [],
-        };
         setOnlineRelations(next);
 
         const primaryCount =
@@ -428,7 +426,7 @@ export function DetailDrawer({
         relatedWorkTitle: relatedWorkTitle.trim() || undefined,
         portrayedBy: portrayedBy.trim() || undefined,
         coverUrl: coverUrlInput.trim()
-          ? buildProxyImageUrl(coverUrlInput.trim())
+          ? formatCoverUrlForMode(coverUrlInput.trim(), getRuntimeModeSync())
           : undefined,
       };
 
