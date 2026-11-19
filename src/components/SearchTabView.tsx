@@ -20,8 +20,9 @@ interface SearchTabViewProps {
 }
 
 const SOURCE_OPTIONS: Array<{ id: SearchSourceOption; label: string }> = [
+  { id: 'imdb', label: 'IMDb（豆瓣辅助）' },
+  { id: 'all', label: '全网直连聚合（IMDb + 豆瓣优先）' },
   { id: 'douban', label: '豆瓣影视' },
-  { id: 'all', label: '全网直连聚合（豆瓣优先）' },
   { id: 'bangumi', label: '番组计划 Bangumi' },
   { id: 'wiki', label: '中文维基百科' },
   { id: 'itunes', label: 'iTunes 影视库' },
@@ -41,7 +42,7 @@ export function SearchTabView({
 }: SearchTabViewProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [category, setCategory] = useState<ArchiveCategory>(initialCategory);
-  const [source, setSource] = useState<SearchSourceOption>('douban');
+  const [source, setSource] = useState<SearchSourceOption>('imdb');
   const [query, setQuery] = useState(initialQuery);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -166,9 +167,9 @@ export function SearchTabView({
               }}
               placeholder={
                 category === 'film'
-                  ? '搜索片名、剧集，或直接粘贴豆瓣条目链接…'
+                  ? '搜索中英文片名、剧集，或粘贴 IMDb（tt...）/ 豆瓣链接…'
                   : category === 'person'
-                    ? '搜索导演、演员，或粘贴豆瓣影人链接…'
+                    ? '搜索导演、演员，或粘贴 IMDb（nm...）/ 豆瓣影人链接…'
                     : '搜索影视角色名（如：甄嬛、苏丽珍、小丑）…'
               }
               className="h-12 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] pl-10 pr-10 text-[15px] text-[#1A1816] placeholder:text-[#8C857B] focus:border-[#1A1816] focus:bg-white focus:outline-none [&::-webkit-search-cancel-button]:hidden"
@@ -230,7 +231,7 @@ export function SearchTabView({
         </form>
 
         <p className="mt-3 text-[12px] text-[#7A7268]">
-          已直连豆瓣影视（评分 · 简介 · 演职员与角色 · 剧照）及全网资料库，支持直接粘贴豆瓣链接建档。
+          默认直连 IMDb 资料库（评分 · 奖项 · 高清海报与主创）并自动融合豆瓣中文片名、评分与简介，支持直接粘贴 IMDb / 豆瓣链接建档。
         </p>
       </div>
 

@@ -46,6 +46,12 @@ import {
   searchDoubanCoverCandidates,
   searchDoubanMedia,
 } from './doubanClient';
+import {
+  fetchImdbFilmRelations,
+  fetchImdbPersonRelations,
+  searchImdbCoverCandidates,
+  searchImdbMedia,
+} from './imdbClient';
 
 export interface OnlineSearchResponse {
   results: OnlineSearchResult[];
@@ -918,6 +924,24 @@ export async function searchOnline(
     ? ({ transport: 'relay', relayBaseUrl: relayUrl } as const)
     : ({ transport: 'static-direct' } as const);
 
+  // Primary IMDb direct path in static/browser mode (CORS-open Cinemeta + IMDb JSONP + non-blocking Douban assist!)
+  if (source === 'imdb') {
+    const bundle = await searchImdbMedia(trimmed, category, {
+      mode: 'browser',
+      doubanOptions: doubanOpts,
+      enableDoubanAssist: true,
+    });
+    const activeSources: string[] = [];
+    if (bundle.results.length > 0) {
+      activeSources.push(bundle.hasDoubanAssist ? 'IMDb · 豆瓣辅助' : 'IMDb');
+    }
+    return {
+      results: deduplicateSearchResults(bundle.results).slice(0, 16),
+      activeSources,
+      mode,
+    };
+  }
+
   // Pure Douban direct path in static / relay mode: preserve real errors instead of
   // misleadingly displaying "未检索到" when the bridge times out or hits rate limits.
   if (source === 'douban') {
@@ -932,8 +956,8 @@ export async function searchOnline(
       const reason = err instanceof DoubanBridgeError ? err.reason : 'network';
       const errorMsg =
         reason === 'rate-limit'
-          ? '豆瓣公开直连通道当前请求繁忙（限流），请等待几秒后点「重试」；如需长期免限流，可在「我的 → 豆瓣影视直连通道」绑定个人免费 Cloudflare Worker 中转。'
-          : '当前网络暂无法连通豆瓣直连节点（超时或网络受限），请点「重试」或切换网络；也可在「我的 → 豆瓣影视直连通道」绑定个人中转以获得稳定直连。';
+          ? '豆瓣公开直连通道当前请求繁忙（限流），建议优先切回「IMDb（豆瓣辅助）」直连，或等待几秒后点「重试」。'
+          : '当前网络暂无法连通豆瓣直连节点（超时或网络受限），建议优先切回「IMDb（豆瓣辅助）」直连，或在「我的」中绑定个人中转。';
       return {
         results: [],
         activeSources: [],
@@ -947,8 +971,14 @@ export async function searchOnline(
 
   if (source === 'all') {
     tasks.push({
-      name: '豆瓣影视',
-      promise: searchDoubanMedia(trimmed, category, doubanOpts).catch(() => []),
+      name: 'IMDb · 豆瓣辅助',
+      promise: searchImdbMedia(trimmed, category, {
+        mode: 'browser',
+        doubanOptions: doubanOpts,
+        enableDoubanAssist: true,
+      })
+        .then((b) => b.results)
+        .catch(() => []),
     });
   }
 
@@ -1102,6 +1132,15 @@ export async function searchCovers(
     ? ({ transport: 'relay', relayBaseUrl: relayUrl } as const)
     : ({ transport: 'static-direct' } as const);
   const tasks: Array<NamedSourceTask<CoverCandidate>> = [
+    {
+      name: 'IMDb 图库',
+      promise: searchImdbCoverCandidates(
+        trimmed,
+        category,
+        originalTitle?.trim() || undefined,
+        { mode: 'browser' }
+      ),
+    },
     {
       name: '豆瓣图库',
       promise: searchDoubanCoverCandidates(
@@ -1268,16 +1307,29 @@ export async function fetchOnlineRelations(
     : ({ transport: 'static-direct', signal } as const);
 
   if (params.category === 'film') {
-    const doubanRel = await fetchDoubanFilmRelations(
-      params.title,
-      params.originalTitle,
-      params.sourceUrl,
-      doubanRelOpts
-    ).catch(() => ({ people: [], characters: [] }));
+    const [imdbRel, doubanRel] = await Promise.all([
+      fetchImdbFilmRelations(
+        params.title,
+        params.originalTitle,
+        params.sourceUrl,
+        { mode: 'browser', signal }
+      ).catch(() => ({ people: [], characters: [] })),
+      fetchDoubanFilmRelations(
+        params.title,
+        params.originalTitle,
+        params.sourceUrl,
+        doubanRelOpts
+      ).catch(() => ({ people: [], characters: [] })),
+    ]);
     if (doubanRel.people.length > 0 || doubanRel.characters.length > 0) {
       sources.push('豆瓣影视');
       pushUnique(people, doubanRel.people);
       pushUnique(characters, doubanRel.characters);
+    }
+    if (imdbRel.people.length > 0 || imdbRel.characters.length > 0) {
+      sources.push('IMDb');
+      pushUnique(people, imdbRel.people);
+      pushUnique(characters, imdbRel.characters);
     }
 
     const [baikeOutcome, iqiyiOutcome, wikiOutcome, bgmOutcome] =
@@ -1535,12 +1587,29 @@ export async function fetchOnlineRelations(
       sources.push('爱奇艺影视库');
       pushUnique(films, iqiyiOutcome.value.relatedFilms);
     }
-    const doubanRel = await fetchDoubanPersonRelations(
-      params.title,
-      params.originalTitle,
-      params.sourceUrl,
-      doubanRelOpts
-    ).catch(() => ({ films: [], characters: [] }));
+    const [imdbRel, doubanRel] = await Promise.all([
+      fetchImdbPersonRelations(
+        params.title,
+        params.originalTitle,
+        params.sourceUrl,
+        { mode: 'browser', signal }
+      ).catch(() => ({ films: [], characters: [] })),
+      fetchDoubanPersonRelations(
+        params.title,
+        params.originalTitle,
+        params.sourceUrl,
+        doubanRelOpts
+      ).catch(() => ({ films: [], characters: [] })),
+    ]);
+    if (imdbRel.films.length > 0 || imdbRel.characters.length > 0) {
+      sources.unshift('IMDb');
+      const nextFilms = [...imdbRel.films, ...films];
+      const nextChars = [...imdbRel.characters, ...characters];
+      films.length = 0;
+      characters.length = 0;
+      pushUnique(films, nextFilms);
+      pushUnique(characters, nextChars);
+    }
     if (doubanRel.films.length > 0 || doubanRel.characters.length > 0) {
       sources.unshift('豆瓣影视');
       const nextFilms = [...doubanRel.films, ...films];

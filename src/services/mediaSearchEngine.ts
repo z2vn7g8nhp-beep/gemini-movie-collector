@@ -33,6 +33,12 @@ import {
   searchDoubanCoverCandidates,
   searchDoubanMedia,
 } from './doubanClient';
+import {
+  fetchImdbFilmRelations,
+  fetchImdbPersonRelations,
+  searchImdbCoverCandidates,
+  searchImdbMedia,
+} from './imdbClient';
 
 export type MediaEngineMode = 'server' | 'browser';
 
@@ -684,7 +690,39 @@ export async function searchOnlineMedia(params: {
   const tasks: Array<{ name: string; promise: Promise<OnlineSearchResult[]> }> =
     [];
 
-  if (mode === 'server' && (source === 'all' || source === 'douban')) {
+  // Dedicated IMDb primary + Douban Chinese info assist path
+  if (source === 'imdb') {
+    const bundle = await searchImdbMedia(query, category, {
+      mode,
+      doubanOptions: mode === 'server' ? { transport: 'server', signal } : undefined,
+      enableDoubanAssist: mode === 'server',
+      signal,
+    });
+    const activeSources: string[] = [];
+    if (bundle.results.length > 0) {
+      activeSources.push(bundle.hasDoubanAssist ? 'IMDb · 豆瓣辅助' : 'IMDb');
+    }
+    return {
+      query,
+      category,
+      results: deduplicateResults(bundle.results).slice(0, 22),
+      activeSources,
+      failedSources: [],
+    };
+  }
+
+  if (source === 'all') {
+    tasks.push({
+      name: 'IMDb · 豆瓣辅助',
+      promise: searchImdbMedia(query, category, {
+        mode,
+        doubanOptions: mode === 'server' ? { transport: 'server', signal } : undefined,
+        enableDoubanAssist: mode === 'server',
+        signal,
+      }).then((b) => b.results),
+    });
+  }
+  if (mode === 'server' && source === 'douban') {
     tasks.push({
       name: '豆瓣影视',
       promise: searchDoubanMedia(query, category, {
@@ -933,6 +971,10 @@ export async function searchCoverCandidates(params: {
 
   const globalQuery = originalTitle || query;
   const priorityTasks: Array<Promise<CoverCandidate[]>> = [
+    searchImdbCoverCandidates(query, category, originalTitle || undefined, {
+      mode,
+      signal,
+    }),
     ...(mode === 'server'
       ? [
           searchDoubanCoverCandidates(
@@ -2116,8 +2158,12 @@ export async function fetchOnlineRelations(params: {
       mode,
       signal
     );
-    const [doubanOutcome, zhWikiOutcome, wdOutcome, bgmOutcome, tvOutcome] =
+    const [imdbOutcome, doubanOutcome, zhWikiOutcome, wdOutcome, bgmOutcome, tvOutcome] =
       await Promise.allSettled([
+        fetchImdbFilmRelations(title, originalTitle, sourceUrl, {
+          mode,
+          signal,
+        }),
         mode === 'server'
           ? fetchDoubanFilmRelations(title, originalTitle, sourceUrl, {
               transport: 'server',
@@ -2144,6 +2190,13 @@ export async function fetchOnlineRelations(params: {
       }
       rawPeople.push(...doubanOutcome.value.people);
       rawChars.push(...doubanOutcome.value.characters);
+    }
+    if (imdbOutcome.status === 'fulfilled') {
+      if (imdbOutcome.value.people.length || imdbOutcome.value.characters.length) {
+        sources.push('IMDb');
+      }
+      rawPeople.push(...imdbOutcome.value.people);
+      rawChars.push(...imdbOutcome.value.characters);
     }
     if (wdOutcome.status === 'fulfilled') {
       if (wdOutcome.value.people.length || wdOutcome.value.characters.length) {
@@ -2673,8 +2726,12 @@ export async function fetchOnlineRelations(params: {
       mode,
       signal
     );
-    const [doubanOutcome, zhWikiOutcome, bgmOutcome, tvOutcome] =
+    const [imdbOutcome, doubanOutcome, zhWikiOutcome, bgmOutcome, tvOutcome] =
       await Promise.allSettled([
+        fetchImdbPersonRelations(title, originalTitle, sourceUrl, {
+          mode,
+          signal,
+        }),
         mode === 'server'
           ? fetchDoubanPersonRelations(title, originalTitle, sourceUrl, {
               transport: 'server',
@@ -2700,6 +2757,13 @@ export async function fetchOnlineRelations(params: {
       }
       rawFilms.push(...doubanOutcome.value.films);
       rawChars.push(...doubanOutcome.value.characters);
+    }
+    if (imdbOutcome.status === 'fulfilled') {
+      if (imdbOutcome.value.films.length || imdbOutcome.value.characters.length) {
+        sources.push('IMDb');
+      }
+      rawFilms.push(...imdbOutcome.value.films);
+      rawChars.push(...imdbOutcome.value.characters);
     }
     if (zhWikiOutcome.status === 'fulfilled') {
       if (

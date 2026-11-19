@@ -38,8 +38,9 @@ const PRESETS: Record<ArchiveCategory, string[]> = {
 };
 
 const SOURCE_OPTIONS: Array<{ id: SearchSourceOption; label: string }> = [
+  { id: 'imdb', label: 'IMDb（豆瓣辅助）' },
+  { id: 'all', label: '全网直连聚合（IMDb + 豆瓣优先）' },
   { id: 'douban', label: '豆瓣影视' },
-  { id: 'all', label: '全网直连聚合（豆瓣优先）' },
   { id: 'bangumi', label: '番组计划 Bangumi' },
   { id: 'wiki', label: '中文维基百科' },
   { id: 'itunes', label: 'iTunes 影视库' },
@@ -63,7 +64,7 @@ export function OnlineSearchModal({
 
   // Online search state
   const [category, setCategory] = useState<ArchiveCategory>(initialCategory);
-  const [source, setSource] = useState<SearchSourceOption>('douban');
+  const [source, setSource] = useState<SearchSourceOption>('imdb');
   const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [loading, setLoading] = useState(false);
   const [searchError, setSearchError] = useState('');
@@ -244,7 +245,7 @@ export function OnlineSearchModal({
               收录新藏品
             </h2>
             <p className="mt-0.5 text-xs text-[#625C54]">
-              直连豆瓣影视资料库（评分、简介、演职员表与高清海报）及全网公开库，支持粘贴豆瓣链接快速建档
+              默认直连 IMDb 影视资料库（评分、奖项、高清海报）并自动融合豆瓣中文片名与简介，支持粘贴 IMDb / 豆瓣链接快速建档
             </p>
           </div>
           <button

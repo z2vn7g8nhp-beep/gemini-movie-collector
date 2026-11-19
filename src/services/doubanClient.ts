@@ -797,26 +797,29 @@ export async function searchDoubanMedia(
 
   // 1. Film & TV Search
   if (category === 'film') {
-    const [rexxarRaw, suggestRaw] = await Promise.all([
-      fetchDoubanJson<Record<string, any>>(
-        `https://m.douban.com/rexxar/api/v2/search/movie?q=${encodeURIComponent(
-          trimmed
-        )}&count=12`,
-        'rexxar',
-        options,
-        5200
-      ),
-      fetchDoubanJson<unknown>(
-        `https://movie.douban.com/j/subject_suggest?q=${encodeURIComponent(
-          trimmed
-        )}`,
-        'web',
-        options,
-        2800
-      ),
-    ]);
+    const rexxarPromise = fetchDoubanJson<Record<string, any>>(
+      `https://m.douban.com/rexxar/api/v2/search/movie?q=${encodeURIComponent(
+        trimmed
+      )}&count=12`,
+      'rexxar',
+      options,
+      4600
+    );
+    const suggestPromise = fetchDoubanJson<unknown>(
+      `https://movie.douban.com/j/subject_suggest?q=${encodeURIComponent(
+        trimmed
+      )}`,
+      'web',
+      options,
+      2400
+    );
 
+    const rexxarRaw = await rexxarPromise;
     const rexxarItems = parseDoubanMovieSearch(rexxarRaw, formatImg);
+    const suggestRaw =
+      rexxarItems.length > 0
+        ? await waitWithGrace(suggestPromise, 450, null)
+        : await suggestPromise;
     const suggestParsed = parseDoubanSuggest(suggestRaw, formatImg);
 
     // Build lookup from suggest for instant originalTitle / year enrichment
