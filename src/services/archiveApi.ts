@@ -961,42 +961,20 @@ export async function searchOnline(
     ? ({ transport: 'relay', relayBaseUrl: relayUrl } as const)
     : ({ transport: 'static-direct' } as const);
 
-  const tasks: Array<NamedSourceTask<OnlineSearchResult>> = [
-    {
-      name: 'IMDb',
-      promise: searchImdbMedia(trimmed, category, {
-        mode: 'browser',
-        doubanOptions: doubanOpts,
-        enableDoubanAssist: true,
-      })
-        .then((b) => b.results)
-        .catch(() => []),
-    },
-    {
-      name: '百度百科',
-      promise: searchBaiduBaikeBrowser(trimmed, category).catch(() => []),
-    },
-  ];
-  if (category !== 'character') {
-    tasks.push({
-      name: '爱奇艺影视库',
-      promise: searchIqiyiBrowser(trimmed, category).catch(() => []),
-    });
-  } else {
-    tasks.push({
-      name: '萌娘百科',
-      promise: searchMoegirlBrowser(trimmed, category).catch(() => []),
-    });
+  const bundle = await searchImdbMedia(trimmed, category, {
+    mode: 'browser',
+    doubanOptions: doubanOpts,
+    enableDoubanAssist: true,
+  });
+  const activeSources: string[] = [];
+  if (bundle.results.length > 0) {
+    activeSources.push(bundle.hasDoubanAssist ? 'IMDb · 豆瓣辅助' : 'IMDb');
   }
-
-  const settled = await settleSourcesWithFastWindow(tasks, 1800);
-  const merged = mergeBilingualResults(
-    deduplicateSearchResults(settled.items)
-  ).slice(0, 16);
-
   return {
-    results: merged,
-    activeSources: settled.activeSources,
+    results: mergeBilingualResults(
+      deduplicateSearchResults(bundle.results)
+    ).slice(0, 16),
+    activeSources,
     mode,
   };
 }
