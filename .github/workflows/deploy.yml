@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+  schedule:
+    - cron: '17 4 * * 1'
   workflow_dispatch:
 
 permissions:
@@ -29,6 +31,11 @@ jobs:
 
       - name: Install dependencies
         run: npm install --legacy-peer-deps --no-audit --no-fund
+
+      - name: Refresh Chinese labels for current releases
+        continue-on-error: true
+        timeout-minutes: 4
+        run: python3 scripts/update-film-index.py --trending-only
 
       - name: Typecheck
         run: npm run lint

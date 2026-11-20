@@ -1,4 +1,5 @@
 """Build the bundled CC0 Wikidata label index for popular IMDb titles."""
+import argparse
 import csv
 import gzip
 import heapq
@@ -35,16 +36,43 @@ def labels(ids):
             if title:
                 yield [record["id"], title, record["en"], record.get("year", "")]
 
-if __name__ == "__main__":
-    with fetch("https://datasets.imdbws.com/title.ratings.tsv.gz") as response:
-        rows = csv.DictReader(io.TextIOWrapper(gzip.GzipFile(fileobj=response)), delimiter="\t")
-        popular = heapq.nlargest(2000, rows, key=lambda r: int(r["numVotes"]))
-    ids = [r["tconst"] for r in popular]
-    if "tt13623126" not in ids:
-        ids.append("tt13623126")  # Ironheart series, distinct from the 1992 film
-    records = {}
+def update(trending_only):
+    target = Path(__file__).resolve().parents[1] / "src/data/film-labels.json"
+    records = {row[0]: row for row in json.loads(target.read_text())}
+    candidates = {}
+    if not trending_only:
+        with fetch("https://datasets.imdbws.com/title.ratings.tsv.gz") as response:
+            rows = csv.DictReader(io.TextIOWrapper(gzip.GzipFile(fileobj=response)), delimiter="\t")
+            for row in heapq.nlargest(6000, rows, key=lambda r: int(r["numVotes"])):
+                candidates[row["tconst"]] = None
+
+    for kind in ("movie", "series"):
+        with fetch(f"https://v3-cinemeta.strem.io/catalog/{kind}/top.json") as response:
+            for item in json.load(response)["metas"]:
+                imdb_id = item["id"]
+                if re.fullmatch(r"tt\d+", imdb_id):
+                    candidates[imdb_id] = item
+
+    ids = list(candidates)
     for start in range(0, len(ids), 100):
         for row in labels(ids[start:start + 100]):
+            previous = records.get(row[0], [])
+            item = candidates[row[0]]
+            if item:
+                row[2] = item.get("name") or row[2]
+                year = re.search(r"\d{4}", str(item.get("releaseInfo", "")))
+                row[3] = row[3] or (year.group() if year else "")
+                row.append(item["type"])
+            elif previous:
+                row[3] = row[3] or previous[3]
+                row.extend(previous[4:])
             records[row[0]] = row
-    target = Path(__file__).resolve().parents[1] / "src/data/film-labels.json"
-    target.write_text(json.dumps([records[i] for i in ids if i in records], ensure_ascii=False, separators=(",", ":")) + "\n")
+
+    target.write_text(json.dumps(list(records.values()), ensure_ascii=False, separators=(",", ":")) + "\n")
+    print(f"{len(records)} indexed titles")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--trending-only", action="store_true")
+    update(parser.parse_args().trending_only)

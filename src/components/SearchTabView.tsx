@@ -18,7 +18,7 @@ interface SearchTabViewProps {
   onJumpToManual: (prefillTitle: string, category: ArchiveCategory) => void;
 }
 
-const SEARCH_SESSION_KEY = 'cinearchive.searchSession.v3';
+const SEARCH_SESSION_KEY = 'cinearchive.searchSession.v4';
 
 interface CachedSearchSession {
   category: ArchiveCategory;

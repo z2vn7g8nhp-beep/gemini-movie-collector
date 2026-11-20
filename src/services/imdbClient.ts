@@ -3,7 +3,6 @@ import type { CoverCandidate } from '../utils/coverPicker';
 import { parseDoubanUrlOrId } from '../utils/doubanParsers';
 import {
   buildImdbCoverCandidates,
-  extractBaiduSuggestZhAlias,
   extractImdbIdFromExternalId,
   extractImdbIdFromUrl,
   hasCjkCharacters,
@@ -532,21 +531,7 @@ async function fetchBangumiChineseAssist(
   return [];
 }
 
-/**
- * China-native zero-VPN Chinese assist via Baidu Baike OpenAPI + Baidu Search Suggest.
- * Works natively on China 5G / GitHub Pages static PWA via JSONP (< 250ms) and on server via fetch.
- * Strictly validates that returned lemmas actually represent films/TV or film people so
- * homonyms (e.g. "Lanterns" -> "灯笼 iphone游戏") are never mis-matched.
- */
-async function fetchBaikeChineseAssist(
-  query: string,
-  category: ArchiveCategory,
-  options: ImdbClientOptions,
-  hintYear?: string
-): Promise<OnlineSearchResult[]> {
-  const trimmed = query.trim();
-  if (!trimmed || category === 'character') return [];
-
+async function fetchBaikePerson(query: string, options: ImdbClientOptions): Promise<OnlineSearchResult[]> {
   const fetchCard = async (keyword: string): Promise<Record<string, any> | null> => {
     const url = `https://baike.baidu.com/api/openapi/BaikeLemmaCardApi?scope=103&format=json&appid=379020&bk_key=${encodeURIComponent(
       keyword
@@ -567,134 +552,41 @@ async function fetchBaikeChineseAssist(
     });
   };
 
-  const verifiedCard = async (keyword: string) => {
-    const { searchResult } = parseBaiduBaikeCard(await fetchCard(keyword), category);
-    if (!searchResult || !isPlausibleBaikeFilmOrPerson(searchResult, category)) return null;
-    if (category === 'film') {
-      if (!hasStrictTitleOverlap([searchResult.title, searchResult.originalTitle], [trimmed])) return null;
-      if (hintYear && searchResult.year !== hintYear) return null;
-    }
-    return searchResult;
-  };
-
-  const direct = await verifiedCard(trimmed);
-  if (direct) return [direct];
-
-  // For English film/series queries where direct Baike hit a homonym (e.g. "Lanterns" -> game),
-  // query Baidu Suggest (`Lanterns 2026` / `Lanterns 美剧`) to uncover the Chinese alias ("绿灯军团").
-  if (category === 'film' && !hasCjkCharacters(trimmed) && !options.signal?.aborted) {
-    const suggestQuery = hintYear ? `${trimmed} ${hintYear}` : `${trimmed} 影视`;
-    const sugUrl = `https://www.baidu.com/sugrec?prod=pc&wd=${encodeURIComponent(suggestQuery)}`;
-    const sugPayload =
-      options.mode === 'browser'
-        ? await fetchBrowserJsonpCached<{ g?: Array<{ q?: string }> }>(
-            sugUrl,
-            'cb',
-            2200,
-            options.signal
-          )
-        : await fetchJsonCached<{ g?: Array<{ q?: string }> }>(sugUrl, {
-            mode: 'server',
-            timeoutMs: 2200,
-            signal: options.signal,
-          });
-
-    const suggestions = (sugPayload?.g || [])
-      .map((row) => (typeof row?.q === 'string' ? row.q.trim() : ''))
-      .filter(Boolean);
-    const zhAlias = extractBaiduSuggestZhAlias(suggestions, trimmed);
-
-    if (zhAlias) {
-      const match = await verifiedCard(zhAlias);
-      if (match) return [match];
-    }
-  }
-
-  return [];
+  const { searchResult } = parseBaiduBaikeCard(await fetchCard(query), 'person');
+  return searchResult && isPlausibleBaikeFilmOrPerson(searchResult, 'person') ? [searchResult] : [];
 }
 
-/**
- * Resolves exact Chinese labels & Douban subject IDs (P4529) directly from canonical IMDb IDs
- * (`tt...` / `nm...`) via Wikidata `haswbstatement:P345=...` in a single batched lookup.
- */
 async function resolveWikidataByImdbIds(
   imdbIds: string[],
   options: ImdbClientOptions
 ): Promise<{ zhTitleMap: Map<string, string>; crossIdMap: Map<string, string> }> {
   const zhTitleMap = new Map<string, string>();
   const crossIdMap = new Map<string, string>();
-  const cleanIds = Array.from(
-    new Set(
-      imdbIds
-        .map((id) => id.trim().toLowerCase())
-        .filter((id) => /^(?:tt|nm)\d{5,10}$/.test(id))
-    )
-  ).slice(0, 4);
-  if (cleanIds.length === 0 || options.signal?.aborted) {
-    return { zhTitleMap, crossIdMap };
-  }
-
-  const srsearch = cleanIds.map((id) => `haswbstatement:P345=${id}`).join(' OR ');
-  const searchJson = await fetchJsonCached<{
-    query?: { search?: Array<{ title?: string }> };
-  }>(
-    `https://www.wikidata.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(
-      srsearch
-    )}&srlimit=6&format=json&origin=*`,
-    {
-      mode: options.mode,
-      timeoutMs: 2600,
-      signal: options.signal,
-      headers: { 'User-Agent': 'CineArchive/1.0 (contact@cinearchive.local)' },
-    }
+  const ids = [...new Set(imdbIds.filter(id => /^(tt|nm)\d{5,10}$/.test(id)))].slice(0, 12);
+  if (!ids.length || options.signal?.aborted) return { zhTitleMap, crossIdMap };
+  const languages = ['zh-cn', 'zh-hans', 'zh', 'zh-sg', 'zh-hk', 'zh-tw'];
+  const query = `SELECT ?id ?label ?douban WHERE {
+    VALUES ?id { ${ids.map(id => JSON.stringify(id)).join(' ')} }
+    ?work wdt:P345 ?id.
+    OPTIONAL { ?work rdfs:label ?label FILTER(LANGMATCHES(LANG(?label), "zh")) }
+    OPTIONAL { ?work wdt:P4529 ?douban }
+  }`;
+  type Row = { id: { value: string }; label?: { value: string; 'xml:lang': string }; douban?: { value: string } };
+  const data = await fetchJsonCached<{ results: { bindings: Row[] } }>(
+    'https://query.wikidata.org/sparql?' + new URLSearchParams({ query, format: 'json' }),
+    { ...options, timeoutMs: 2300 }
   );
-
-  const qids = (searchJson?.query?.search || [])
-    .map((r) => r.title)
-    .filter((id): id is string => typeof id === 'string' && /^Q\d+$/.test(id));
-  if (qids.length === 0) return { zhTitleMap, crossIdMap };
-
-  const entJson = await fetchJsonCached<{
-    entities?: Record<string, Record<string, any>>;
-  }>(
-    `https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${encodeURIComponent(
-      qids.join('|')
-    )}&props=labels|claims&languages=zh-cn|zh-hans|zh-sg|zh-hk|zh-tw|zh&format=json&origin=*`,
-    {
-      mode: options.mode,
-      timeoutMs: 2600,
-      signal: options.signal,
-      headers: { 'User-Agent': 'CineArchive/1.0 (contact@cinearchive.local)' },
-    }
-  );
-
-  const entities = entJson?.entities || {};
-  for (const qid of qids) {
-    const ent = entities[qid];
-    if (!ent) continue;
-    const imdbIdRaw = ent.claims?.P345?.[0]?.mainsnak?.datavalue?.value;
-    const imdbId =
-      typeof imdbIdRaw === 'string' ? imdbIdRaw.trim().toLowerCase() : undefined;
-    if (!imdbId) continue;
-
-    const labels = ent.labels || {};
-    const zhLabel: string | undefined =
-      labels['zh-cn']?.value ||
-      labels['zh-hans']?.value ||
-      labels['zh-sg']?.value ||
-      labels.zh?.value ||
-      labels['zh-hk']?.value ||
-      labels['zh-tw']?.value;
-    if (zhLabel && hasCjkCharacters(zhLabel)) {
-      zhTitleMap.set(imdbId, zhLabel);
-    }
-
-    const doubanRaw = ent.claims?.P4529?.[0]?.mainsnak?.datavalue?.value;
-    if (typeof doubanRaw === 'string' && doubanRaw.trim()) {
-      crossIdMap.set(imdbId, doubanRaw.trim());
+  const priority = new Map<string, number>();
+  for (const row of data?.results?.bindings || []) {
+    const id = row.id.value;
+    if (!ids.includes(id)) continue;
+    if (row.douban?.value) crossIdMap.set(id, row.douban.value);
+    const rank = languages.indexOf(row.label?.['xml:lang'] || '');
+    if (row.label && hasCjkCharacters(row.label.value) && rank >= 0 && rank < (priority.get(id) ?? Infinity)) {
+      priority.set(id, rank);
+      zhTitleMap.set(id, row.label.value);
     }
   }
-
   return { zhTitleMap, crossIdMap };
 }
 
@@ -722,50 +614,129 @@ async function runDoubanAssistSafe(
  * - Characters (IMDb work metadata + Wikidata ch-ID bridge + Douban credits character extraction)
  * - Direct IMDb URLs/IDs (`tt...`, `nm...`) AND direct Douban URLs/IDs
  */
+type FilmHit = {
+  imdbId: string;
+  mediaType: 'movie' | 'series' | 'auto';
+  result: OnlineSearchResult;
+};
+
+async function discoverFilmTitles(query: string, options: ImdbClientOptions): Promise<FilmHit[]> {
+  const catalog = async (kind: 'movie' | 'series') => {
+    const raw = await fetchJsonCached<Record<string, unknown>>(
+      `https://v3-cinemeta.strem.io/catalog/${kind}/top/search=${encodeURIComponent(query)}.json`,
+      { ...options, timeoutMs: 3000 }
+    );
+    return parseCinemetaSearchPayload(raw, kind);
+  };
+  const suggested = fetchImdbSuggestRaw(query, 'titles', options)
+    .then(raw => parseImdbSuggestPayload(raw).titles);
+  // Keep source order deterministic even when one catalog is slow or unavailable.
+  const batches = await Promise.all([suggested, catalog('movie'), catalog('series')]
+    .map(request => waitWithGrace(request, 3100, [])));
+  return batches.flat();
+}
+
+async function searchFilmTitles(query: string, options: ImdbClientOptions): Promise<ImdbSearchBundle> {
+  const indexed = searchFilmIndex(query);
+  const direct = parseImdbUrlOrId(query);
+  const byId = new Map<string, FilmHit>();
+  const register = (hit: FilmHit) => {
+    if (!byId.has(hit.imdbId)) byId.set(hit.imdbId, hit);
+  };
+  const localLabel = (item: OnlineSearchResult, label?: string) => localizeFilm(
+    label && hasCjkCharacters(label) && item.title !== label
+      ? { ...item, title: label, originalTitle: item.originalTitle || item.title }
+      : item
+  );
+  const lookup = indexed[0]?.title === query ? indexed[0].originalTitle || query : query;
+  const douban = runDoubanAssistSafe(query, 'film', options, 2800);
+  const wiki = direct ? Promise.resolve(undefined) : resolveWikidataImdbBridge(query, options);
+  const [hits, dbHits, bridge] = await Promise.all([
+    direct ? Promise.resolve([]) : discoverFilmTitles(lookup, options),
+    douban,
+    waitWithGrace(wiki, 3100, undefined),
+  ]);
+
+  hits.forEach(register);
+  for (const item of indexed) {
+    register({ imdbId: item.externalId.slice(5), mediaType: 'auto', result: item });
+  }
+  if (!direct) {
+    for (const id of bridge?.titleIds || []) {
+      const title = bridge?.enNameMap.get(id) || bridge?.zhTitleMap.get(id);
+      if (title) register({ imdbId: id, mediaType: 'auto', result: {
+        externalId: 'imdb-' + id, category: 'film', title, tags: [], summary: '',
+        sourceName: 'IMDb', sourceUrl: 'https://www.imdb.com/title/' + id + '/',
+      } });
+    }
+  }
+  // A Chinese catalog entry may supply the original spelling for IMDb discovery.
+  // The spelling retrieves candidates. It never establishes a cross-source identity.
+  if (!direct && !byId.size && hasCjkCharacters(query)) {
+    const alias = dbHits.find(item => item.originalTitle && !hasCjkCharacters(item.originalTitle))?.originalTitle;
+    if (alias) (await discoverFilmTitles(alias, options)).forEach(register);
+  }
+  if (direct && !byId.has(direct.id)) {
+    const found = await waitWithGrace(fetchImdbSuggestRaw(direct.id, 'titles', options), 2000, null);
+    parseImdbSuggestPayload(found).titles.filter(hit => hit.imdbId === direct.id).forEach(register);
+  }
+
+  const candidates = [...byId.values()].map(hit => localLabel(hit.result, bridge?.zhTitleMap.get(hit.imdbId)));
+  const ranked = rankImdbResults(candidates, query).slice(0, 12);
+  const details = new Map<string, OnlineSearchResult>();
+  const ids = ranked.slice(0, 6).map(item => item.externalId.slice(5));
+  if (direct && !ids.length) ids.push(direct.id);
+  const hydrate = Promise.all(ids.map(async id => {
+    const meta = await fetchCinemetaTitleMeta(id, byId.get(id)?.mediaType || 'auto', options);
+    if (meta?.imdbId === id) details.set(id, meta.result);
+  }));
+  const unknown = ranked.filter(item => !hasCjkCharacters(item.title) || dbHits.length > 0).map(item => item.externalId.slice(5));
+  if (direct && !ranked.length) unknown.push(direct.id);
+  const [labels] = await Promise.all([
+    waitWithGrace(resolveWikidataByImdbIds(unknown, options), 2400, undefined),
+    waitWithGrace(hydrate, 2400, undefined),
+  ]);
+  if (direct && !ranked.length && details.has(direct.id)) ranked.push(details.get(direct.id)!);
+  let usedDouban = false;
+  const results = ranked.map(candidate => {
+    const id = candidate.externalId.slice(5);
+    const item = details.get(id) || candidate;
+    const dbId = labels?.crossIdMap.get(id) || bridge?.crossIdMap.get(id);
+    const db = dbId ? dbHits.find(hit => hit.externalId === 'douban-subj-' + dbId) : undefined;
+    const crossIdMap = db && dbId ? new Map([[id, dbId]]) : undefined;
+    if (db) usedDouban = true;
+    const enriched = db ? mergeImdbWithDoubanAssist([item], [db], { crossIdMap })[0] : item;
+    return localLabel(enriched, labels?.zhTitleMap.get(id) || bridge?.zhTitleMap.get(id));
+  });
+  if (!direct && !results.length && dbHits.length) {
+    results.push(...dbHits.slice(0, 12));
+    usedDouban = true;
+  }
+  return {
+    results: rankImdbResults(results, query),
+    hasDoubanAssist: usedDouban,
+    hasChineseAssist: results.some(item => hasCjkCharacters(item.title)),
+  };
+}
+
 export async function searchImdbMedia(
   query: string,
   category: ArchiveCategory,
   options: ImdbClientOptions
 ): Promise<ImdbSearchBundle> {
-  if (category !== 'film') return searchLiveMedia(query, category, options);
-  const indexed = searchFilmIndex(query);
-  const controller = new AbortController();
-  const cancel = () => controller.abort();
-  if (options.signal?.aborted) cancel();
-  options.signal?.addEventListener('abort', cancel, { once: true });
-  try {
-    const localResults = new Map(indexed.map(item => [item.externalId, item]));
-    const remember = (item: OnlineSearchResult) => {
-      if (localResults.has(item.externalId)) localResults.set(item.externalId, localizeFilm(item));
-    };
-    const live = searchLiveMedia(query, category, { ...options, signal: controller.signal }, indexed, remember);
-    const bundle = indexed.length
-      ? await waitWithGrace<ImdbSearchBundle>(live, 5500, { results: [], hasDoubanAssist: false })
-      : await live;
-    const results = new Map(bundle.results.map(item => [item.externalId, localizeFilm(item)]));
-    for (const item of localResults.values()) {
-      if (!results.has(item.externalId)) results.set(item.externalId, item);
-    }
-    return {
-      ...bundle,
-      results: rankImdbResults([...results.values()], query).slice(0, 12),
-      hasChineseAssist: bundle.hasChineseAssist || indexed.length > 0,
-    };
-  } finally {
-    cancel();
-    options.signal?.removeEventListener('abort', cancel);
+  const trimmed = query.trim();
+  if (trimmed && category === 'film' && !parseDoubanUrlOrId(trimmed) && parseImdbUrlOrId(trimmed)?.kind !== 'name') {
+    return searchFilmTitles(trimmed, options);
   }
+  return searchLiveMedia(trimmed, category, options);
 }
 
 async function searchLiveMedia(
-  query: string, category: ArchiveCategory, options: ImdbClientOptions,
-  indexed: OnlineSearchResult[] = [],
-  remember?: (item: OnlineSearchResult) => void
+  query: string, category: ArchiveCategory, options: ImdbClientOptions
 ): Promise<ImdbSearchBundle> {
   const trimmed = query.trim();
   if (!trimmed) return { results: [], hasDoubanAssist: false };
 
-  const searchStartedAt = Date.now();
   const doubanGraceMs = options.mode === 'server' ? 4500 : 5200;
 
   // 0A. Direct IMDb URL / ID paste (`tt...` or `nm...`)
@@ -785,7 +756,6 @@ async function searchLiveMedia(
           }
         : suggestHit?.result || null;
 
-      if (baseResult) remember?.(baseResult);
       if (!baseResult) return { results: [], hasDoubanAssist: false };
 
       if (category === 'person' && meta) {
@@ -874,400 +844,20 @@ async function searchLiveMedia(
     const dbHits = await runDoubanAssistSafe(trimmed, category, options, 4500);
     if (dbHits.length > 0 && category === 'film') {
       const lead = dbHits[0];
-      const lookupQ = lead.originalTitle || lead.title;
-      const [cinMovie, cinSeries] = await Promise.all([
-        fetchJsonCached<Record<string, any>>(
-          `https://v3-cinemeta.strem.io/catalog/movie/top/search=${encodeURIComponent(
-            lookupQ
-          )}.json`,
-          { mode: options.mode, timeoutMs: 3800, signal: options.signal }
-        ),
-        fetchJsonCached<Record<string, any>>(
-          `https://v3-cinemeta.strem.io/catalog/series/top/search=${encodeURIComponent(
-            lookupQ
-          )}.json`,
-          { mode: options.mode, timeoutMs: 3800, signal: options.signal }
-        ),
-      ]);
-      const candidates = [
-        ...parseCinemetaSearchPayload(cinMovie, 'movie'),
-        ...parseCinemetaSearchPayload(cinSeries, 'series'),
-      ];
-      const matched = matchFilmRelationCandidate(
-        candidates.map(entry => ({ ...entry.result, entry })), lead
-      );
-      if (matched) {
-        const meta = await fetchCinemetaTitleMeta(
-          matched.entry.imdbId,
-          matched.entry.mediaType,
-          options
-        );
-        if (meta) {
-          const fused = mergeImdbWithDoubanAssist([meta.result], dbHits, {
-            fallbackThreshold: 0,
-          });
-          return { results: fused, hasDoubanAssist: true };
-        }
+      const hits = await discoverFilmTitles(lead.originalTitle || lead.title, options);
+      const { crossIdMap } = await resolveWikidataByImdbIds(hits.map(hit => hit.imdbId), options);
+      const match = hits.find(hit => crossIdMap.get(hit.imdbId) === directDouban.id);
+      if (match) {
+        const meta = await fetchCinemetaTitleMeta(match.imdbId, match.mediaType, options);
+        const results = mergeImdbWithDoubanAssist([meta?.result || match.result], [lead], { crossIdMap });
+        return { results: results.map(localizeFilm), hasDoubanAssist: true };
       }
       return { results: dbHits, hasDoubanAssist: true };
     }
     return { results: dbHits, hasDoubanAssist: dbHits.length > 0 };
   }
 
-  // 1. FILM & TV SERIES SEARCH (IMDb Primary + Multi-Layer Douban/Bangumi/Baike Chinese Assist)
-  if (category === 'film') {
-    // Kick off Douban & Bangumi Chinese assists immediately at t=0 so they overlap with IMDb search + hydration
-    const doubanPromise =
-      options.enableDoubanAssist !== false && options.doubanOptions
-        ? searchDoubanMedia(trimmed, 'film', {
-            ...options.doubanOptions,
-            signal: options.signal,
-          }).catch(() => [])
-        : Promise.resolve([] as OnlineSearchResult[]);
-    const bangumiPromise = fetchBangumiChineseAssist(trimmed, 'film', options).catch(
-      () => [] as OnlineSearchResult[]
-    );
-
-    const [cinMovieRaw, cinSeriesRaw, suggestRaw, wdMap] = await Promise.all([
-      fetchJsonCached<Record<string, any>>(
-        `https://v3-cinemeta.strem.io/catalog/movie/top/search=${encodeURIComponent(
-          trimmed
-        )}.json`,
-        { mode: options.mode, timeoutMs: 4500, signal: options.signal }
-      ),
-      fetchJsonCached<Record<string, any>>(
-        `https://v3-cinemeta.strem.io/catalog/series/top/search=${encodeURIComponent(
-          trimmed
-        )}.json`,
-        { mode: options.mode, timeoutMs: 4500, signal: options.signal }
-      ),
-      fetchImdbSuggestRaw(trimmed, 'titles', options),
-      resolveWikidataImdbBridge(trimmed, options),
-    ]);
-
-    const cinMovies = parseCinemetaSearchPayload(cinMovieRaw, 'movie');
-    const cinSeries = parseCinemetaSearchPayload(cinSeriesRaw, 'series');
-    const suggestTitles = parseImdbSuggestPayload(suggestRaw).titles;
-
-    // Combine & deduplicate by IMDb tt-ID, prioritizing exact/Wikidata hits first
-    const byId = new Map<
-      string,
-      {
-        imdbId: string;
-        mediaType: 'movie' | 'series';
-        result: OnlineSearchResult;
-      }
-    >();
-    const orderedIds: string[] = [];
-
-    const register = (entry: {
-      imdbId: string;
-      mediaType: 'movie' | 'series';
-      result: OnlineSearchResult;
-    }) => {
-      const existing = byId.get(entry.imdbId);
-      if (!existing) {
-        byId.set(entry.imdbId, entry);
-        orderedIds.push(entry.imdbId);
-      } else {
-        byId.set(entry.imdbId, {
-          ...existing,
-          result: {
-            ...existing.result,
-            coverUrl: existing.result.coverUrl || entry.result.coverUrl,
-            year: existing.result.year || entry.result.year,
-          },
-        });
-      }
-    };
-
-    // Prioritize Wikidata exact tt-ID hits (crucial for Chinese queries that differ from English title!)
-    for (const wdTtId of wdMap.titleIds.slice(0, 3)) {
-      const matched =
-        cinMovies.find((m) => m.imdbId === wdTtId) ||
-        cinSeries.find((s) => s.imdbId === wdTtId) ||
-        suggestTitles.find((t) => t.imdbId === wdTtId);
-      if (matched) {
-        register(matched);
-      } else {
-        register({
-          imdbId: wdTtId,
-          mediaType: 'movie',
-          result: {
-            externalId: `imdb-${wdTtId}`,
-            category: 'film',
-            title: wdMap.enNameMap.get(wdTtId) || wdMap.zhTitleMap.get(wdTtId) || trimmed,
-            sourceName: 'IMDb',
-            sourceUrl: `https://www.imdb.com/title/${wdTtId}/`,
-            summary: `${wdMap.zhTitleMap.get(wdTtId) || trimmed} — IMDb 影视条目。`,
-            tags: ['电影'],
-          },
-        });
-      }
-    }
-
-    for (const s of suggestTitles.slice(0, 8)) register(s);
-    for (const m of cinMovies.slice(0, 8)) register(m);
-    for (const s of cinSeries.slice(0, 6)) register(s);
-
-    for (const item of indexed) {
-      const imdbId = item.externalId.slice(5);
-      register({ imdbId, mediaType: 'movie', result: item });
-      wdMap.zhTitleMap.set(imdbId, item.title);
-    }
-
-    for (const entry of byId.values()) remember?.(entry.result);
-
-    // Pre-rank exact title matches to the front BEFORE picking top 6 to hydrate via Cinemeta `/meta`,
-    // so an exact TV series match (e.g. "Lanterns" 2026) is never pushed out by partial movie matches.
-    const qNormForHydrate = normalizeEntityKey(trimmed);
-    const hydratePriorityIds = [...orderedIds].sort((idA, idB) => {
-      const a = byId.get(idA)!;
-      const b = byId.get(idB)!;
-      const score = (entry: { imdbId: string; result: OnlineSearchResult }) => {
-        const t = normalizeEntityKey(entry.result.title);
-        let s = 0;
-        if (wdMap.titleIds.includes(entry.imdbId)) s += 80;
-        if (t === qNormForHydrate) s += 100;
-        else if (t.startsWith(qNormForHydrate)) s += 40;
-        const yr = Number(entry.result.year || 0);
-        if (yr >= 2020) s += 15;
-        return s;
-      };
-      return score(b) - score(a);
-    });
-
-    // Hydrate top 6 IMDb titles in parallel via Cinemeta `/meta/{type}/{ttId}.json` for IMDb ratings, awards, director & cast
-    const toHydrate = hydratePriorityIds.slice(0, 6);
-    const hydratedMeta = await Promise.all(
-      toHydrate.map(async (id) => {
-        const entry = byId.get(id)!;
-        const meta = await fetchCinemetaTitleMeta(id, entry.mediaType, options);
-        if (meta) remember?.(meta.result);
-        return meta;
-      })
-    );
-
-    const hydratedById = new Map<string, OnlineSearchResult>();
-    for (const meta of hydratedMeta) {
-      if (meta) {
-        const orig = byId.get(meta.imdbId);
-        hydratedById.set(meta.imdbId, {
-          ...meta.result,
-          // Keep sharp m.media-amazon.com poster from Suggest if available, else Metahub medium poster
-          coverUrl: orig?.result.coverUrl || meta.result.coverUrl,
-        });
-      }
-    }
-
-    let imdbResults: OnlineSearchResult[] = hydratePriorityIds
-      .slice(0, 12)
-      .map((id) => hydratedById.get(id) || byId.get(id)!.result);
-
-    // Wait for parallel Douban & Bangumi Chinese assists (already started at t=0!)
-    const [doubanHits, bangumiHits] = await Promise.all([
-      waitWithGrace(
-        doubanPromise,
-        imdbResults.length > 0 ? doubanGraceMs : 5800,
-        []
-      ),
-      waitWithGrace(bangumiPromise, 1800, []),
-    ]);
-
-    // If the user searched in Chinese (e.g. on mainland China network where Wikidata is blocked)
-    // and IMDb had 0 hits (or none matched Douban), bridge via Douban's Latin originalTitle -> Cinemeta!
-    const hasAnyDoubanOverlap =
-      imdbResults.length > 0 &&
-      doubanHits.length > 0 &&
-      mergeImdbWithDoubanAssist(imdbResults, doubanHits, {
-        crossIdMap: wdMap.crossIdMap,
-        zhTitleMap: wdMap.zhTitleMap,
-        fallbackThreshold: 0,
-      }).some((item) => item.sourceName === 'IMDb · 豆瓣辅助');
-
-    if (
-      (imdbResults.length === 0 || (hasCjkCharacters(trimmed) && !hasAnyDoubanOverlap)) &&
-      doubanHits.length > 0
-    ) {
-      const latinFilmQueries = Array.from(
-        new Set(
-          doubanHits
-            .map((d) => (d.originalTitle || '').split(/\s*[/／]\s*/)[0]?.trim() || '')
-            .filter((t) => Boolean(t) && !hasCjkCharacters(t))
-        )
-      ).slice(0, 2);
-
-      if (latinFilmQueries.length > 0) {
-        const extraBatches = await Promise.all(
-          latinFilmQueries.map(async (qLatin) => {
-            const [mRaw, sRaw, sugRaw] = await Promise.all([
-              fetchJsonCached<Record<string, any>>(
-                `https://v3-cinemeta.strem.io/catalog/movie/top/search=${encodeURIComponent(
-                  qLatin
-                )}.json`,
-                { mode: options.mode, timeoutMs: 3600, signal: options.signal }
-              ),
-              fetchJsonCached<Record<string, any>>(
-                `https://v3-cinemeta.strem.io/catalog/series/top/search=${encodeURIComponent(
-                  qLatin
-                )}.json`,
-                { mode: options.mode, timeoutMs: 3600, signal: options.signal }
-              ),
-              fetchImdbSuggestRaw(qLatin, 'titles', options),
-            ]);
-            return [
-              ...parseImdbSuggestPayload(sugRaw).titles.slice(0, 3),
-              ...parseCinemetaSearchPayload(mRaw, 'movie').slice(0, 3),
-              ...parseCinemetaSearchPayload(sRaw, 'series').slice(0, 2),
-            ];
-          })
-        );
-
-        const newlyAddedIds: string[] = [];
-        for (const entry of extraBatches.flat()) {
-          if (!byId.has(entry.imdbId)) {
-            register(entry);
-            newlyAddedIds.push(entry.imdbId);
-          }
-        }
-
-        if (newlyAddedIds.length > 0) {
-          const extraHydrated = await Promise.all(
-            newlyAddedIds.slice(0, 4).map((id) => {
-              const entry = byId.get(id)!;
-              return fetchCinemetaTitleMeta(id, entry.mediaType, options);
-            })
-          );
-          for (const meta of extraHydrated) {
-            if (meta) {
-              const orig = byId.get(meta.imdbId);
-              hydratedById.set(meta.imdbId, {
-                ...meta.result,
-                coverUrl: orig?.result.coverUrl || meta.result.coverUrl,
-              });
-            }
-          }
-          imdbResults = orderedIds
-            .slice(0, 12)
-            .map((id) => hydratedById.get(id) || byId.get(id)!.result);
-        }
-      }
-    }
-
-    let fused = mergeImdbWithDoubanAssist(imdbResults, doubanHits, {
-      crossIdMap: wdMap.crossIdMap,
-      zhTitleMap: wdMap.zhTitleMap,
-      secondaryZhItems: bangumiHits,
-      fallbackThreshold: 4,
-      query: trimmed,
-    });
-
-    // Multi-layer fallback ONLY for top unmatched English results (keeps latency fast when
-    // top result already matched Douban/Bangumi, while rescuing China 5G / throttled queries!)
-    const unmatchedTop = fused
-      .slice(0, 3)
-      .filter((item) => !hasCjkCharacters(item.title));
-
-    for (const result of fused) remember?.(result);
-    if (unmatchedTop.length > 0 && !options.signal?.aborted) {
-      const topIsUnmatched = !hasCjkCharacters(fused[0]?.title || '');
-      const elapsedMs = Date.now() - searchStartedAt;
-      const unmatchedIds = unmatchedTop
-        .map(
-          (item) =>
-            extractImdbIdFromExternalId(item.externalId) ||
-            extractImdbIdFromUrl(item.sourceUrl)
-        )
-        .filter((id): id is string => Boolean(id));
-
-      const normalizedQuery = normalizeEntityKey(trimmed);
-      const shouldRunExtraDouban =
-        options.enableDoubanAssist !== false &&
-        Boolean(options.doubanOptions) &&
-        (topIsUnmatched || elapsedMs < 3800);
-      const extraDoubanTargets = shouldRunExtraDouban
-        ? unmatchedTop
-            .filter(
-              (item) =>
-                item.sourceName === 'IMDb' &&
-                normalizeEntityKey(item.title) !== normalizedQuery
-            )
-            .slice(0, topIsUnmatched ? 2 : 1)
-        : [];
-
-      const leadForBaike = topIsUnmatched ? fused[0] : undefined;
-
-      const [wdById, baikeHits, extraDoubanArrays] = await Promise.all([
-        unmatchedIds.length > 0
-          ? resolveWikidataByImdbIds(unmatchedIds, options).catch(() => ({
-              zhTitleMap: new Map<string, string>(),
-              crossIdMap: new Map<string, string>(),
-            }))
-          : Promise.resolve({
-              zhTitleMap: new Map<string, string>(),
-              crossIdMap: new Map<string, string>(),
-            }),
-        leadForBaike
-          ? fetchBaikeChineseAssist(
-              leadForBaike.title,
-              'film',
-              options,
-              leadForBaike.year
-            ).catch(() => [] as OnlineSearchResult[])
-          : Promise.resolve([] as OnlineSearchResult[]),
-        extraDoubanTargets.length > 0
-          ? Promise.all(
-              extraDoubanTargets.map((item) =>
-                runDoubanAssistSafe(item.title, 'film', options, 2400)
-              )
-            )
-          : Promise.resolve([] as OnlineSearchResult[][]),
-      ]);
-
-      const mergedCrossIdMap = new Map(wdMap.crossIdMap);
-      wdById.crossIdMap.forEach((v, k) => mergedCrossIdMap.set(k, v));
-      const mergedZhTitleMap = new Map(wdMap.zhTitleMap);
-      wdById.zhTitleMap.forEach((v, k) => mergedZhTitleMap.set(k, v));
-
-      const extraDouban = extraDoubanArrays.flat();
-      if (
-        extraDouban.length > 0 ||
-        baikeHits.length > 0 ||
-        wdById.zhTitleMap.size > 0
-      ) {
-        const enrichedSubset = mergeImdbWithDoubanAssist(
-          unmatchedTop,
-          extraDouban,
-          {
-            crossIdMap: mergedCrossIdMap,
-            zhTitleMap: mergedZhTitleMap,
-            secondaryZhItems: baikeHits,
-            fallbackThreshold: 0,
-          }
-        );
-        const enrichedById = new Map(
-          enrichedSubset.map((item) => [item.externalId, item])
-        );
-        fused = rankImdbResults(
-          fused.map((item) => enrichedById.get(item.externalId) || item),
-          trimmed
-        );
-      }
-    }
-
-    return {
-      results: fused.slice(0, 12),
-      hasDoubanAssist: fused.some(
-        (r) => r.sourceName === 'IMDb · 豆瓣辅助' || r.sourceName === '豆瓣辅助'
-      ),
-      hasChineseAssist: fused.some(
-        (r) =>
-          r.sourceName === 'IMDb · 豆瓣辅助' ||
-          r.sourceName === '豆瓣辅助' ||
-          r.sourceName === 'IMDb · 中文资料'
-      ),
-    };
-  }
+  if (category === 'film') return { results: [], hasDoubanAssist: false };
 
   // 2. PERSON SEARCH (IMDb nm... via Suggest + Wikidata P345 Bridge + Douban Chinese Bio Assist)
   if (category === 'person') {
@@ -1280,7 +870,7 @@ async function searchLiveMedia(
         : Promise.resolve([] as OnlineSearchResult[]);
 
     const baikePersonPromise = !hasCjkCharacters(trimmed)
-      ? fetchBaikeChineseAssist(trimmed, 'person', options).catch(
+      ? fetchBaikePerson(trimmed, options).catch(
           () => [] as OnlineSearchResult[]
         )
       : Promise.resolve([] as OnlineSearchResult[]);
@@ -1393,7 +983,7 @@ async function searchLiveMedia(
             .filter((p) => normalizeEntityKey(p.title) !== normalizedQuery)
             .slice(0, 1)
             .map((p) =>
-              fetchBaikeChineseAssist(p.title, 'person', options).catch(
+              fetchBaikePerson(p.title, options).catch(
                 () => [] as OnlineSearchResult[]
               )
             )

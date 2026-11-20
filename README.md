@@ -35,6 +35,6 @@ npm run preview
 
 常见影视的中文名、英文名、年份和 IMDb 编号随应用发布，静态版和服务端共用同一份索引。打开应用后，即使外部资料源超时，索引内的影片也可以搜索、收藏。索引外的条目、实时评分、海报、简介和影人资料依赖在线来源。
 
-维护者可运行 `python3 scripts/update-film-index.py` 更新索引。脚本从 IMDb 非商业数据集按投票数选取 2,000 个候选编号，从 Wikidata 的 P345 对应实体提取公开的 CC0 标签和年份，只保留有中文名的条目。投票数和评分不随索引发布。
+维护者可运行 `python3 scripts/update-film-index.py` 更新完整索引。候选来自 IMDb 投票数最多的 6,000 个编号及 Cinemeta 当前热门电影、剧集。中文名取自同一 IMDb 编号关联的 Wikidata 实体。GitHub Pages 每次部署及每周一更新热门片名；更新源不可用时，构建使用仓库内的索引。
 
 [IMDb 数据集](https://developer.imdb.com/non-commercial-datasets/) · [Wikidata 数据许可](https://www.wikidata.org/wiki/Wikidata:Licensing)

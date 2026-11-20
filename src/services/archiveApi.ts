@@ -1335,7 +1335,7 @@ export async function searchOnline(
       );
     }
     return {
-      results: mergeBilingualResults(
+      results: category === 'film' ? bundle.results : mergeBilingualResults(
         deduplicateSearchResults(bundle.results)
       ).slice(0, 16),
       activeSources,
