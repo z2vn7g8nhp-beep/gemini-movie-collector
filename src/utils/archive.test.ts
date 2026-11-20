@@ -218,3 +218,47 @@ test('findExistingItemByTitle, findAutoLinkIds, and formatRelatedSummary handle 
   assert.equal(formatRelatedSummary([]), '');
 });
 
+test('findExistingItemByTitle and isAlreadyCollected match cross-language title/originalTitle and respect film years', () => {
+  const customLib = [
+    {
+      ...SEED_COLLECTION[2],
+      id: 'person-austin',
+      category: 'person' as const,
+      title: '奥斯汀·艾布拉姆斯',
+      originalTitle: 'Austin Abrams',
+      sourceUrl: 'https://www.imdb.com/name/nm3641002/',
+    },
+    {
+      ...SEED_COLLECTION[0],
+      id: 'film-re-2026',
+      category: 'film' as const,
+      title: '生化危机：爆发夜',
+      originalTitle: 'Resident Evil',
+      year: '2026',
+      sourceUrl: 'https://www.imdb.com/title/tt31973693/',
+    },
+  ];
+
+  // English cast name from IMDb matches existing Chinese person record via originalTitle
+  const hitByEnglish = findExistingItemByTitle(customLib, 'person', 'Austin Abrams');
+  assert.equal(hitByEnglish?.id, 'person-austin');
+  assert.equal(isAlreadyCollected(customLib, 'person', 'Austin Abrams'), true);
+
+  // Chinese search result with English originalTitle matches even with punctuation differences
+  const hitByOrig = findExistingItemByTitle(customLib, 'person', '奥斯汀 艾布拉姆斯', {
+    originalTitle: 'Austin Abrams',
+  });
+  assert.equal(hitByOrig?.id, 'person-austin');
+
+  // Same-year Resident Evil matches existing 2026 film, while 2002 remake does NOT collide
+  assert.equal(
+    findExistingItemByTitle(customLib, 'film', 'Resident Evil', { year: '2026' })?.id,
+    'film-re-2026'
+  );
+  assert.equal(
+    findExistingItemByTitle(customLib, 'film', 'Resident Evil', { year: '2002' }),
+    undefined
+  );
+});
+
+

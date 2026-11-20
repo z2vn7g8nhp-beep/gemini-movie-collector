@@ -9,6 +9,10 @@ import type {
 } from '../types/archive';
 import { getApiBaseUrl, isStaticAppMode } from '../services/apiClient';
 import { unwrapProxyImageUrl } from './coverPicker';
+import {
+  collectNormalizedTitleKeys,
+  yearsAreCompatible,
+} from './relationMatching';
 
 export const CATEGORY_LABELS: Record<ArchiveCategory, string> = {
   film: '影视',
@@ -280,28 +284,107 @@ export function computeArchiveStats(items: ArchiveItem[]): ArchiveStats {
   };
 }
 
+export interface ExistingItemMatchOptions {
+  originalTitle?: string;
+  sourceUrl?: string;
+  year?: string;
+}
+
+function extractCanonicalExternalKey(
+  category: ArchiveCategory,
+  sourceUrl?: string
+): string | null {
+  if (!sourceUrl) return null;
+  const trimmed = sourceUrl.trim();
+  if (!trimmed) return null;
+
+  if (category === 'film') {
+    const imdbTitle = /imdb\.com\/title\/(tt\d{5,10})/i.exec(trimmed);
+    if (imdbTitle) return `imdb:${imdbTitle[1].toLowerCase()}`;
+    const doubanSubj = /douban\.com\/(?:movie\/|tv\/)?subject\/(\d{5,12})/i.exec(
+      trimmed
+    );
+    if (doubanSubj) return `douban:subject:${doubanSubj[1]}`;
+    const bgmSubj = /bgm\.tv\/subject\/(\d+)/i.exec(trimmed);
+    if (bgmSubj) return `bgm:subject:${bgmSubj[1]}`;
+    return null;
+  }
+
+  if (category === 'person') {
+    const imdbName = /imdb\.com\/name\/(nm\d{5,10})/i.exec(trimmed);
+    if (imdbName) return `imdb:${imdbName[1].toLowerCase()}`;
+    const doubanCeleb = /douban\.com\/(?:celebrity|personage)\/(\d{5,12})/i.exec(
+      trimmed
+    );
+    if (doubanCeleb) return `douban:celebrity:${doubanCeleb[1]}`;
+    const bgmPerson = /bgm\.tv\/person\/(\d+)/i.exec(trimmed);
+    if (bgmPerson) return `bgm:person:${bgmPerson[1]}`;
+    return null;
+  }
+
+  const bgmChar = /bgm\.tv\/character\/(\d+)/i.exec(trimmed);
+  if (bgmChar) return `bgm:character:${bgmChar[1]}`;
+  return null;
+}
+
 export function isAlreadyCollected(
   items: ArchiveItem[],
   category: ArchiveCategory,
-  title: string
+  title: string,
+  options?: ExistingItemMatchOptions
 ): boolean {
-  const norm = title.trim().toLowerCase();
-  return items.some(
-    (item) =>
-      item.category === category && item.title.trim().toLowerCase() === norm
-  );
+  return Boolean(findExistingItemByTitle(items, category, title, options));
 }
 
 export function findExistingItemByTitle(
   items: ArchiveItem[],
   category: ArchiveCategory,
-  title: string
+  title: string,
+  options?: ExistingItemMatchOptions
 ): ArchiveItem | undefined {
-  const norm = title.trim().toLowerCase();
-  return items.find(
-    (item) =>
-      item.category === category && item.title.trim().toLowerCase() === norm
+  const candCanonical = extractCanonicalExternalKey(
+    category,
+    options?.sourceUrl
   );
+  const candKeys = collectNormalizedTitleKeys([title, options?.originalTitle]);
+  if (!candCanonical && candKeys.size === 0) return undefined;
+
+  return items.find((item) => {
+    if (item.category !== category) return false;
+
+    if (candCanonical) {
+      const itemCanonical = extractCanonicalExternalKey(
+        category,
+        item.sourceUrl
+      );
+      if (itemCanonical && itemCanonical === candCanonical) {
+        return true;
+      }
+    }
+
+    const itemKeys = collectNormalizedTitleKeys([
+      item.title,
+      item.originalTitle,
+    ]);
+    let titleOverlap = false;
+    for (const ck of candKeys) {
+      if (itemKeys.has(ck)) {
+        titleOverlap = true;
+        break;
+      }
+    }
+    if (!titleOverlap) return false;
+
+    // For films/TV, allow collecting remakes from different years (e.g. Resident Evil 2002 vs 2026)
+    if (
+      category === 'film' &&
+      !yearsAreCompatible(item.year, options?.year, 2)
+    ) {
+      return false;
+    }
+
+    return true;
+  });
 }
 
 export function findAutoLinkIds(

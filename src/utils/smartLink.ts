@@ -246,6 +246,26 @@ export function findRecommendedUnlinkedItems(
     if (cand.id === target.id) continue;
     if (isExplicitlyLinked(target, cand)) continue;
 
+    // Never recommend linking two items of the same category that represent the same entity
+    // (e.g. duplicate person records "Austin Abrams" and "奥斯汀·艾布拉姆斯")
+    if (cand.category === target.category) {
+      const targetOwn = Array.from(
+        new Set([
+          ...extractEntityNames(target.title),
+          ...extractEntityNames(target.originalTitle),
+        ])
+      );
+      const candOwn = Array.from(
+        new Set([
+          ...extractEntityNames(cand.title),
+          ...extractEntityNames(cand.originalTitle),
+        ])
+      );
+      if (findMatchingPair(targetOwn, candOwn)) {
+        continue;
+      }
+    }
+
     const candSig = buildSignalProfile(cand, byId, allItems);
 
     type CandidateScore = Omit<LinkRecommendation, 'item'>;
@@ -257,8 +277,12 @@ export function findRecommendedUnlinkedItems(
 
     // 1. Direct work title match: target references a work title that IS this film (or reverse)
     const directFilmHit =
-      findMatchingPair(targetSig.referencedWorkNames, candSig.ownFilmNames) ||
-      findMatchingPair(targetSig.ownFilmNames, candSig.referencedWorkNames);
+      (target.category !== 'film' && cand.category === 'film'
+        ? findMatchingPair(targetSig.referencedWorkNames, candSig.ownFilmNames)
+        : null) ||
+      (target.category === 'film' && cand.category !== 'film'
+        ? findMatchingPair(targetSig.ownFilmNames, candSig.referencedWorkNames)
+        : null);
     if (directFilmHit) {
       best = pickBetter(best, {
         kind: 'work_title',
@@ -270,8 +294,12 @@ export function findRecommendedUnlinkedItems(
 
     // 2. Direct actor/person name match: target's portrayedBy / subtitle mentions this person (or reverse)
     const directActorHit =
-      findMatchingPair(targetSig.referencedActorNames, candSig.ownPersonNames) ||
-      findMatchingPair(targetSig.ownPersonNames, candSig.referencedActorNames);
+      (target.category !== 'person' && cand.category === 'person'
+        ? findMatchingPair(targetSig.referencedActorNames, candSig.ownPersonNames)
+        : null) ||
+      (target.category === 'person' && cand.category !== 'person'
+        ? findMatchingPair(targetSig.ownPersonNames, candSig.referencedActorNames)
+        : null);
     if (directActorHit) {
       best = pickBetter(best, {
         kind: 'actor_name',
@@ -282,14 +310,22 @@ export function findRecommendedUnlinkedItems(
     }
 
     // 3. Shared work match: both target & candidate reference or link to the same film/work
-    const candAllWorks = Array.from(
+    const sameCategoryFilm =
+      target.category === 'film' && cand.category === 'film';
+    const targetWorksForShared = sameCategoryFilm
+      ? [...targetSig.referencedWorkNames, ...targetSig.linkedWorkNames]
+      : targetAllWorks;
+    const candWorksForShared = Array.from(
       new Set([
-        ...candSig.ownFilmNames,
+        ...(sameCategoryFilm ? [] : candSig.ownFilmNames),
         ...candSig.referencedWorkNames,
         ...candSig.linkedWorkNames,
       ])
     );
-    const sharedWorkHit = findMatchingPair(targetAllWorks, candAllWorks);
+    const sharedWorkHit = findMatchingPair(
+      targetWorksForShared,
+      candWorksForShared
+    );
     if (sharedWorkHit) {
       const label =
         cand.category === 'film'
@@ -304,14 +340,22 @@ export function findRecommendedUnlinkedItems(
     }
 
     // 4. Shared actor match: both target & candidate reference or link to the same actor/person
-    const candAllActors = Array.from(
+    const sameCategoryPerson =
+      target.category === 'person' && cand.category === 'person';
+    const targetActorsForShared = sameCategoryPerson
+      ? [...targetSig.referencedActorNames, ...targetSig.linkedActorNames]
+      : targetAllActors;
+    const candActorsForShared = Array.from(
       new Set([
-        ...candSig.ownPersonNames,
+        ...(sameCategoryPerson ? [] : candSig.ownPersonNames),
         ...candSig.referencedActorNames,
         ...candSig.linkedActorNames,
       ])
     );
-    const sharedActorHit = findMatchingPair(targetAllActors, candAllActors);
+    const sharedActorHit = findMatchingPair(
+      targetActorsForShared,
+      candActorsForShared
+    );
     if (sharedActorHit) {
       const label =
         cand.category === 'person'

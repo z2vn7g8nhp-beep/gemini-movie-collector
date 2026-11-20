@@ -245,7 +245,12 @@ export function SearchTabView({
               const collected = isAlreadyCollected(
                 existingItems,
                 item.category,
-                item.title
+                item.title,
+                {
+                  originalTitle: item.originalTitle,
+                  sourceUrl: item.sourceUrl,
+                  year: item.year,
+                }
               );
               const isCollecting = collectingId === item.externalId;
 

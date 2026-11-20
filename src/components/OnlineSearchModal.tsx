@@ -441,7 +441,12 @@ export function OnlineSearchModal({
                       const collected = isAlreadyCollected(
                         existingItems,
                         resItem.category,
-                        resItem.title
+                        resItem.title,
+                        {
+                          originalTitle: resItem.originalTitle,
+                          sourceUrl: resItem.sourceUrl,
+                          year: resItem.year,
+                        }
                       );
                       const isCollecting = collectingId === resItem.externalId;
 

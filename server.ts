@@ -326,6 +326,7 @@ async function createServer() {
     const title = String(req.query.title || '').trim();
     const originalTitle = String(req.query.originalTitle || '').trim() || undefined;
     const sourceUrl = String(req.query.sourceUrl || '').trim() || undefined;
+    const year = String(req.query.year || '').trim() || undefined;
 
     if (!title) {
       res
@@ -339,6 +340,7 @@ async function createServer() {
       title,
       originalTitle,
       sourceUrl,
+      year,
       mode: 'server',
     });
     res.json(payload);

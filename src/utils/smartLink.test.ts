@@ -141,3 +141,48 @@ test('findDraftLinkRecommendations finds live matches while typing work or actor
   assert.equal(recs[0].item.id, 'person-rdj');
   assert.equal(recs[0].kind, 'actor_name');
 });
+
+test('findRecommendedUnlinkedItems never recommends linking a person to a duplicate alias of themselves', () => {
+  const austinZh = makeItem({
+    id: 'person-austin-zh',
+    category: 'person',
+    title: '奥斯汀·艾布拉姆斯',
+    originalTitle: 'Austin Abrams',
+    relatedIds: [],
+  });
+  const austinEn = makeItem({
+    id: 'person-austin-en',
+    category: 'person',
+    title: 'Austin Abrams',
+    relatedWorkTitle: '生化危机：爆发夜',
+    relatedIds: ['film-re-2026'],
+  });
+  const film = makeItem({
+    id: 'film-re-2026',
+    category: 'film',
+    title: '生化危机：爆发夜',
+    originalTitle: 'Resident Evil',
+    relatedIds: ['person-austin-en'],
+  });
+
+  const recsForEn = findRecommendedUnlinkedItems(austinEn, [
+    austinZh,
+    austinEn,
+    film,
+  ]);
+  assert.equal(
+    recsForEn.some((r) => r.item.id === 'person-austin-zh'),
+    false
+  );
+
+  const recsForZh = findRecommendedUnlinkedItems(austinZh, [
+    austinZh,
+    austinEn,
+    film,
+  ]);
+  assert.equal(
+    recsForZh.some((r) => r.item.id === 'person-austin-en'),
+    false
+  );
+});
+

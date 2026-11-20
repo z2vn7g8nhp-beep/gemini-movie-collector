@@ -16,6 +16,10 @@ import {
 } from '../utils/imdbParsers';
 import { normalizeEntityKey } from '../utils/wikiCast';
 import {
+  matchFilmRelationCandidate,
+  normalizeStrictTitleKey,
+} from '../utils/relationMatching';
+import {
   searchDoubanMedia,
   type DoubanClientOptions,
 } from './doubanClient';
@@ -1026,7 +1030,7 @@ export async function fetchImdbFilmRelations(
   title: string,
   originalTitle: string | undefined,
   sourceUrl: string | undefined,
-  options: ImdbClientOptions
+  options: ImdbClientOptions & { year?: string }
 ): Promise<{ people: OnlineSearchResult[]; characters: OnlineSearchResult[] }> {
   const empty = { people: [], characters: [] };
 
@@ -1048,16 +1052,19 @@ export async function fetchImdbFilmRelations(
     ]);
     const movies = parseCinemetaSearchPayload(cinMovieRaw, 'movie');
     const series = parseCinemetaSearchPayload(cinSeriesRaw, 'series');
-    const targetKeys = [title, originalTitle]
-      .filter((s): s is string => Boolean(s))
-      .map((s) => normalizeEntityKey(s));
     const all = [...movies, ...series];
-    const exact =
-      all.find((item) => targetKeys.includes(normalizeEntityKey(item.result.title))) ||
-      all[0];
-    if (exact) {
-      imdbId = exact.imdbId;
-      preferredType = exact.mediaType;
+    const matched = matchFilmRelationCandidate(
+      all.map((entry) => ({
+        title: entry.result.title,
+        originalTitle: entry.result.originalTitle,
+        year: entry.result.year,
+        entry,
+      })),
+      { title, originalTitle, year: options.year }
+    );
+    if (matched) {
+      imdbId = matched.entry.imdbId;
+      preferredType = matched.entry.mediaType;
     }
   }
 
@@ -1079,7 +1086,6 @@ export async function fetchImdbFilmRelations(
       summary: `在《${title}》中担任${role}（IMDb ${imdbId}）。`,
       relatedWorkTitle: title,
       sourceName: 'IMDb',
-      sourceUrl: `https://www.imdb.com/title/${imdbId}/`,
       tags: [tag],
     });
   };
@@ -1087,6 +1093,32 @@ export async function fetchImdbFilmRelations(
   for (const d of meta.directors) addPerson(d, '导演', '导演');
   for (const w of meta.writers) addPerson(w, '编剧', '编剧');
   for (const a of meta.cast) addPerson(a, '主演', '演员');
+
+  // Enrich top cast & directors with IMDb Suggest portraits and real nm... URLs on server mode
+  if (options.mode === 'server' && people.length > 0) {
+    const enrichTargets = people.slice(0, 8);
+    await Promise.allSettled(
+      enrichTargets.map(async (person) => {
+        if (hasCjkCharacters(person.title)) return;
+        const suggestRaw = await fetchImdbSuggestRaw(
+          person.title,
+          'names',
+          options
+        );
+        const targetKey = normalizeStrictTitleKey(person.title);
+        const hit = parseImdbSuggestPayload(suggestRaw).names.find(
+          (cand) => normalizeStrictTitleKey(cand.title) === targetKey
+        );
+        if (!hit) return;
+        if (hit.coverUrl && !person.coverUrl) {
+          person.coverUrl = hit.coverUrl;
+        }
+        if (hit.sourceUrl && /\/name\/nm\d+/i.test(hit.sourceUrl)) {
+          person.sourceUrl = hit.sourceUrl;
+        }
+      })
+    );
+  }
 
   return { people, characters: [] };
 }

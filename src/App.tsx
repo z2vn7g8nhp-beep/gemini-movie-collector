@@ -580,6 +580,21 @@ export default function App() {
   };
 
   const handleCollectOnlineResult = async (result: OnlineSearchResult) => {
+    const existing = findExistingItemByTitle(
+      items,
+      result.category,
+      result.title,
+      {
+        originalTitle: result.originalTitle,
+        sourceUrl: result.sourceUrl,
+        year: result.year,
+      }
+    );
+    if (existing) {
+      setNotice(`「${existing.title}」已在藏馆中`);
+      return;
+    }
+
     const now = new Date().toISOString();
     const newItem: ArchiveItem = {
       id: `arc-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -731,7 +746,12 @@ export default function App() {
     const existing = findExistingItemByTitle(
       items,
       candidate.category,
-      candidate.title
+      candidate.title,
+      {
+        originalTitle: candidate.originalTitle,
+        sourceUrl: candidate.sourceUrl,
+        year: candidate.year,
+      }
     );
     if (existing) {
       await handleLinkExisting(sourceItem.id, existing.id);

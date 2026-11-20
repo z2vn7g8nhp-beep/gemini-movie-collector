@@ -172,6 +172,7 @@ export async function apiFetchRelations(params: {
   title: string;
   originalTitle?: string;
   sourceUrl?: string;
+  year?: string;
   signal?: AbortSignal;
 }): Promise<OnlineRelationsResponse> {
   const qs = new URLSearchParams({
@@ -184,6 +185,9 @@ export async function apiFetchRelations(params: {
   if (params.sourceUrl?.trim()) {
     qs.set('sourceUrl', params.sourceUrl.trim());
   }
+  if (params.year?.trim()) {
+    qs.set('year', params.year.trim());
+  }
   return fetchJsonOrFallbackToBrowser(
     `/api/relations?${qs.toString()}`,
     () =>
@@ -192,6 +196,7 @@ export async function apiFetchRelations(params: {
         title: params.title,
         originalTitle: params.originalTitle,
         sourceUrl: params.sourceUrl,
+        year: params.year,
         mode: 'browser',
         signal: params.signal,
       }),

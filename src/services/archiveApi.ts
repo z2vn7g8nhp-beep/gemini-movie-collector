@@ -52,6 +52,13 @@ import {
   searchImdbCoverCandidates,
   searchImdbMedia,
 } from './imdbClient';
+import {
+  extractYearNumber,
+  hasStrictTitleOverlap,
+  isRelevantFilmCrewRole,
+  matchBangumiSubjectCandidate,
+  yearsAreCompatible,
+} from '../utils/relationMatching';
 
 export interface OnlineSearchResponse {
   results: OnlineSearchResult[];
@@ -1152,6 +1159,7 @@ export async function fetchOnlineRelations(
     title: string;
     originalTitle?: string;
     sourceUrl?: string;
+    year?: string;
   },
   signal?: AbortSignal
 ): Promise<OnlineRelationsResponse> {
@@ -1163,6 +1171,7 @@ export async function fetchOnlineRelations(
     });
     if (params.originalTitle) qs.set('originalTitle', params.originalTitle);
     if (params.sourceUrl) qs.set('sourceUrl', params.sourceUrl);
+    if (params.year) qs.set('year', params.year);
     const res = await fetch(`/api/relations?${qs.toString()}`, { signal });
     if (res.ok) {
       const data = (await res.json()) as Partial<OnlineRelationsResponse>;
@@ -1204,18 +1213,19 @@ export async function fetchOnlineRelations(
     : ({ transport: 'static-direct', signal } as const);
 
   if (params.category === 'film') {
+    const targetYear = extractYearNumber(params.year);
     const [imdbRel, doubanRel] = await Promise.all([
       fetchImdbFilmRelations(
         params.title,
         params.originalTitle,
         params.sourceUrl,
-        { mode: 'browser', signal }
+        { mode: 'browser', year: params.year, signal }
       ).catch(() => ({ people: [], characters: [] })),
       fetchDoubanFilmRelations(
         params.title,
         params.originalTitle,
         params.sourceUrl,
-        doubanRelOpts
+        { ...doubanRelOpts, year: params.year }
       ).catch(() => ({ people: [], characters: [] })),
     ]);
     if (doubanRel.people.length > 0 || doubanRel.characters.length > 0) {
@@ -1233,7 +1243,9 @@ export async function fetchOnlineRelations(
       await Promise.allSettled([
         fetchBaikeCardBrowser(params.title, 'film', signal),
         fetchIqiyiSuggestBrowser(params.title, 'film', signal),
-        fetchJsonWithTimeout<{ parse?: { text?: { '*'?: string } } }>(
+        fetchJsonWithTimeout<{
+          parse?: { title?: string; text?: { '*'?: string } };
+        }>(
           `https://zh.wikipedia.org/w/api.php?action=parse&format=json&origin=*&redirects=1&prop=text&page=${encodeURIComponent(
             params.title
           )}`,
@@ -1245,9 +1257,16 @@ export async function fetchOnlineRelations(
             bgmMatch?.[1] === 'subject' ? Number(bgmMatch[2]) : null;
           if (!subjectId) {
             const searchRes = await fetchJsonWithTimeout<{
-              data?: Array<{ id: number; name?: string; name_cn?: string }>;
+              data?: Array<{
+                id: number;
+                type?: number;
+                name?: string;
+                name_cn?: string;
+                date?: string;
+                infobox?: Array<{ key?: string; value?: unknown }>;
+              }>;
             }>(
-              'https://api.bgm.tv/v0/search/subjects?limit=3',
+              'https://api.bgm.tv/v0/search/subjects?limit=6',
               {
                 method: 'POST',
                 headers: {
@@ -1262,12 +1281,11 @@ export async function fetchOnlineRelations(
               },
               4500
             );
-            const exact = searchRes?.data?.find(
-              (d) =>
-                String(d.name_cn || '').trim() === params.title ||
-                String(d.name || '').trim() === params.title
-            );
-            subjectId = (exact || searchRes?.data?.[0])?.id ?? null;
+            subjectId = matchBangumiSubjectCandidate(searchRes?.data, {
+              title: params.title,
+              originalTitle: params.originalTitle,
+              year: params.year,
+            });
           }
           if (!subjectId) return { people: [], characters: [] };
           const [bgmPersons, bgmChars] = await Promise.all([
@@ -1286,10 +1304,11 @@ export async function fetchOnlineRelations(
           const seen = new Set<string>();
           for (const p of bgmPersons || []) {
             if (p.type && p.type !== 1) continue;
+            const rel = String(p.relation || '').trim();
+            if (!isRelevantFilmCrewRole(rel)) continue;
             const name = String(p.name || '').trim();
             if (!name || seen.has(name)) continue;
             seen.add(name);
-            const rel = String(p.relation || '演职员');
             bgmPeople.push({
               externalId: `bgm-person-${p.id}`,
               category: 'person',
@@ -1339,7 +1358,13 @@ export async function fetchOnlineRelations(
     }
 
     if (wikiOutcome.status === 'fulfilled') {
-      const html = wikiOutcome.value?.parse?.text?.['*'];
+      const resolvedWikiTitle = wikiOutcome.value?.parse?.title || '';
+      const wikiTitleYear = extractYearNumber(resolvedWikiTitle);
+      const wikiYearOk =
+        targetYear === null ||
+        wikiTitleYear === null ||
+        yearsAreCompatible(targetYear, wikiTitleYear, 2);
+      const html = wikiYearOk ? wikiOutcome.value?.parse?.text?.['*'] : undefined;
       if (html) {
         const parsedCast = parseZhWikiCastHtml(html);
         if (parsedCast.length > 0) {
@@ -1397,14 +1422,42 @@ export async function fetchOnlineRelations(
       }
     }
 
-    if (baikeOutcome.status === 'fulfilled' && baikeOutcome.value.relatedPeople.length > 0) {
-      sources.push('百度百科');
-      pushUnique(people, baikeOutcome.value.relatedPeople);
+    if (
+      baikeOutcome.status === 'fulfilled' &&
+      baikeOutcome.value.relatedPeople.length > 0
+    ) {
+      const baikeItem = baikeOutcome.value.searchResult;
+      const baikeTitleMatches =
+        !baikeItem ||
+        hasStrictTitleOverlap(
+          [baikeItem.title, baikeItem.originalTitle],
+          [params.title, params.originalTitle]
+        );
+      const baikeYearMatches =
+        !baikeItem || yearsAreCompatible(params.year, baikeItem.year, 2);
+      if (baikeTitleMatches && baikeYearMatches) {
+        sources.push('百度百科');
+        pushUnique(people, baikeOutcome.value.relatedPeople);
+      }
     }
 
-    if (iqiyiOutcome.status === 'fulfilled' && iqiyiOutcome.value.relatedPeople.length > 0) {
-      sources.push('爱奇艺影视库');
-      pushUnique(people, iqiyiOutcome.value.relatedPeople);
+    if (
+      iqiyiOutcome.status === 'fulfilled' &&
+      iqiyiOutcome.value.relatedPeople.length > 0
+    ) {
+      const iqiyiItem = iqiyiOutcome.value.searchResults[0];
+      const iqiyiTitleMatches =
+        Boolean(iqiyiItem) &&
+        hasStrictTitleOverlap(
+          [iqiyiItem.title, iqiyiItem.originalTitle],
+          [params.title, params.originalTitle]
+        );
+      const iqiyiYearMatches =
+        !iqiyiItem || yearsAreCompatible(params.year, iqiyiItem.year, 2);
+      if (iqiyiTitleMatches && iqiyiYearMatches) {
+        sources.push('爱奇艺影视库');
+        pushUnique(people, iqiyiOutcome.value.relatedPeople);
+      }
     }
   } else {
     // Person -> Representative films & characters

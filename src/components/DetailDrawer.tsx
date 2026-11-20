@@ -293,6 +293,7 @@ export function DetailDrawer({
             title: item!.title,
             originalTitle: item!.originalTitle,
             sourceUrl: item!.sourceUrl,
+            year: item!.year,
           },
           controller.signal
         );
@@ -1085,12 +1086,21 @@ export function DetailDrawer({
                       const existing = findExistingItemByTitle(
                         allItems,
                         cand.category,
-                        cand.title
+                        cand.title,
+                        {
+                          originalTitle: cand.originalTitle,
+                          sourceUrl: cand.sourceUrl,
+                          year: cand.year,
+                        }
                       );
                       const isLinked = existing
                         ? relatedIdSet.has(existing.id)
                         : false;
                       const isBusy = linkingKey === cand.externalId;
+                      const matchedAliasLabel =
+                        existing && existing.title !== cand.title
+                          ? `馆内：${existing.title}`
+                          : undefined;
 
                       return (
                         <li
@@ -1099,9 +1109,9 @@ export function DetailDrawer({
                         >
                           <div className="flex min-w-0 flex-1 items-center gap-2.5">
                             <ArchivalImage
-                              src={cand.coverUrl}
-                              alt={cand.title}
-                              title={cand.title}
+                              src={existing?.coverUrl || cand.coverUrl}
+                              alt={existing?.title || cand.title}
+                              title={existing?.title || cand.title}
                               category={cand.category}
                               compact
                               className="h-14 w-11 shrink-0 rounded-lg"
@@ -1110,9 +1120,11 @@ export function DetailDrawer({
                               <p className="truncate font-editorial text-sm font-medium text-[#1A1816]">
                                 {cand.title}
                               </p>
-                              {cand.subtitle && (
+                              {(cand.subtitle || matchedAliasLabel) && (
                                 <p className="mt-0.5 line-clamp-1 text-[11px] text-[#625C54]">
-                                  {cand.subtitle}
+                                  {[cand.subtitle, matchedAliasLabel]
+                                    .filter(Boolean)
+                                    .join(' · ')}
                                 </p>
                               )}
                             </div>

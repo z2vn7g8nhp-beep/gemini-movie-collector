@@ -18,6 +18,7 @@ import {
   rankStaticDoubanFilmResults,
 } from '../utils/doubanParsers';
 import { normalizeEntityKey } from '../utils/wikiCast';
+import { matchFilmRelationCandidate } from '../utils/relationMatching';
 
 export type DoubanBridgeFailureReason = 'timeout' | 'rate-limit' | 'network';
 
@@ -624,7 +625,7 @@ async function resolveDoubanSubjectId(
   title: string,
   originalTitle: string | undefined,
   sourceUrl: string | undefined,
-  options: DoubanClientOptions
+  options: DoubanClientOptions & { year?: string }
 ): Promise<string | null> {
   const fromUrl = extractSubjectIdFromUrl(sourceUrl);
   if (fromUrl) return fromUrl;
@@ -632,8 +633,6 @@ async function resolveDoubanSubjectId(
   const queries = [title, originalTitle].filter(
     (s): s is string => Boolean(s && s.trim())
   );
-  const targetKey = normalizeEntityKey(title);
-  const origKey = originalTitle ? normalizeEntityKey(originalTitle) : '';
 
   for (const q of queries) {
     const data = await fetchDoubanJson<Record<string, any>>(
@@ -647,11 +646,12 @@ async function resolveDoubanSubjectId(
     const parsed = parseDoubanMovieSearch(data);
     if (parsed.length === 0) continue;
 
-    const exact = parsed.find((item) => {
-      const k = normalizeEntityKey(item.title);
-      return k === targetKey || (origKey && k === origKey);
+    const pick = matchFilmRelationCandidate(parsed, {
+      title,
+      originalTitle,
+      year: options.year,
     });
-    const pick = exact || parsed[0];
+    if (!pick) continue;
     const id = extractSubjectIdFromUrl(pick.sourceUrl);
     if (id) return id;
   }
@@ -976,7 +976,7 @@ export async function fetchDoubanFilmRelations(
   title: string,
   originalTitle: string | undefined,
   sourceUrl: string | undefined,
-  options: DoubanClientOptions
+  options: DoubanClientOptions & { year?: string }
 ): Promise<{ people: OnlineSearchResult[]; characters: OnlineSearchResult[] }> {
   const empty = { people: [], characters: [] };
 
@@ -989,15 +989,20 @@ export async function fetchDoubanFilmRelations(
         6500
       );
       const entries = parseWmdbSearchPayload(wmdbRaw);
-      const exact =
-        entries.find(
-          (e) => normalizeEntityKey(e.result.title) === normalizeEntityKey(title)
-        ) || entries[0];
-      if (exact) {
-        if (exact.people.length > 0) {
-          return { people: exact.people, characters: [] };
+      const matched = matchFilmRelationCandidate(
+        entries.map((entry) => ({
+          title: entry.result.title,
+          originalTitle: entry.result.originalTitle,
+          year: entry.result.year,
+          entry,
+        })),
+        { title, originalTitle, year: options.year }
+      );
+      if (matched) {
+        if (matched.entry.people.length > 0) {
+          return { people: matched.entry.people, characters: [] };
         }
-        sid = extractSubjectIdFromUrl(exact.result.sourceUrl);
+        sid = extractSubjectIdFromUrl(matched.entry.result.sourceUrl);
       }
     }
     if (!sid) return empty;

@@ -36,7 +36,7 @@ export function MobileNavBar({
   return (
     <nav
       aria-label="底部主导航"
-      className="fixed bottom-0 left-0 right-0 z-40 border-t border-[#E4DFD5] bg-white/95 pb-[env(safe-area-inset-bottom)] md:hidden"
+      className="fixed bottom-0 left-0 right-0 z-40 border-t border-[#E4DFD5] bg-white pb-[env(safe-area-inset-bottom)] md:hidden"
     >
       <div className="grid h-[60px] grid-cols-5 items-center">
         {TABS.map(({ id, label, Icon }) => {
@@ -93,7 +93,7 @@ export function AppTopBar({
   onQuickCheckIn,
 }: AppTopBarProps) {
   return (
-    <header className="sticky top-0 z-30 border-b border-[#E4DFD5] bg-[#F7F5F0]/95">
+    <header className="sticky top-0 z-30 border-b border-[#E4DFD5] bg-[#F7F5F0] pt-[env(safe-area-inset-top)]">
       {/* Mobile Compact App Bar (52px) */}
       <div className="flex h-[52px] items-center justify-between gap-2 px-4 md:hidden">
         <button

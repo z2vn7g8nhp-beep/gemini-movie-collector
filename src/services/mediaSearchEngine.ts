@@ -39,6 +39,14 @@ import {
   searchImdbCoverCandidates,
   searchImdbMedia,
 } from './imdbClient';
+import { extractImdbIdFromUrl } from '../utils/imdbParsers';
+import {
+  extractYearNumber,
+  isRelevantFilmCrewRole,
+  matchBangumiCharacterCandidate,
+  matchBangumiSubjectCandidate,
+  yearsAreCompatible,
+} from '../utils/relationMatching';
 
 export type MediaEngineMode = 'server' | 'browser';
 
@@ -980,7 +988,8 @@ async function resolveBangumiId(
   title: string,
   sourceUrl: string | undefined,
   mode: MediaEngineMode,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  options?: { originalTitle?: string; year?: string }
 ): Promise<number | null> {
   if (sourceUrl) {
     const m = /bgm\.tv\/(subject|person|character)\/(\d+)/.exec(sourceUrl);
@@ -988,25 +997,35 @@ async function resolveBangumiId(
   }
   try {
     if (category === 'film') {
-      const res = await fetchWithTimeout(
-        'https://api.bgm.tv/v0/search/subjects?limit=3',
-        {
-          method: 'POST',
-          headers: BGM_HEADERS,
-          body: JSON.stringify({ keyword: title, filter: { type: [6, 2] } }),
-        },
-        5500,
-        mode,
-        signal
+      const queries = Array.from(
+        new Set(
+          [title, options?.originalTitle]
+            .map((q) => (q || '').trim())
+            .filter(Boolean)
+        )
       );
-      if (!res.ok) return null;
-      const json = (await res.json()) as { data?: Array<Record<string, any>> };
-      const exact = json.data?.find(
-        (d) =>
-          String(d.name_cn || '').trim() === title ||
-          String(d.name || '').trim() === title
-      );
-      return (exact || json.data?.[0])?.id ?? null;
+      for (const keyword of queries) {
+        const res = await fetchWithTimeout(
+          'https://api.bgm.tv/v0/search/subjects?limit=6',
+          {
+            method: 'POST',
+            headers: BGM_HEADERS,
+            body: JSON.stringify({ keyword, filter: { type: [6, 2] } }),
+          },
+          5500,
+          mode,
+          signal
+        );
+        if (!res.ok) continue;
+        const json = (await res.json()) as { data?: Array<Record<string, any>> };
+        const matchedId = matchBangumiSubjectCandidate(json.data as any, {
+          title,
+          originalTitle: options?.originalTitle,
+          year: options?.year,
+        });
+        if (matchedId) return matchedId;
+      }
+      return null;
     }
     if (category === 'person') {
       const res = await fetchWithTimeout(
@@ -1040,7 +1059,7 @@ async function resolveBangumiId(
       return exact?.id ?? null;
     }
     const res = await fetchWithTimeout(
-      'https://api.bgm.tv/v0/search/characters?limit=3',
+      'https://api.bgm.tv/v0/search/characters?limit=6',
       {
         method: 'POST',
         headers: BGM_HEADERS,
@@ -1052,7 +1071,10 @@ async function resolveBangumiId(
     );
     if (!res.ok) return null;
     const json = (await res.json()) as { data?: Array<Record<string, any>> };
-    return json.data?.[0]?.id ?? null;
+    return matchBangumiCharacterCandidate(json.data as any, {
+      title,
+      originalTitle: options?.originalTitle,
+    });
   } catch {
     return null;
   }
@@ -1091,7 +1113,7 @@ async function fetchBangumiFilmRelations(
     .filter((p: any) => {
       const rel = String(p.relation || '');
       if (p.type && p.type !== 1) return false;
-      if (isIgnoredCrewRole(rel)) return false;
+      if (isIgnoredCrewRole(rel) || !isRelevantFilmCrewRole(rel)) return false;
       return personRolePriority(rel) < 99;
     })
     .sort(
@@ -1328,18 +1350,39 @@ async function fetchWikidataFilmRelations(
   filmTitle: string,
   originalTitle: string | undefined,
   mode: MediaEngineMode,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  options?: { sourceUrl?: string; year?: string }
 ): Promise<{ people: OnlineSearchResult[]; characters: OnlineSearchResult[] }> {
   const empty = { people: [], characters: [] };
   try {
-    const lookupTitles = [filmTitle, originalTitle].filter(
-      (t): t is string => Boolean(t && t.trim())
+    const targetYear = extractYearNumber(options?.year);
+    const targetImdbId = extractImdbIdFromUrl(options?.sourceUrl);
+    const expectedImdbTitleId =
+      targetImdbId && targetImdbId.startsWith('tt') ? targetImdbId : null;
+
+    const rawLookupTitles: Array<string | undefined> = [];
+    if (targetYear) {
+      rawLookupTitles.push(`${filmTitle} (${targetYear}年电影)`);
+      if (originalTitle) {
+        rawLookupTitles.push(`${originalTitle} (${targetYear}年电影)`);
+      }
+    }
+    rawLookupTitles.push(filmTitle, originalTitle);
+    const lookupTitles = Array.from(
+      new Set(
+        rawLookupTitles
+          .map((t) => (t || '').trim())
+          .filter(Boolean)
+      )
     );
-    let qid: string | undefined;
+
+    let claims: Record<string, any> | null = null;
+    const seenQids = new Set<string>();
+
     for (const t of lookupTitles) {
       const wpRes = await fetchWithTimeout(
-        `https://zh.wikipedia.org/w/api.php?action=query&format=json&redirects=1&converttitles=1&prop=pageprops&titles=${encodeURIComponent(
-          t.trim()
+        `https://zh.wikipedia.org/w/api.php?action=query&format=json&redirects=1&converttitles=1&variant=zh-cn&prop=pageprops&titles=${encodeURIComponent(
+          t
         )}`,
         { headers: WIKI_HEADERS },
         5000,
@@ -1351,25 +1394,75 @@ async function fetchWikidataFilmRelations(
         query?: { pages?: Record<string, any> };
       };
       const page = Object.values(wpJson.query?.pages || {})[0];
-      if (page?.pageprops?.wikibase_item) {
-        qid = String(page.pageprops.wikibase_item);
-        break;
-      }
-    }
-    if (!qid) return empty;
+      const candQid = page?.pageprops?.wikibase_item
+        ? String(page.pageprops.wikibase_item)
+        : undefined;
+      if (!candQid || seenQids.has(candQid)) continue;
+      seenQids.add(candQid);
 
-    const entRes = await fetchWithTimeout(
-      `https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${encodeURIComponent(
-        qid
-      )}&props=claims&format=json`,
-      { headers: WIKI_HEADERS },
-      5500,
-      mode,
-      signal
-    );
-    if (!entRes.ok) return empty;
-    const entJson = (await entRes.json()) as { entities?: Record<string, any> };
-    const claims = entJson.entities?.[qid]?.claims || {};
+      const entRes = await fetchWithTimeout(
+        `https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${encodeURIComponent(
+          candQid
+        )}&props=claims&format=json`,
+        { headers: WIKI_HEADERS },
+        5500,
+        mode,
+        signal
+      );
+      if (!entRes.ok) continue;
+      const entJson = (await entRes.json()) as { entities?: Record<string, any> };
+      const candClaims = entJson.entities?.[candQid]?.claims || {};
+
+      // Reject video game / franchise / comic / novel entities that have no film cast or director
+      const p31Ids: string[] = (candClaims.P31 || [])
+        .map((c: any) => String(c?.mainsnak?.datavalue?.value?.id || ''))
+        .filter(Boolean);
+      const isNonFilmFranchise = p31Ids.some((id) =>
+        ['Q7889', 'Q7058673', 'Q196600', 'Q559618', 'Q8274', 'Q21198342'].includes(id)
+      );
+      const hasFilmCredits =
+        (candClaims.P57 && candClaims.P57.length > 0) ||
+        (candClaims.P161 && candClaims.P161.length > 0);
+      if (isNonFilmFranchise && !hasFilmCredits) {
+        continue;
+      }
+
+      // Validate IMDb ID (P345) when known
+      const wdImdbIds: string[] = (candClaims.P345 || [])
+        .map((c: any) => String(c?.mainsnak?.datavalue?.value || '').trim().toLowerCase())
+        .filter(Boolean);
+      if (
+        expectedImdbTitleId &&
+        wdImdbIds.length > 0 &&
+        !wdImdbIds.includes(expectedImdbTitleId)
+      ) {
+        continue;
+      }
+
+      // Validate publication/inception/start year (P577 / P571 / P580) when targetYear is known
+      if (targetYear !== null) {
+        const wdYears: number[] = [
+          ...(candClaims.P577 || []),
+          ...(candClaims.P571 || []),
+          ...(candClaims.P580 || []),
+        ]
+          .map((c: any) =>
+            extractYearNumber(String(c?.mainsnak?.datavalue?.value?.time || ''))
+          )
+          .filter((y: number | null): y is number => y !== null);
+        if (
+          wdYears.length > 0 &&
+          !wdYears.some((y) => yearsAreCompatible(targetYear, y, 2))
+        ) {
+          continue;
+        }
+      }
+
+      claims = candClaims;
+      break;
+    }
+
+    if (!claims) return empty;
 
     const directorIds: string[] = (claims.P57 || [])
       .slice(0, 5)
@@ -1570,12 +1663,22 @@ async function fetchZhWikiFilmRelations(
   filmTitle: string,
   originalTitle: string | undefined,
   mode: MediaEngineMode,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  year?: string
 ): Promise<{ people: OnlineSearchResult[]; characters: OnlineSearchResult[] }> {
   const empty = { people: [], characters: [] };
   try {
-    const candidates = [filmTitle, originalTitle].filter(
-      (t): t is string => Boolean(t && t.trim())
+    const targetYear = extractYearNumber(year);
+    const rawCandidates: Array<string | undefined> = [];
+    if (targetYear) {
+      rawCandidates.push(`${filmTitle} (${targetYear}年电影)`);
+      if (originalTitle) {
+        rawCandidates.push(`${originalTitle} (${targetYear}年电影)`);
+      }
+    }
+    rawCandidates.push(filmTitle, originalTitle);
+    const candidates = Array.from(
+      new Set(rawCandidates.map((t) => (t || '').trim()).filter(Boolean))
     );
 
     let pageTitle: string | undefined;
@@ -1584,7 +1687,7 @@ async function fetchZhWikiFilmRelations(
     for (const title of candidates) {
       const secRes = await fetchWithTimeout(
         `https://zh.wikipedia.org/w/api.php?action=parse&format=json&redirects=1&variant=zh-cn&prop=sections&page=${encodeURIComponent(
-          title.trim()
+          title
         )}`,
         { headers: WIKI_HEADERS },
         5500,
@@ -1604,11 +1707,47 @@ async function fetchZhWikiFilmRelations(
           s.line.replace(/<[^>]+>/g, '').trim()
         )
       );
-      if (match && secJson.parse?.title) {
-        pageTitle = secJson.parse.title;
-        castSectionIdx = match.index;
-        break;
+      if (!match || !secJson.parse?.title) continue;
+
+      const resolvedTitle = secJson.parse.title;
+      if (targetYear !== null) {
+        const titleYear = extractYearNumber(resolvedTitle);
+        if (titleYear !== null && !yearsAreCompatible(targetYear, titleYear, 2)) {
+          continue;
+        }
+        if (titleYear === null) {
+          // Verify lead paragraph doesn't belong to an older/different remake
+          const introRes = await fetchWithTimeout(
+            `https://zh.wikipedia.org/w/api.php?action=query&format=json&redirects=1&converttitles=1&variant=zh-cn&prop=extracts&exintro=1&explaintext=1&exsentences=2&titles=${encodeURIComponent(
+              resolvedTitle
+            )}`,
+            { headers: WIKI_HEADERS },
+            4000,
+            mode,
+            signal
+          );
+          if (introRes.ok) {
+            const introJson = (await introRes.json()) as {
+              query?: { pages?: Record<string, any> };
+            };
+            const introPage = Object.values(introJson.query?.pages || {})[0];
+            const introText = String(introPage?.extract || '');
+            const introYears = Array.from(
+              introText.matchAll(/\b(18\d{2}|19\d{2}|20\d{2})\b/g)
+            ).map((m) => Number.parseInt(m[1], 10));
+            if (
+              introYears.length > 0 &&
+              !introYears.some((y) => yearsAreCompatible(targetYear, y, 2))
+            ) {
+              continue;
+            }
+          }
+        }
       }
+
+      pageTitle = resolvedTitle;
+      castSectionIdx = match.index;
+      break;
     }
 
     if (!pageTitle || !castSectionIdx) return empty;
@@ -2059,6 +2198,7 @@ export async function fetchOnlineRelations(params: {
   title: string;
   originalTitle?: string;
   sourceUrl?: string;
+  year?: string;
   mode: MediaEngineMode;
   signal?: AbortSignal;
 }): Promise<OnlineRelationsResponse> {
@@ -2066,6 +2206,7 @@ export async function fetchOnlineRelations(params: {
   const title = params.title.trim();
   const originalTitle = params.originalTitle?.trim() || undefined;
   const sourceUrl = params.sourceUrl?.trim() || undefined;
+  const year = params.year?.trim() || undefined;
   const { mode, signal } = params;
 
   if (!title) {
@@ -2080,22 +2221,28 @@ export async function fetchOnlineRelations(params: {
       title,
       sourceUrl,
       mode,
-      signal
+      signal,
+      { originalTitle, year }
     );
     const [imdbOutcome, doubanOutcome, zhWikiOutcome, wdOutcome, bgmOutcome, tvOutcome] =
       await Promise.allSettled([
         fetchImdbFilmRelations(title, originalTitle, sourceUrl, {
           mode,
+          year,
           signal,
         }),
         mode === 'server'
           ? fetchDoubanFilmRelations(title, originalTitle, sourceUrl, {
               transport: 'server',
+              year,
               signal,
             })
           : Promise.resolve({ people: [], characters: [] }),
-        fetchZhWikiFilmRelations(title, originalTitle, mode, signal),
-        fetchWikidataFilmRelations(title, originalTitle, mode, signal),
+        fetchZhWikiFilmRelations(title, originalTitle, mode, signal, year),
+        fetchWikidataFilmRelations(title, originalTitle, mode, signal, {
+          sourceUrl,
+          year,
+        }),
         bgmId
           ? fetchBangumiFilmRelations(bgmId, title, mode, signal)
           : Promise.resolve({ people: [], characters: [] }),
