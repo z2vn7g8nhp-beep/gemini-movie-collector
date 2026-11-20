@@ -51,11 +51,14 @@ import {
   searchImdbCoverCandidates,
   searchImdbMedia,
 } from './imdbClient';
+import { extractJsonFromBridgeText } from '../utils/doubanParsers';
 import {
   extractYearNumber,
   hasStrictTitleOverlap,
+  isLikelyMovieItem,
   isRelevantFilmCrewRole,
   matchBangumiSubjectCandidate,
+  matchTvmazeShowCandidate,
   yearsAreCompatible,
 } from '../utils/relationMatching';
 import {
@@ -272,6 +275,49 @@ async function fetchJsonWithTimeout<T>(
     if (externalSignal) {
       externalSignal.removeEventListener('abort', onExternalAbort);
     }
+  }
+}
+
+/**
+ * Fetches a public JSON GET endpoint directly first, and automatically falls
+ * back to headerless `https://r.jina.ai/<url>` if the host is blocked or timed
+ * out on Chinese mobile networks (e.g., `api.bgm.tv` or `zh.wikipedia.org`).
+ */
+async function fetchJsonDirectOrJina<T>(
+  url: string,
+  signal?: AbortSignal,
+  directTimeoutMs = 2600,
+  jinaTimeoutMs = 6200
+): Promise<T | null> {
+  if (signal?.aborted) return null;
+  const host = getHostKey(url);
+  const hostMarkedSlow = Boolean(host && (slowHostUntil.get(host) || 0) > Date.now());
+
+  if (!hostMarkedSlow) {
+    const direct = await fetchJsonWithTimeout<T>(url, { signal }, directTimeoutMs);
+    if (direct !== null) return direct;
+    if (signal?.aborted) return null;
+  }
+
+  const controller = new AbortController();
+  const onExternalAbort = () => controller.abort();
+  if (signal) {
+    if (signal.aborted) return null;
+    signal.addEventListener('abort', onExternalAbort, { once: true });
+  }
+  const timer = window.setTimeout(() => controller.abort(), jinaTimeoutMs);
+  try {
+    const res = await fetch(`https://r.jina.ai/${url}`, {
+      signal: controller.signal,
+    });
+    if (!res.ok) return null;
+    const rawText = await res.text();
+    return extractJsonFromBridgeText(rawText) as T | null;
+  } catch {
+    return null;
+  } finally {
+    window.clearTimeout(timer);
+    if (signal) signal.removeEventListener('abort', onExternalAbort);
   }
 }
 
@@ -909,51 +955,76 @@ async function fetchBangumiSubjectMatchBrowser(
   };
 
   for (const keyword of uniqueQueries) {
-    // Query type: [6] (live-action films/TV) and type: [2] (anime) separately so anime
-    // spinoffs never crowd out live-action films (e.g. 2008 Iron Man vs 2010 Iron Man anime).
-    const [realRes, animeRes] = await Promise.all([
-      fetchJsonWithTimeout<{
-        data?: Array<{
-          id: number;
-          type?: number;
-          name?: string;
-          name_cn?: string;
-          date?: string;
-          infobox?: Array<{ key?: string; value?: unknown }>;
-        }>;
-      }>(
-        'https://api.bgm.tv/v0/search/subjects?limit=6',
-        {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ keyword, filter: { type: [6] } }),
-          signal,
-        },
-        3800
-      ),
-      fetchJsonWithTimeout<{
-        data?: Array<{
-          id: number;
-          type?: number;
-          name?: string;
-          name_cn?: string;
-          date?: string;
-          infobox?: Array<{ key?: string; value?: unknown }>;
-        }>;
-      }>(
-        'https://api.bgm.tv/v0/search/subjects?limit=6',
-        {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ keyword, filter: { type: [2] } }),
-          signal,
-        },
-        3800
-      ),
-    ]);
+    const bgmSlow = (slowHostUntil.get('api.bgm.tv') || 0) > Date.now();
+    let realData: Array<{
+      id: number;
+      type?: number;
+      name?: string;
+      name_cn?: string;
+      date?: string;
+      infobox?: Array<{ key?: string; value?: unknown }>;
+    }> = [];
+    let animeData: typeof realData = [];
 
-    const realData = realRes?.data || [];
-    const animeData = animeRes?.data || [];
+    if (!bgmSlow) {
+      // Query type: [6] (live-action films/TV) and type: [2] (anime) separately so anime
+      // spinoffs never crowd out live-action films (e.g. 2008 Iron Man vs 2010 Iron Man anime).
+      const [realRes, animeRes] = await Promise.all([
+        fetchJsonWithTimeout<{ data?: typeof realData }>(
+          'https://api.bgm.tv/v0/search/subjects?limit=6',
+          {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ keyword, filter: { type: [6] } }),
+            signal,
+          },
+          3000
+        ),
+        fetchJsonWithTimeout<{ data?: typeof realData }>(
+          'https://api.bgm.tv/v0/search/subjects?limit=6',
+          {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ keyword, filter: { type: [2] } }),
+            signal,
+          },
+          3000
+        ),
+      ]);
+      realData = realRes?.data || [];
+      animeData = animeRes?.data || [];
+    }
+
+    // China 5G fallback: if direct POST to api.bgm.tv failed/timed out, use GET
+    // `/search/subject/{keyword}` via direct-or-r.jina.ai bridge!
+    if (realData.length === 0 && animeData.length === 0 && !signal?.aborted) {
+      const [legacyReal, legacyAnime] = await Promise.all([
+        fetchJsonDirectOrJina<{ list?: Array<Record<string, any>> }>(
+          `https://api.bgm.tv/search/subject/${encodeURIComponent(keyword)}?type=6&responseGroup=medium`,
+          signal,
+          2200,
+          6200
+        ),
+        fetchJsonDirectOrJina<{ list?: Array<Record<string, any>> }>(
+          `https://api.bgm.tv/search/subject/${encodeURIComponent(keyword)}?type=2&responseGroup=medium`,
+          signal,
+          2200,
+          6200
+        ),
+      ]);
+      const mapLegacy = (rows: Array<Record<string, any>> | undefined, fallbackType: number) =>
+        (rows || [])
+          .filter((r) => typeof r?.id === 'number')
+          .map((r) => ({
+            id: Number(r.id),
+            type: typeof r.type === 'number' ? r.type : fallbackType,
+            name: typeof r.name === 'string' ? r.name : '',
+            name_cn: typeof r.name_cn === 'string' ? r.name_cn : '',
+            date: typeof r.air_date === 'string' ? r.air_date : '',
+          }));
+      realData = mapLegacy(legacyReal?.list, 6);
+      animeData = mapLegacy(legacyAnime?.list, 2);
+    }
 
     const realMatchId = matchBangumiSubjectCandidate(realData, {
       title: uniqueQueries[0],
@@ -1014,10 +1085,11 @@ async function searchBangumiSubjectCharactersBrowser(
 ): Promise<OnlineSearchResult[]> {
   const matched = await fetchBangumiSubjectMatchBrowser(queries, year, signal);
   if (!matched) return [];
-  const rows = await fetchJsonWithTimeout<Array<Record<string, any>>>(
+  const rows = await fetchJsonDirectOrJina<Array<Record<string, any>>>(
     `https://api.bgm.tv/v0/subjects/${matched.subjectId}/characters`,
-    { signal },
-    3800
+    signal,
+    2800,
+    6200
   );
   return parseBangumiSubjectCharacters(rows, matched.workTitle, {
     workYear: year,
@@ -1058,29 +1130,30 @@ async function searchBaikeCharacterBrowser(
 
 async function searchTvmazeCharactersBrowser(
   queries: string[],
-  signal?: AbortSignal
+  opts?: { year?: string; isMovie?: boolean; signal?: AbortSignal }
 ): Promise<OnlineSearchResult[]> {
+  if (opts?.isMovie) return [];
   const uniqueQueries = Array.from(
     new Set(queries.map((q) => q.trim()).filter(Boolean))
   ).slice(0, 2);
   for (const q of uniqueQueries) {
     const shows = await fetchJsonWithTimeout<Array<{ show?: Record<string, any> }>>(
       `https://api.tvmaze.com/search/shows?q=${encodeURIComponent(q)}`,
-      { signal },
+      { signal: opts?.signal },
       3600
     );
-    const topShow = (shows || [])
-      .map((row) => row.show)
-      .find(
-        (s) =>
-          s?.id &&
-          s?.name &&
-          hasStrictTitleOverlap([String(s.name)], uniqueQueries)
-      );
+    const topShow = matchTvmazeShowCandidate(
+      (shows || []).map((row) => row.show),
+      {
+        titles: uniqueQueries,
+        year: opts?.year,
+        isMovie: opts?.isMovie,
+      }
+    );
     if (!topShow?.id) continue;
     const cast = await fetchJsonWithTimeout<
       Array<{ person?: Record<string, any>; character?: Record<string, any> }>
-    >(`https://api.tvmaze.com/shows/${topShow.id}/cast`, { signal }, 3600);
+    >(`https://api.tvmaze.com/shows/${topShow.id}/cast`, { signal: opts?.signal }, 3600);
     const parsed = parseTvmazeShowCharacters(topShow, cast, 16);
     if (parsed.length > 0) return parsed;
   }
@@ -1119,12 +1192,13 @@ async function enrichCharacterNamesBrowser(
       const item = targets[cursor++];
       const bgmCharIdMatch = /^bgm-char-(\d+)$/.exec(item.externalId);
 
-      // 1. Fast CORS Bangumi `/v0/characters/{id}` lookup for official `简体中文名`
+      // 1. Fast CORS Bangumi `/v0/characters/{id}` lookup (with r.jina.ai fallback on China 5G)
       if (bgmCharIdMatch && !hasCjkChars(item.title)) {
-        const detail = await fetchJsonWithTimeout<Record<string, any>>(
+        const detail = await fetchJsonDirectOrJina<Record<string, any>>(
           `https://api.bgm.tv/v0/characters/${bgmCharIdMatch[1]}`,
-          { signal },
-          2600
+          signal,
+          2200,
+          5200
         );
         if (detail && Array.isArray(detail.infobox)) {
           const zhRow = detail.infobox.find(
@@ -1538,6 +1612,8 @@ export async function fetchOnlineRelations(
     originalTitle?: string;
     sourceUrl?: string;
     year?: string;
+    tags?: string[];
+    subtitle?: string;
   },
   signal?: AbortSignal
 ): Promise<OnlineRelationsResponse> {
@@ -1758,7 +1834,7 @@ export async function fetchOnlineRelations(
           )
         );
         for (const pageCandidate of candidates) {
-          const secData = await fetchJsonWithTimeout<{
+          const secData = await fetchJsonDirectOrJina<{
             parse?: {
               title?: string;
               sections?: Array<{ index?: string; line?: string }>;
@@ -1767,8 +1843,9 @@ export async function fetchOnlineRelations(
             `https://zh.wikipedia.org/w/api.php?action=parse&format=json&origin=*&redirects=1&variant=zh-cn&prop=sections&page=${encodeURIComponent(
               pageCandidate
             )}`,
-            { signal },
-            2800
+            signal,
+            2400,
+            6000
           );
           const resolvedTitle = secData?.parse?.title || '';
           const sections = secData?.parse?.sections || [];
@@ -1785,14 +1862,15 @@ export async function fetchOnlineRelations(
             /演员|角色|主演|配音|人物|卡司/i.test(String(s.line || ''))
           );
           if (!castSection?.index) continue;
-          const htmlData = await fetchJsonWithTimeout<{
+          const htmlData = await fetchJsonDirectOrJina<{
             parse?: { title?: string; text?: { '*'?: string } };
           }>(
             `https://zh.wikipedia.org/w/api.php?action=parse&format=json&origin=*&redirects=1&variant=zh-cn&prop=text&section=${encodeURIComponent(
               castSection.index
             )}&page=${encodeURIComponent(resolvedTitle)}`,
-            { signal },
-            2800
+            signal,
+            2400,
+            6000
           );
           if (htmlData?.parse?.text?.['*']) return htmlData;
         }
@@ -1815,15 +1893,17 @@ export async function fetchOnlineRelations(
         }
         if (!subjectId) return { people: [], characters: [] };
         const [bgmPersons, bgmChars] = await Promise.all([
-          fetchJsonWithTimeout<Array<Record<string, any>>>(
+          fetchJsonDirectOrJina<Array<Record<string, any>>>(
             `https://api.bgm.tv/v0/subjects/${subjectId}/persons`,
-            { signal },
-            3800
+            signal,
+            2800,
+            6200
           ),
-          fetchJsonWithTimeout<Array<Record<string, any>>>(
+          fetchJsonDirectOrJina<Array<Record<string, any>>>(
             `https://api.bgm.tv/v0/subjects/${subjectId}/characters`,
-            { signal },
-            3800
+            signal,
+            2800,
+            6200
           ),
         ]);
         const bgmPeople: OnlineSearchResult[] = [];
@@ -1858,7 +1938,11 @@ export async function fetchOnlineRelations(
       })(),
       searchTvmazeCharactersBrowser(
         [params.originalTitle || '', params.title],
-        signal
+        {
+          year: params.year,
+          isMovie: isLikelyMovieItem(params),
+          signal,
+        }
       ),
     ]);
 
@@ -2033,12 +2117,13 @@ export async function fetchOnlineRelations(
       ),
       fetchBaikeCardBrowser(params.title, 'person', signal),
       fetchIqiyiSuggestBrowser(params.title, 'person', signal),
-      fetchJsonWithTimeout<{ parse?: { text?: { '*'?: string } } }>(
-        `https://zh.wikipedia.org/w/api.php?action=parse&format=json&origin=*&redirects=1&prop=text&page=${encodeURIComponent(
+      fetchJsonDirectOrJina<{ parse?: { text?: { '*'?: string } } }>(
+        `https://zh.wikipedia.org/w/api.php?action=parse&format=json&origin=*&redirects=1&variant=zh-cn&prop=text&page=${encodeURIComponent(
           params.title
         )}`,
-        { signal },
-        3800
+        signal,
+        2800,
+        6200
       ),
       fetchImdbPersonRelations(
         params.title,
@@ -2088,10 +2173,11 @@ export async function fetchOnlineRelations(
           }
         }
         if (!personId) return [] as OnlineSearchResult[];
-        const rows = await fetchJsonWithTimeout<Array<Record<string, any>>>(
+        const rows = await fetchJsonDirectOrJina<Array<Record<string, any>>>(
           `https://api.bgm.tv/v0/persons/${personId}/characters`,
-          { signal },
-          3600
+          signal,
+          2800,
+          6200
         );
         const chars: OnlineSearchResult[] = [];
         const seenChar = new Set<string>();

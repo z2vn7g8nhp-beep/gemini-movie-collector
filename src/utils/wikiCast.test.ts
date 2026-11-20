@@ -125,4 +125,19 @@ test('parseZhWikiCastHtml ignores Wikipedia infoboxes, authority control navboxe
   assert.deepEqual(parseZhWikiCastHtml(garbagePageHtml), []);
 });
 
+test('parseZhWikiCastHtml separates comma-delimited bios from character names', () => {
+  const commaListHtml = `
+    <ul>
+      <li><a href="/wiki/%E6%9D%B0%E5%A4%AB%C2%B7%E5%B8%83%E9%87%8C%E5%90%89%E6%96%AF">杰夫·布里吉斯</a> 饰演 <a href="/wiki/%E9%93%81%E9%9C%B8%E7%8E%8B">欧巴戴·史坦恩</a>，史塔克工业的副总裁，私下贩售武器给十环帮。</li>
+      <li><a href="/wiki/%E8%82%96%E6%81%A9%C2%B7%E6%89%98%E5%B8%83">肖恩·托布</a> 饰演 胡伊申，十环帮的俘虏，协助东尼打造第一套钢铁侠动力服。</li>
+    </ul>
+  `;
+  const parsed = parseZhWikiCastHtml(commaListHtml);
+  assert.equal(parsed.length, 2);
+  assert.equal(parsed[0].characterName, '欧巴戴·史坦恩');
+  assert.equal(parsed[0].summary, '史塔克工业的副总裁，私下贩售武器给十环帮。');
+  assert.equal(parsed[1].characterName, '胡伊申');
+});
+
+
 

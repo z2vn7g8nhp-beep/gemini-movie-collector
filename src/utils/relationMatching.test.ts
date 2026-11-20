@@ -1,10 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  isLikelyMovieItem,
   isRelevantFilmCrewRole,
   matchBangumiCharacterCandidate,
   matchBangumiSubjectCandidate,
   matchFilmRelationCandidate,
+  matchTvmazeShowCandidate,
 } from './relationMatching';
 
 test('matchBangumiSubjectCandidate rejects unrelated anime when Bangumi lacks a 2026 live-action film', () => {
@@ -151,3 +153,57 @@ test('isRelevantFilmCrewRole filters out anime key-animation/technical staff whi
   assert.equal(isRelevantFilmCrewRole('音乐'), true);
   assert.equal(isRelevantFilmCrewRole('演员'), true);
 });
+
+test('isLikelyMovieItem distinguishes theatrical movies from TV series', () => {
+  assert.equal(
+    isLikelyMovieItem({ tags: ['电影', '动作', '科幻'], subtitle: '电影 · IMDb 7.9' }),
+    true
+  );
+  assert.equal(
+    isLikelyMovieItem({ tags: ['剧集', '美剧'], subtitle: '剧集 · IMDb 9.5' }),
+    false
+  );
+  assert.equal(
+    isLikelyMovieItem({ tags: ['电影'], sourceUrl: 'https://www.tvmaze.com/shows/169/breaking-bad' }),
+    false
+  );
+});
+
+test('matchTvmazeShowCandidate rejects 1994 Iron Man cartoon for 2008 Iron Man movie while matching real TV series', () => {
+  const ironManShows = [
+    { id: 4243, name: 'Iron Man', type: 'Animation', premiered: '1994-09-24' },
+    { id: 11556, name: 'Iron Man', type: 'Scripted', premiered: '2014-09-10' },
+  ];
+
+  // Rejected by year mismatch (1994 vs 2008) even without movie tag
+  assert.equal(
+    matchTvmazeShowCandidate(ironManShows, {
+      titles: ['Iron Man', '钢铁侠'],
+      year: '2008',
+    }),
+    null
+  );
+
+  // Rejected immediately when tagged as a movie
+  assert.equal(
+    matchTvmazeShowCandidate(ironManShows, {
+      titles: ['Iron Man', '钢铁侠'],
+      isMovie: true,
+    }),
+    null
+  );
+
+  // Real TV series with matching title and year succeeds
+  const lokiShows = [
+    { id: 44162, name: 'Loki', type: 'Scripted', premiered: '2021-06-09' },
+  ];
+  assert.equal(
+    matchTvmazeShowCandidate(lokiShows, {
+      titles: ['洛基', 'Loki'],
+      year: '2021',
+      isMovie: false,
+    })?.id,
+    44162
+  );
+});
+

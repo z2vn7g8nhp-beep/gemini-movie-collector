@@ -8,7 +8,7 @@ import type { AppTab } from '../components/MobileNavBar';
 import type { RuntimeMode } from './runtimeEnv';
 import { normalizeEntityKey } from './wikiCast';
 
-const RELATIONS_CACHE_KEY = 'cinearchive.relationsCache.v3';
+const RELATIONS_CACHE_KEY = 'cinearchive.relationsCache.v4';
 const RELATIONS_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const RELATIONS_CACHE_MAX_ENTRIES = 45;
 

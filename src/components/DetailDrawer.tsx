@@ -289,6 +289,8 @@ export function DetailDrawer({
       originalTitle: item.originalTitle,
       sourceUrl: item.sourceUrl,
       year: item.year,
+      tags: item.tags,
+      subtitle: item.subtitle,
     };
 
     const isManualRefresh = relationsReloadTick > 0;

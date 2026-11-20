@@ -58,7 +58,7 @@ export function ArchivalImage({
   const imgRef = useRef<HTMLImageElement | null>(null);
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  const [usedDirectFallback, setUsedDirectFallback] = useState(false);
+  const [fallbackStep, setFallbackStep] = useState<0 | 1 | 2>(0);
 
   const baseUrl =
     typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL
@@ -75,12 +75,26 @@ export function ArchivalImage({
     rawDirectFallback && /doubanio\.com|douban\.com/i.test(rawDirectFallback)
       ? ''
       : rawDirectFallback;
+
+  const cdnFallbackTarget = directFallback || primarySrc;
+  const cdnMirrorFallback =
+    cdnFallbackTarget &&
+    /^https?:\/\/([^/]*\.)?(bgm\.tv|wikimedia\.org|media-amazon\.com|metahub\.space)\//i.test(
+      cdnFallbackTarget
+    )
+      ? `https://wsrv.nl/?url=${encodeURIComponent(cdnFallbackTarget)}&w=480&output=webp`
+      : '';
+
   const effectiveSrc =
-    usedDirectFallback && directFallback ? directFallback : primarySrc;
+    fallbackStep === 0
+      ? primarySrc
+      : fallbackStep === 1 && directFallback && directFallback !== primarySrc
+        ? directFallback
+        : cdnMirrorFallback || primarySrc;
 
   useEffect(() => {
     setFailed(false);
-    setUsedDirectFallback(false);
+    setFallbackStep(0);
     const el = imgRef.current;
     if (el && el.complete && el.naturalWidth > 0) {
       setLoaded(true);
@@ -114,11 +128,18 @@ export function ArchivalImage({
             onLoad={() => setLoaded(true)}
             onError={() => {
               if (
-                !usedDirectFallback &&
+                fallbackStep === 0 &&
                 directFallback &&
                 directFallback !== effectiveSrc
               ) {
-                setUsedDirectFallback(true);
+                setFallbackStep(1);
+                setLoaded(false);
+              } else if (
+                fallbackStep < 2 &&
+                cdnMirrorFallback &&
+                cdnMirrorFallback !== effectiveSrc
+              ) {
+                setFallbackStep(2);
                 setLoaded(false);
               } else {
                 setFailed(true);

@@ -276,3 +276,68 @@ export function isRelevantFilmCrewRole(role: string): boolean {
     rel
   );
 }
+
+const SERIES_HINT_RE =
+  /(剧集|电视剧|美剧|英剧|日剧|韩剧|港剧|台剧|网剧|番剧|连载|连续剧|迷你剧|season|series|tv\s*show|television)/i;
+const MOVIE_HINT_RE = /(电影|影片|剧场版|feature\s*film|movie)/i;
+
+/**
+ * Detects whether an archive film entry is clearly a theatrical/feature movie
+ * rather than a TV series, so TV-only databases (like TVMaze) do not attach
+ * unrelated animated or TV adaptations with the same title.
+ */
+export function isLikelyMovieItem(params: {
+  tags?: string[];
+  subtitle?: string;
+  sourceUrl?: string;
+}): boolean {
+  const combined = `${(params.tags || []).join(' ')} ${params.subtitle || ''}`;
+  if (params.sourceUrl && /tvmaze\.com\/shows\//i.test(params.sourceUrl)) {
+    return false;
+  }
+  if (SERIES_HINT_RE.test(combined)) return false;
+  if (MOVIE_HINT_RE.test(combined)) return true;
+  return false;
+}
+
+export interface TvmazeShowCandidate {
+  id?: number;
+  name?: string;
+  premiered?: string | null;
+  type?: string | null;
+  url?: string | null;
+}
+
+/**
+ * Selects a TVMaze show candidate only when it matches the target title AND
+ * (when year is known) aligns within ±2 years of `premiered`.
+ * Immediately returns null when `isMovie` is true so movies never pull
+ * unrelated cartoon/TV series casts (e.g. 1994 Iron Man cartoon for 2008 Iron Man).
+ */
+export function matchTvmazeShowCandidate<T extends TvmazeShowCandidate>(
+  shows: Array<T | null | undefined> | null | undefined,
+  params: {
+    titles: Array<string | undefined | null>;
+    year?: string;
+    isMovie?: boolean;
+  }
+): T | null {
+  if (params.isMovie) return null;
+  if (!Array.isArray(shows) || shows.length === 0) return null;
+  const targetYear = extractYearNumber(params.year);
+
+  for (const show of shows) {
+    if (!show?.id || !show?.name) continue;
+    if (!hasStrictTitleOverlap([show.name], params.titles)) continue;
+    if (targetYear !== null) {
+      const showYear = extractYearNumber(show.premiered);
+      if (showYear === null || !yearsAreCompatible(targetYear, showYear, 2)) {
+        continue;
+      }
+    }
+    return show;
+  }
+
+  return null;
+}
+

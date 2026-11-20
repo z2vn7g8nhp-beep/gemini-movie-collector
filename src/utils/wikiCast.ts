@@ -243,8 +243,8 @@ export function parseZhWikiCastHtml(html: string): ParsedCastEntry[] {
     const rest = m[2].trim();
     if (!rawActor || !rest) continue;
 
-    // Split character name from bio description by Chinese/ASCII colon or period
-    const bioSplit = /^([^：:。\n]{1,70})(?:[：:。]\s*([\s\S]*))?$/.exec(rest);
+    // Split character name from bio description by Chinese/ASCII colon, comma, or period
+    const bioSplit = /^([^：:。，,\n]{1,70})(?:[：:。，,]\s*([\s\S]*))?$/.exec(rest);
     if (!bioSplit) continue;
 
     const { characterName, characterOriginalName } = splitOriginalName(
@@ -252,7 +252,7 @@ export function parseZhWikiCastHtml(html: string): ParsedCastEntry[] {
     );
     const bio = (bioSplit[2] || '').trim().slice(0, 140);
 
-    // Extract wiki article titles for BOTH actor (before separator) AND character (after separator, before bio colon)
+    // Extract wiki article titles for BOTH actor (before separator) AND character (after separator, before bio separator)
     const sepMatchInHtml = /(?:饰演|声演|饰|演|配音|出演)/.exec(topHtml);
     const actorHtmlPart = sepMatchInHtml
       ? topHtml.slice(0, sepMatchInHtml.index)
@@ -260,7 +260,7 @@ export function parseZhWikiCastHtml(html: string): ParsedCastEntry[] {
     const afterSepHtml = sepMatchInHtml
       ? topHtml.slice(sepMatchInHtml.index + sepMatchInHtml[0].length)
       : '';
-    const charHtmlBeforeBio = afterSepHtml.split(/[：:。]/)[0] || afterSepHtml;
+    const charHtmlBeforeBio = afterSepHtml.split(/[：:。，,]/)[0] || afterSepHtml;
 
     const actorWikiTitle = extractFirstWikiTitle(actorHtmlPart);
     const characterWikiTitle = extractFirstWikiTitle(charHtmlBeforeBio);
