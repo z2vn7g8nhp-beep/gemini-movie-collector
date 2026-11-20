@@ -30,3 +30,11 @@ npm run build:gh-pages
 # 本地预览静态构建产物
 npm run preview
 ```
+
+### 中文片名搜索
+
+常见影视的中文名、英文名、年份和 IMDb 编号随应用发布，静态版和服务端共用同一份索引。打开应用后，即使外部资料源超时，索引内的影片也可以搜索、收藏。索引外的条目、实时评分、海报、简介和影人资料依赖在线来源。
+
+维护者可运行 `python3 scripts/update-film-index.py` 更新索引。脚本从 IMDb 非商业数据集按投票数选取 2,000 个候选编号，从 Wikidata 的 P345 对应实体提取公开的 CC0 标签和年份，只保留有中文名的条目。投票数和评分不随索引发布。
+
+[IMDb 数据集](https://developer.imdb.com/non-commercial-datasets/) · [Wikidata 数据许可](https://www.wikidata.org/wiki/Wikidata:Licensing)
