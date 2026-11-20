@@ -11,10 +11,10 @@ const mainlandTitles: Record<string, string> = {
   tt10545296: '饥饿游戏：鸣鸟与蛇之歌',
 };
 
-const records = labels.map(([id, label, originalTitle, year]) => {
+const records = labels.map(([id, label, originalTitle, year, kind]) => {
   const title = mainlandTitles[id] || label;
   return {
-    id, title, originalTitle, year,
+    id, title, originalTitle, year, kind,
     keys: [label, title, originalTitle].map(normalizeEntityKey),
   };
 });
@@ -44,6 +44,7 @@ export function searchFilmIndex(query: string): OnlineSearchResult[] {
     title: record.title,
     originalTitle: record.originalTitle || undefined,
     year: record.year || undefined,
+    subtitle: record.kind === 'series' ? '剧集' : record.kind === 'movie' ? '电影' : undefined,
     sourceName: 'IMDb · 中文片名索引',
     sourceUrl: 'https://www.imdb.com/title/' + record.id + '/',
     summary: '',

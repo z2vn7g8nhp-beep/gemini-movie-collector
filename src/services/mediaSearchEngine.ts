@@ -891,7 +891,7 @@ export async function searchOnlineMedia(params: {
     return {
       query,
       category,
-      results: mergeBilingualResults(deduplicateResults(bundle.results)).slice(0, 22),
+      results: category === 'film' ? bundle.results : mergeBilingualResults(deduplicateResults(bundle.results)).slice(0, 22),
       activeSources,
       failedSources: [],
     };

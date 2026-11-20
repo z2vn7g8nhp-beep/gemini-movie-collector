@@ -995,6 +995,25 @@ export function rankImdbResults(
   const qNorm = normalizeEntityKey(query);
   if (!qNorm || items.length <= 1) return items;
 
+  // Stable sort keeps the discovery source's order for equally relevant films.
+  // Word boundaries matter for an exact match ("VisionQuest" vs "Vision Quest").
+  if (items.every(item => item.category === 'film')) {
+    const literal = (s: string) => s.normalize('NFKC').trim().toLowerCase().replace(/\s+/g, ' ');
+    const exact = literal(query);
+    const loose = normalizeEntityKey(exact);
+    const relevance = (s: string) => {
+      const title = literal(s);
+      if (title === exact) return 4;
+      const key = normalizeEntityKey(title);
+      if (key === loose) return 3;
+      if (key.startsWith(loose)) return 2;
+      return key.includes(loose) ? 1 : 0;
+    };
+    return items.map(item => ({
+      item, score: Math.max(relevance(item.title), relevance(item.originalTitle || '')),
+    })).sort((a, b) => b.score - a.score).map(row => row.item);
+  }
+
   const scoreItem = (item: OnlineSearchResult): number => {
     const tNorm = normalizeEntityKey(item.title || '');
     const oNorm = normalizeEntityKey(item.originalTitle || '');
