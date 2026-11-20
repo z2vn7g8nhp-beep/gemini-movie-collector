@@ -337,32 +337,31 @@ async function searchDoubanStaticDirect(
     }
   }
 
-  // 1. Film & TV Search: Single-wave fast path!
-  //    WMDB (Douban-indexed + ratings + Chinese synopsis + anti-hotlink-free img.wmdb.tv posters)
-  //    races alongside Douban `subject_suggest`, returning immediately once WMDB succeeds
-  //    (with a short 900ms grace window for suggest) and NEVER blocking on slow Wave 2 calls.
+  // 1. Film & TV Search: Prioritize official Douban `subject_suggest` (returns Chinese title +
+  //    English `sub_title` in ~1.5-3.4s for both Chinese & English queries) alongside WMDB
+  //    (which adds Douban ratings/synopsis when fast, without blocking English queries).
   if (category === 'film') {
-    const wmdbPromise = fetchViaStaticBridgeDetailed<Record<string, any>>(
-      `https://api.wmdb.tv/api/v1/movie/search?q=${encodeURIComponent(trimmed)}&limit=12`,
-      options,
-      9500
-    );
     const suggestPromise = fetchViaStaticBridgeDetailed<unknown>(
       `https://movie.douban.com/j/subject_suggest?q=${encodeURIComponent(trimmed)}`,
       options,
-      9500
+      9000
+    );
+    const wmdbPromise = fetchViaStaticBridgeDetailed<Record<string, any>>(
+      `https://api.wmdb.tv/api/v1/movie/search?q=${encodeURIComponent(trimmed)}&limit=12`,
+      options,
+      9000
     );
 
-    const wmdbRes = await wmdbPromise;
-    const wmdbEntries = parseWmdbSearchPayload(wmdbRes.data);
-
-    // If WMDB already returned rich Douban hits, give Douban suggest at most 900ms to merge in;
-    // if WMDB had 0 hits or failed, wait cleanly for Douban suggest to finish.
-    const suggestRes: StaticBridgeResult<unknown> =
-      wmdbEntries.length > 0
-        ? await waitWithGrace(suggestPromise, 900, { data: null })
-        : await suggestPromise;
+    const suggestRes = await suggestPromise;
     const suggestParsed = parseDoubanSuggest(suggestRes.data, () => undefined);
+
+    // If Douban suggest already returned hits, give WMDB at most 650ms to enrich ratings/synopsis;
+    // otherwise wait cleanly for WMDB to finish.
+    const wmdbRes: StaticBridgeResult<Record<string, any>> =
+      suggestParsed.movies.length > 0
+        ? await waitWithGrace(wmdbPromise, 650, { data: null })
+        : await wmdbPromise;
+    const wmdbEntries = parseWmdbSearchPayload(wmdbRes.data);
 
     const byId = new Map<string, OnlineSearchResult>();
     const order: string[] = [];
@@ -409,24 +408,28 @@ async function searchDoubanStaticDirect(
     return rankStaticDoubanFilmResults(merged, trimmed).slice(0, 12);
   }
 
-  // 2. Person Search: Douban Suggest celebrity hits + WMDB `actor=` lookup in parallel
+  // 2. Person Search: Prioritize Douban Suggest celebrity hits, with WMDB `actor=` fallback
   if (category === 'person') {
-    const [suggestRes, wmdbActorRes] = await Promise.all([
-      fetchViaStaticBridgeDetailed<unknown>(
-        `https://movie.douban.com/j/subject_suggest?q=${encodeURIComponent(trimmed)}`,
-        options,
-        9000
-      ),
-      fetchViaStaticBridgeDetailed<Record<string, any>>(
-        `https://api.wmdb.tv/api/v1/movie/search?actor=${encodeURIComponent(trimmed)}&limit=8`,
-        options,
-        9000
-      ),
-    ]);
+    const suggestPromise = fetchViaStaticBridgeDetailed<unknown>(
+      `https://movie.douban.com/j/subject_suggest?q=${encodeURIComponent(trimmed)}`,
+      options,
+      8500
+    );
+    const wmdbActorPromise = fetchViaStaticBridgeDetailed<Record<string, any>>(
+      `https://api.wmdb.tv/api/v1/movie/search?actor=${encodeURIComponent(trimmed)}&limit=8`,
+      options,
+      8500
+    );
 
+    const suggestRes = await suggestPromise;
     const suggestParsed = parseDoubanSuggest(suggestRes.data, () => undefined);
     const out: OnlineSearchResult[] = [...suggestParsed.celebrities];
     const seen = new Set(out.map((p) => normalizeEntityKey(p.title)));
+
+    const wmdbActorRes: StaticBridgeResult<Record<string, any>> =
+      out.length > 0
+        ? await waitWithGrace(wmdbActorPromise, 650, { data: null })
+        : await wmdbActorPromise;
 
     const entries = parseWmdbSearchPayload(wmdbActorRes.data);
     if (out.length === 0) {
@@ -818,7 +821,7 @@ export async function searchDoubanMedia(
     const rexxarItems = parseDoubanMovieSearch(rexxarRaw, formatImg);
     const suggestRaw =
       rexxarItems.length > 0
-        ? await waitWithGrace(suggestPromise, 450, null)
+        ? await waitWithGrace(suggestPromise, 1200, null)
         : await suggestPromise;
     const suggestParsed = parseDoubanSuggest(suggestRaw, formatImg);
 
@@ -953,11 +956,12 @@ export async function searchDoubanMedia(
     return { ch, score, idx };
   });
 
-  scored.sort((a, b) => b.score - a.score || a.idx - b.idx);
+  const relevantScored = scored.filter((row) => row.score > 0);
+  relevantScored.sort((a, b) => b.score - a.score || a.idx - b.idx);
 
   const seenCharKeys = new Set<string>();
   const out: OnlineSearchResult[] = [];
-  for (const row of scored) {
+  for (const row of relevantScored) {
     const key = `${normalizeEntityKey(row.ch.title)}::${normalizeEntityKey(
       row.ch.relatedWorkTitle || ''
     )}`;

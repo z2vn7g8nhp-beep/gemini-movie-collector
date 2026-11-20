@@ -160,3 +160,50 @@ test('mergeBilingualResults merges Chinese transliteration variants via aliasMap
   assert.equal(merged.length, 1);
   assert.equal(merged[0].coverUrl, 'https://bkimg.cdn.bcebos.com/pic/gp.jpg');
 });
+
+test('mergeBilingualResults never collapses distinct characters sharing the same movie sourceUrl or universe suffix', () => {
+  const raw: OnlineSearchResult[] = [
+    {
+      externalId: 'douban-char-1',
+      category: 'character',
+      title: '佩珀·波兹',
+      subtitle: '饰 佩珀·波兹 · 格温妮丝·帕特洛',
+      summary: '钢铁侠角色',
+      portrayedBy: '格温妮丝·帕特洛',
+      relatedWorkTitle: '钢铁侠',
+      sourceName: '豆瓣影视',
+      sourceUrl: 'https://movie.douban.com/subject/1432146/',
+      tags: ['角色'],
+    },
+    {
+      externalId: 'douban-char-2',
+      category: 'character',
+      title: '托尼·斯塔克 / 钢铁侠（地球199999）',
+      subtitle: '饰 托尼·斯塔克 · 小罗伯特·唐尼',
+      summary: '钢铁侠主角',
+      portrayedBy: '小罗伯特·唐尼',
+      relatedWorkTitle: '钢铁侠',
+      sourceName: '豆瓣影视',
+      sourceUrl: 'https://movie.douban.com/subject/1432146/',
+      tags: ['角色'],
+    },
+    {
+      externalId: 'bgm-char-3',
+      category: 'character',
+      title: '詹姆斯·罗德斯 / 战争机器（地球199999）',
+      subtitle: '配角 · 钢铁侠',
+      summary: '战争机器',
+      relatedWorkTitle: '钢铁侠',
+      sourceName: '番组计划 Bangumi',
+      sourceUrl: 'https://bgm.tv/character/75114',
+      tags: ['角色'],
+    },
+  ];
+
+  const merged = mergeBilingualResults(raw);
+  assert.equal(merged.length, 3);
+  assert.equal(merged[0].title, '佩珀·波兹');
+  assert.equal(merged[1].title, '托尼·斯塔克 / 钢铁侠（地球199999）');
+  assert.equal(merged[2].title, '詹姆斯·罗德斯 / 战争机器（地球199999）');
+});
+

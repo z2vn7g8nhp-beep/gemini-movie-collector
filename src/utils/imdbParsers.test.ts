@@ -315,3 +315,95 @@ test('mergeImdbWithDoubanAssist rejects making-of documentary false positive and
   assert.match(fused[0].summary, /周慕云/);
 });
 
+test('mergeImdbWithDoubanAssist matches slash-separated Douban aliases and +-2 year release offsets', () => {
+  const imdbItems: OnlineSearchResult[] = [
+    {
+      externalId: 'imdb-tt0371746',
+      category: 'film',
+      title: 'Iron Man',
+      year: '2008',
+      subtitle: '电影 · IMDb 7.9',
+      coverUrl: 'https://images.metahub.space/poster/medium/tt0371746/img',
+      summary: 'After being held captive in an Afghan cave, billionaire engineer Tony Stark creates a unique weaponized suit of armor.',
+      sourceName: 'IMDb',
+      sourceUrl: 'https://www.imdb.com/title/tt0371746/',
+      tags: ['动作', '科幻'],
+    },
+  ];
+
+  const doubanItems: OnlineSearchResult[] = [
+    {
+      externalId: 'douban-subj-1432146',
+      category: 'film',
+      title: '钢铁侠',
+      originalTitle: 'Iron Man / 铁甲奇侠(港)',
+      year: '2008',
+      subtitle: '电影 · 豆瓣 8.4',
+      summary: '斯塔克军火公司是美军在全球范围内第一大军火供应商。',
+      sourceName: '豆瓣影视',
+      sourceUrl: 'https://movie.douban.com/subject/1432146/',
+      tags: ['动作', '科幻'],
+    },
+  ];
+
+  const fused = mergeImdbWithDoubanAssist(imdbItems, doubanItems, {
+    query: 'Iron Man',
+  });
+  assert.equal(fused.length, 1);
+  assert.equal(fused[0].title, '钢铁侠');
+  assert.equal(fused[0].originalTitle, 'Iron Man');
+  assert.equal(fused[0].sourceName, 'IMDb · 豆瓣辅助');
+});
+
+test('mergeImdbWithDoubanAssist matches Latin person names with middle names and falls back to English when unmatched', () => {
+  const imdbPeople: OnlineSearchResult[] = [
+    {
+      externalId: 'imdb-nm0000375',
+      category: 'person',
+      title: 'Robert Downey Jr.',
+      subtitle: '演员 · 代表作 Iron Man',
+      coverUrl: 'https://m.media-amazon.com/images/M/rdj._V1_UX600_.jpg',
+      summary: 'Robert Downey Jr., IMDb profile.',
+      sourceName: 'IMDb',
+      sourceUrl: 'https://www.imdb.com/name/nm0000375/',
+      tags: ['演员'],
+    },
+    {
+      externalId: 'imdb-nm9999999',
+      category: 'person',
+      title: 'Obscure Indie Actor',
+      subtitle: '演员',
+      summary: 'No Douban entry.',
+      sourceName: 'IMDb',
+      sourceUrl: 'https://www.imdb.com/name/nm9999999/',
+      tags: ['演员'],
+    },
+  ];
+
+  const doubanPeople: OnlineSearchResult[] = [
+    {
+      externalId: 'douban-celeb-1016681',
+      category: 'person',
+      title: '小罗伯特·唐尼',
+      originalTitle: 'Robert John Downey Jr.',
+      subtitle: '豆瓣影人',
+      summary: '小罗伯特·唐尼，美国演员。',
+      sourceName: '豆瓣影视',
+      sourceUrl: 'https://movie.douban.com/celebrity/1016681/',
+      tags: ['影人'],
+    },
+  ];
+
+  const fused = mergeImdbWithDoubanAssist(imdbPeople, doubanPeople, {
+    fallbackThreshold: 0,
+    query: 'Robert Downey Jr.',
+  });
+  assert.equal(fused.length, 2);
+  assert.equal(fused[0].title, '小罗伯特·唐尼');
+  assert.equal(fused[0].originalTitle, 'Robert Downey Jr.');
+  assert.equal(fused[0].sourceName, 'IMDb · 豆瓣辅助');
+  assert.equal(fused[1].title, 'Obscure Indie Actor');
+  assert.equal(fused[1].sourceName, 'IMDb');
+});
+
+

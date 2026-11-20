@@ -38,8 +38,8 @@ export function splitCandidateAliases(raw?: string | null): string[] {
   if (!raw || typeof raw !== 'string') return [];
   const cleaned = raw
     .replace(/[《》「」『』]/g, '')
-    .replace(/\s*\([^)]*\)\s*/g, ' / ')
-    .replace(/\s*（[^）]*）\s*/g, ' / ');
+    .replace(/\s*\([^)]*\)\s*/g, '')
+    .replace(/\s*（[^）]*）\s*/g, '');
   const parts = cleaned
     .split(/[／/、,;；|]+/)
     .map((p) => p.trim())
@@ -118,26 +118,37 @@ export function buildImdbSingleTokenSlug(raw: string): string | null {
   return slug;
 }
 
-function extractCanonicalSourceIds(sourceUrl?: string): string[] {
+function extractCanonicalSourceIds(
+  sourceUrl: string | undefined,
+  category: OnlineSearchResult['category']
+): string[] {
   if (!sourceUrl) return [];
   const ids: string[] = [];
-  const imdbMatch = /imdb\.com\/(?:title|name)\/((?:tt|nm)\d{5,10})/i.exec(
-    sourceUrl
-  );
-  if (imdbMatch) ids.push(`imdb:${imdbMatch[1].toLowerCase()}`);
 
-  const doubanSub = /movie\.douban\.com\/subject\/(\d+)/i.exec(sourceUrl);
-  if (doubanSub) ids.push(`douban-sub:${doubanSub[1]}`);
+  if (category === 'film') {
+    const imdbTitle = /imdb\.com\/title\/(tt\d{5,10})/i.exec(sourceUrl);
+    if (imdbTitle) ids.push(`imdb:${imdbTitle[1].toLowerCase()}`);
 
-  const doubanCel = /douban\.com\/(?:celebrity|personage)\/(\d+)/i.exec(
-    sourceUrl
-  );
-  if (doubanCel) ids.push(`douban-cel:${doubanCel[1]}`);
+    const doubanSub = /movie\.douban\.com\/subject\/(\d+)/i.exec(sourceUrl);
+    if (doubanSub) ids.push(`douban-sub:${doubanSub[1]}`);
 
-  const bgmMatch = /bgm\.tv\/(subject|person|character)\/(\d+)/i.exec(
-    sourceUrl
-  );
-  if (bgmMatch) ids.push(`bgm:${bgmMatch[1]}:${bgmMatch[2]}`);
+    const bgmSub = /bgm\.tv\/subject\/(\d+)/i.exec(sourceUrl);
+    if (bgmSub) ids.push(`bgm:subject:${bgmSub[1]}`);
+  } else if (category === 'person') {
+    const imdbName = /imdb\.com\/name\/(nm\d{5,10})/i.exec(sourceUrl);
+    if (imdbName) ids.push(`imdb:${imdbName[1].toLowerCase()}`);
+
+    const doubanCel = /douban\.com\/(?:celebrity|personage)\/(\d+)/i.exec(
+      sourceUrl
+    );
+    if (doubanCel) ids.push(`douban-cel:${doubanCel[1]}`);
+
+    const bgmPerson = /bgm\.tv\/person\/(\d+)/i.exec(sourceUrl);
+    if (bgmPerson) ids.push(`bgm:person:${bgmPerson[1]}`);
+  } else if (category === 'character') {
+    const bgmChar = /bgm\.tv\/character\/(\d+)/i.exec(sourceUrl);
+    if (bgmChar) ids.push(`bgm:character:${bgmChar[1]}`);
+  }
 
   return ids;
 }
@@ -149,7 +160,7 @@ function extractMatchKeys(
   const keys = new Set<string>();
   const prefix = item.category;
 
-  for (const id of extractCanonicalSourceIds(item.sourceUrl)) {
+  for (const id of extractCanonicalSourceIds(item.sourceUrl, item.category)) {
     keys.add(`${prefix}::id::${id}`);
   }
 

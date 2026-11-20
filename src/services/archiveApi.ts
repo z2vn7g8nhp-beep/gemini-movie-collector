@@ -64,6 +64,14 @@ import {
   mergeBilingualResults,
 } from '../utils/bilingualMerge';
 import {
+  cleanBangumiCharacterName,
+  isPlausibleCharacterBaikeBundle,
+  parseBangumiCharacterSearch,
+  parseBangumiSubjectCharacters,
+  parseTvmazeShowCharacters,
+  rankCharacterResults,
+} from '../utils/characterSearchParsers';
+import {
   loadPersistedRuntimeMode,
   savePersistedRuntimeMode,
 } from '../utils/relationsCache';
@@ -885,11 +893,285 @@ function deduplicateSearchResults(
   return out;
 }
 
+async function fetchBangumiSubjectMatchBrowser(
+  queries: string[],
+  year?: string,
+  signal?: AbortSignal
+): Promise<{ subjectId: number; isLiveAction: boolean; workTitle: string } | null> {
+  const uniqueQueries = Array.from(
+    new Set(queries.map((q) => q.trim()).filter(Boolean))
+  ).slice(0, 2);
+  if (uniqueQueries.length === 0) return null;
+
+  const headers = {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+  };
+
+  for (const keyword of uniqueQueries) {
+    // Query type: [6] (live-action films/TV) and type: [2] (anime) separately so anime
+    // spinoffs never crowd out live-action films (e.g. 2008 Iron Man vs 2010 Iron Man anime).
+    const [realRes, animeRes] = await Promise.all([
+      fetchJsonWithTimeout<{
+        data?: Array<{
+          id: number;
+          type?: number;
+          name?: string;
+          name_cn?: string;
+          date?: string;
+          infobox?: Array<{ key?: string; value?: unknown }>;
+        }>;
+      }>(
+        'https://api.bgm.tv/v0/search/subjects?limit=6',
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ keyword, filter: { type: [6] } }),
+          signal,
+        },
+        3800
+      ),
+      fetchJsonWithTimeout<{
+        data?: Array<{
+          id: number;
+          type?: number;
+          name?: string;
+          name_cn?: string;
+          date?: string;
+          infobox?: Array<{ key?: string; value?: unknown }>;
+        }>;
+      }>(
+        'https://api.bgm.tv/v0/search/subjects?limit=6',
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ keyword, filter: { type: [2] } }),
+          signal,
+        },
+        3800
+      ),
+    ]);
+
+    const realData = realRes?.data || [];
+    const animeData = animeRes?.data || [];
+
+    const realMatchId = matchBangumiSubjectCandidate(realData, {
+      title: uniqueQueries[0],
+      originalTitle: uniqueQueries[1],
+      year,
+    });
+    if (realMatchId) {
+      const hit = realData.find((d) => d.id === realMatchId);
+      return {
+        subjectId: realMatchId,
+        isLiveAction: true,
+        workTitle: String(hit?.name_cn || hit?.name || uniqueQueries[0]).trim(),
+      };
+    }
+
+    const animeMatchId = matchBangumiSubjectCandidate(animeData, {
+      title: uniqueQueries[0],
+      originalTitle: uniqueQueries[1],
+      year,
+    });
+    if (animeMatchId) {
+      const hit = animeData.find((d) => d.id === animeMatchId);
+      return {
+        subjectId: animeMatchId,
+        isLiveAction: false,
+        workTitle: String(hit?.name_cn || hit?.name || uniqueQueries[0]).trim(),
+      };
+    }
+  }
+
+  return null;
+}
+
+async function searchBangumiCharactersStrictBrowser(
+  query: string,
+  signal?: AbortSignal
+): Promise<OnlineSearchResult[]> {
+  const json = await fetchJsonWithTimeout<{ data?: Array<Record<string, any>> }>(
+    'https://api.bgm.tv/v0/search/characters?limit=12&offset=0',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({ keyword: query }),
+      signal,
+    },
+    4200
+  );
+  return parseBangumiCharacterSearch(json, query);
+}
+
+async function searchBangumiSubjectCharactersBrowser(
+  queries: string[],
+  year?: string,
+  signal?: AbortSignal
+): Promise<OnlineSearchResult[]> {
+  const matched = await fetchBangumiSubjectMatchBrowser(queries, year, signal);
+  if (!matched) return [];
+  const rows = await fetchJsonWithTimeout<Array<Record<string, any>>>(
+    `https://api.bgm.tv/v0/subjects/${matched.subjectId}/characters`,
+    { signal },
+    3800
+  );
+  return parseBangumiSubjectCharacters(rows, matched.workTitle, {
+    workYear: year,
+    isLiveAction: matched.isLiveAction,
+    limit: 20,
+  });
+}
+
+async function searchBaikeCharacterBrowser(
+  query: string,
+  signal?: AbortSignal
+): Promise<OnlineSearchResult[]> {
+  const out: OnlineSearchResult[] = [];
+  const direct = await fetchBaikeCardBrowser(query, 'character', signal);
+  if (isPlausibleCharacterBaikeBundle(direct, query) && direct.searchResult) {
+    out.push(direct.searchResult);
+  }
+
+  if (out.length === 0 && !signal?.aborted) {
+    const suggestions = await fetchBaiduSuggestTerms(`${query} 角色`, signal);
+    const fallbackTerms = suggestions
+      .map((s) => s.replace(/\s*(?:角色|人物介绍|扮演者|饰演者)$/g, '').trim())
+      .filter((s) => s.length >= 2 && s !== query.trim())
+      .slice(0, 2);
+    if (fallbackTerms.length > 0) {
+      const bundles = await Promise.all(
+        fallbackTerms.map((term) => fetchBaikeCardBrowser(term, 'character', signal))
+      );
+      for (const bundle of bundles) {
+        if (isPlausibleCharacterBaikeBundle(bundle, query) && bundle.searchResult) {
+          out.push(bundle.searchResult);
+        }
+      }
+    }
+  }
+  return out;
+}
+
+async function searchTvmazeCharactersBrowser(
+  queries: string[],
+  signal?: AbortSignal
+): Promise<OnlineSearchResult[]> {
+  const uniqueQueries = Array.from(
+    new Set(queries.map((q) => q.trim()).filter(Boolean))
+  ).slice(0, 2);
+  for (const q of uniqueQueries) {
+    const shows = await fetchJsonWithTimeout<Array<{ show?: Record<string, any> }>>(
+      `https://api.tvmaze.com/search/shows?q=${encodeURIComponent(q)}`,
+      { signal },
+      3600
+    );
+    const topShow = (shows || [])
+      .map((row) => row.show)
+      .find(
+        (s) =>
+          s?.id &&
+          s?.name &&
+          hasStrictTitleOverlap([String(s.name)], uniqueQueries)
+      );
+    if (!topShow?.id) continue;
+    const cast = await fetchJsonWithTimeout<
+      Array<{ person?: Record<string, any>; character?: Record<string, any> }>
+    >(`https://api.tvmaze.com/shows/${topShow.id}/cast`, { signal }, 3600);
+    const parsed = parseTvmazeShowCharacters(topShow, cast, 16);
+    if (parsed.length > 0) return parsed;
+  }
+  return [];
+}
+
 /**
- * Dual-mode online search (IMDb Primary + Douban Chinese Info Assist):
- * - `'server'` mode: queries Express `/api/search?source=imdb`
- * - `'static'` mode (GitHub Pages / mobile PWA): queries CORS-open IMDb Cinemeta +
- *   IMDb Suggest JSONP + Wikidata bridge with non-blocking Douban Chinese assist.
+ * Enriches English-only Bangumi/TVMaze character entries with official Chinese names
+ * (`简体中文名` from Bangumi `/v0/characters/{id}` or Baidu Baike JSONP card) and preserves
+ * the English name as `originalTitle`.
+ */
+async function enrichCharacterNamesBrowser(
+  items: OnlineSearchResult[],
+  signal?: AbortSignal
+): Promise<OnlineSearchResult[]> {
+  if (items.length === 0 || signal?.aborted) return items;
+  const cloned = items.map((it) => ({ ...it }));
+  // Prioritize real Bangumi/portrait characters so text-only rows never crowd out
+  // Chinese name lookups for main cast characters.
+  const targets = cloned
+    .filter((it) => !hasCjkChars(it.title) || !it.coverUrl)
+    .sort((a, b) => {
+      const score = (it: OnlineSearchResult) =>
+        (/^bgm-char-\d+$/.test(it.externalId) ? 4 : 0) +
+        (it.coverUrl ? 2 : 0) +
+        (!hasCjkChars(it.title) ? 1 : 0);
+      return score(b) - score(a);
+    })
+    .slice(0, 12);
+  if (targets.length === 0) return cloned;
+
+  const CONCURRENCY = 4;
+  let cursor = 0;
+  const worker = async () => {
+    while (cursor < targets.length && !signal?.aborted) {
+      const item = targets[cursor++];
+      const bgmCharIdMatch = /^bgm-char-(\d+)$/.exec(item.externalId);
+
+      // 1. Fast CORS Bangumi `/v0/characters/{id}` lookup for official `简体中文名`
+      if (bgmCharIdMatch && !hasCjkChars(item.title)) {
+        const detail = await fetchJsonWithTimeout<Record<string, any>>(
+          `https://api.bgm.tv/v0/characters/${bgmCharIdMatch[1]}`,
+          { signal },
+          2600
+        );
+        if (detail && Array.isArray(detail.infobox)) {
+          const zhRow = detail.infobox.find(
+            (r: any) => r?.key === '简体中文名' || r?.key === '中文名'
+          );
+          const zhName =
+            typeof zhRow?.value === 'string'
+              ? cleanBangumiCharacterName(zhRow.value)
+              : '';
+          if (zhName && hasCjkChars(zhName)) {
+            if (!item.originalTitle) item.originalTitle = item.title;
+            item.title = zhName;
+          }
+          if (typeof detail.summary === 'string' && detail.summary.trim().length > 20) {
+            item.summary = cleanText(detail.summary, 220);
+          }
+        }
+      }
+
+      // 2. Baidu Baike JSONP fallback for Chinese title or portrait
+      if ((!hasCjkChars(item.title) || !item.coverUrl) && !signal?.aborted) {
+        const lookupKey = item.title.split(/\s*[/／]\s*/)[0]?.trim() || item.title;
+        const baike = await fetchBaikeCardBrowser(lookupKey, 'character', signal);
+        if (isPlausibleCharacterBaikeBundle(baike, lookupKey) && baike.searchResult) {
+          if (!hasCjkChars(item.title) && hasCjkChars(baike.searchResult.title)) {
+            if (!item.originalTitle) item.originalTitle = item.title;
+            item.title = baike.searchResult.title;
+          }
+          if (!item.coverUrl && baike.searchResult.coverUrl) {
+            item.coverUrl = baike.searchResult.coverUrl;
+          }
+        }
+      }
+    }
+  };
+
+  await Promise.all(
+    Array.from({ length: Math.min(CONCURRENCY, targets.length) }, () => worker())
+  );
+
+  return cloned;
+}
+
+/**
+ * Dual-mode online search:
+ * - Film (`影视`) & Person (`影人`): strictly IMDb primary + Douban Chinese info assist
+ * - Character (`角色`): IMDb + Douban + Baidu Baike + Bangumi (direct & work cast) + TVMaze + Moegirl
  */
 export async function searchOnline(
   query: string,
@@ -961,19 +1243,77 @@ export async function searchOnline(
     ? ({ transport: 'relay', relayBaseUrl: relayUrl } as const)
     : ({ transport: 'static-direct' } as const);
 
-  const bundle = await searchImdbMedia(trimmed, category, {
-    mode: 'browser',
-    doubanOptions: doubanOpts,
-    enableDoubanAssist: true,
-  });
-  const activeSources: string[] = [];
-  if (bundle.results.length > 0) {
-    activeSources.push(bundle.hasDoubanAssist ? 'IMDb · 豆瓣辅助' : 'IMDb');
+  // Film & Person: strictly IMDb primary + Douban Chinese title/info assist
+  if (category !== 'character') {
+    const bundle = await searchImdbMedia(trimmed, category, {
+      mode: 'browser',
+      doubanOptions: doubanOpts,
+      enableDoubanAssist: true,
+    });
+    const activeSources: string[] = [];
+    if (bundle.results.length > 0) {
+      activeSources.push(bundle.hasDoubanAssist ? 'IMDb · 豆瓣辅助' : 'IMDb');
+    }
+    return {
+      results: mergeBilingualResults(
+        deduplicateSearchResults(bundle.results)
+      ).slice(0, 16),
+      activeSources,
+      mode,
+    };
   }
+
+  // Character search: parallel multi-source fusion (Baike + Bangumi direct & work cast + IMDb/Douban + TVMaze + Moegirl)
+  const [imdbOut, baikeOut, bgmCharOut, bgmWorkOut, tvmazeOut, moegirlOut] =
+    await Promise.allSettled([
+      searchImdbMedia(trimmed, 'character', {
+        mode: 'browser',
+        doubanOptions: doubanOpts,
+        enableDoubanAssist: true,
+      }),
+      searchBaikeCharacterBrowser(trimmed),
+      searchBangumiCharactersStrictBrowser(trimmed),
+      searchBangumiSubjectCharactersBrowser([trimmed]),
+      searchTvmazeCharactersBrowser([trimmed]),
+      searchMoegirlBrowser(trimmed, 'character'),
+    ]);
+
+  const rawChars: OnlineSearchResult[] = [];
+  const activeSources: string[] = [];
+
+  if (baikeOut.status === 'fulfilled' && baikeOut.value.length > 0) {
+    activeSources.push('百度百科');
+    rawChars.push(...baikeOut.value);
+  }
+  if (bgmCharOut.status === 'fulfilled' && bgmCharOut.value.length > 0) {
+    activeSources.push('番组计划 Bangumi');
+    rawChars.push(...bgmCharOut.value);
+  }
+  if (bgmWorkOut.status === 'fulfilled' && bgmWorkOut.value.length > 0) {
+    if (!activeSources.includes('番组计划 Bangumi')) {
+      activeSources.push('番组计划 Bangumi');
+    }
+    rawChars.push(...bgmWorkOut.value);
+  }
+  if (imdbOut.status === 'fulfilled' && imdbOut.value.results.length > 0) {
+    activeSources.push(imdbOut.value.hasDoubanAssist ? 'IMDb · 豆瓣辅助' : 'IMDb');
+    rawChars.push(...imdbOut.value.results);
+  }
+  if (tvmazeOut.status === 'fulfilled' && tvmazeOut.value.length > 0) {
+    activeSources.push('TVMaze 剧集库');
+    rawChars.push(...tvmazeOut.value);
+  }
+  if (moegirlOut.status === 'fulfilled' && moegirlOut.value.length > 0) {
+    activeSources.push('萌娘百科');
+    rawChars.push(...moegirlOut.value);
+  }
+
+  const enriched = await enrichCharacterNamesBrowser(rawChars);
+  const merged = mergeBilingualResults(deduplicateSearchResults(enriched));
+  const ranked = rankCharacterResults(merged, trimmed);
+
   return {
-    results: mergeBilingualResults(
-      deduplicateSearchResults(bundle.results)
-    ).slice(0, 16),
+    results: ranked.slice(0, 18),
     activeSources,
     mode,
   };
@@ -1383,127 +1723,144 @@ export async function fetchOnlineRelations(
 
   if (params.category === 'film') {
     const targetYear = extractYearNumber(params.year);
-    const [imdbOutcome, doubanOutcome, baikeOutcome, iqiyiOutcome, wikiOutcome, bgmOutcome] =
-      await Promise.allSettled([
-        fetchImdbFilmRelations(
+    const [
+      imdbOutcome,
+      doubanOutcome,
+      baikeOutcome,
+      iqiyiOutcome,
+      wikiOutcome,
+      bgmOutcome,
+      tvmazeOutcome,
+    ] = await Promise.allSettled([
+      fetchImdbFilmRelations(
+        params.title,
+        params.originalTitle,
+        params.sourceUrl,
+        { mode: 'browser', year: params.year, signal }
+      ),
+      fetchDoubanFilmRelations(
+        params.title,
+        params.originalTitle,
+        params.sourceUrl,
+        { ...doubanRelOpts, year: params.year }
+      ),
+      fetchBaikeCardBrowser(params.title, 'film', signal),
+      fetchIqiyiSuggestBrowser(params.title, 'film', signal),
+      (async () => {
+        const yearDigits = targetYear ? String(targetYear) : '';
+        const candidates = Array.from(
+          new Set(
+            [
+              yearDigits ? `${params.title} (${yearDigits}年电影)` : '',
+              `${params.title} (电影)`,
+              params.title,
+            ].filter(Boolean)
+          )
+        );
+        for (const pageCandidate of candidates) {
+          const secData = await fetchJsonWithTimeout<{
+            parse?: {
+              title?: string;
+              sections?: Array<{ index?: string; line?: string }>;
+            };
+          }>(
+            `https://zh.wikipedia.org/w/api.php?action=parse&format=json&origin=*&redirects=1&variant=zh-cn&prop=sections&page=${encodeURIComponent(
+              pageCandidate
+            )}`,
+            { signal },
+            2800
+          );
+          const resolvedTitle = secData?.parse?.title || '';
+          const sections = secData?.parse?.sections || [];
+          if (!resolvedTitle || sections.length === 0) continue;
+          const titleYear = extractYearNumber(resolvedTitle);
+          if (
+            targetYear !== null &&
+            titleYear !== null &&
+            !yearsAreCompatible(targetYear, titleYear, 2)
+          ) {
+            continue;
+          }
+          const castSection = sections.find((s) =>
+            /演员|角色|主演|配音|人物|卡司/i.test(String(s.line || ''))
+          );
+          if (!castSection?.index) continue;
+          const htmlData = await fetchJsonWithTimeout<{
+            parse?: { title?: string; text?: { '*'?: string } };
+          }>(
+            `https://zh.wikipedia.org/w/api.php?action=parse&format=json&origin=*&redirects=1&variant=zh-cn&prop=text&section=${encodeURIComponent(
+              castSection.index
+            )}&page=${encodeURIComponent(resolvedTitle)}`,
+            { signal },
+            2800
+          );
+          if (htmlData?.parse?.text?.['*']) return htmlData;
+        }
+        return null;
+      })(),
+      (async () => {
+        let subjectId =
+          bgmMatch?.[1] === 'subject' ? Number(bgmMatch[2]) : null;
+        let isLiveAction = false;
+        if (!subjectId) {
+          const matched = await fetchBangumiSubjectMatchBrowser(
+            [params.title, params.originalTitle || ''],
+            params.year,
+            signal
+          );
+          if (matched) {
+            subjectId = matched.subjectId;
+            isLiveAction = matched.isLiveAction;
+          }
+        }
+        if (!subjectId) return { people: [], characters: [] };
+        const [bgmPersons, bgmChars] = await Promise.all([
+          fetchJsonWithTimeout<Array<Record<string, any>>>(
+            `https://api.bgm.tv/v0/subjects/${subjectId}/persons`,
+            { signal },
+            3800
+          ),
+          fetchJsonWithTimeout<Array<Record<string, any>>>(
+            `https://api.bgm.tv/v0/subjects/${subjectId}/characters`,
+            { signal },
+            3800
+          ),
+        ]);
+        const bgmPeople: OnlineSearchResult[] = [];
+        const seen = new Set<string>();
+        for (const p of bgmPersons || []) {
+          if (p.type && p.type !== 1) continue;
+          const rel = String(p.relation || '').trim();
+          if (!isRelevantFilmCrewRole(rel)) continue;
+          const name = String(p.name || '').trim();
+          if (!name || seen.has(name)) continue;
+          seen.add(name);
+          bgmPeople.push({
+            externalId: `bgm-person-${p.id}`,
+            category: 'person',
+            title: name,
+            subtitle: rel,
+            coverUrl: upgradeToHttpsUrl(p.images?.large || p.images?.medium),
+            summary: `在《${params.title}》中担任${rel}。`,
+            relatedWorkTitle: params.title,
+            sourceName: '番组计划 Bangumi',
+            sourceUrl: `https://bgm.tv/person/${p.id}`,
+            tags: [rel],
+          });
+          if (bgmPeople.length >= 20) break;
+        }
+        const bgmCharacters = parseBangumiSubjectCharacters(
+          bgmChars,
           params.title,
-          params.originalTitle,
-          params.sourceUrl,
-          { mode: 'browser', year: params.year, signal }
-        ),
-        fetchDoubanFilmRelations(
-          params.title,
-          params.originalTitle,
-          params.sourceUrl,
-          { ...doubanRelOpts, year: params.year }
-        ),
-        fetchBaikeCardBrowser(params.title, 'film', signal),
-        fetchIqiyiSuggestBrowser(params.title, 'film', signal),
-        fetchJsonWithTimeout<{
-          parse?: { title?: string; text?: { '*'?: string } };
-        }>(
-          `https://zh.wikipedia.org/w/api.php?action=parse&format=json&origin=*&redirects=1&prop=text&page=${encodeURIComponent(
-            params.title
-          )}`,
-          { signal },
-          3800
-        ),
-        (async () => {
-          let subjectId =
-            bgmMatch?.[1] === 'subject' ? Number(bgmMatch[2]) : null;
-          if (!subjectId) {
-            const searchRes = await fetchJsonWithTimeout<{
-              data?: Array<{
-                id: number;
-                type?: number;
-                name?: string;
-                name_cn?: string;
-                date?: string;
-                infobox?: Array<{ key?: string; value?: unknown }>;
-              }>;
-            }>(
-              'https://api.bgm.tv/v0/search/subjects?limit=6',
-              {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  Accept: 'application/json',
-                },
-                body: JSON.stringify({
-                  keyword: params.title,
-                  filter: { type: [6, 2] },
-                }),
-                signal,
-              },
-              3800
-            );
-            subjectId = matchBangumiSubjectCandidate(searchRes?.data, {
-              title: params.title,
-              originalTitle: params.originalTitle,
-              year: params.year,
-            });
-          }
-          if (!subjectId) return { people: [], characters: [] };
-          const [bgmPersons, bgmChars] = await Promise.all([
-            fetchJsonWithTimeout<Array<Record<string, any>>>(
-              `https://api.bgm.tv/v0/subjects/${subjectId}/persons`,
-              { signal },
-              3800
-            ),
-            fetchJsonWithTimeout<Array<Record<string, any>>>(
-              `https://api.bgm.tv/v0/subjects/${subjectId}/characters`,
-              { signal },
-              3800
-            ),
-          ]);
-          const bgmPeople: OnlineSearchResult[] = [];
-          const seen = new Set<string>();
-          for (const p of bgmPersons || []) {
-            if (p.type && p.type !== 1) continue;
-            const rel = String(p.relation || '').trim();
-            if (!isRelevantFilmCrewRole(rel)) continue;
-            const name = String(p.name || '').trim();
-            if (!name || seen.has(name)) continue;
-            seen.add(name);
-            bgmPeople.push({
-              externalId: `bgm-person-${p.id}`,
-              category: 'person',
-              title: name,
-              subtitle: rel,
-              coverUrl: upgradeToHttpsUrl(p.images?.large || p.images?.medium),
-              summary: `在《${params.title}》中担任${rel}。`,
-              relatedWorkTitle: params.title,
-              sourceName: '番组计划 Bangumi',
-              sourceUrl: `https://bgm.tv/person/${p.id}`,
-              tags: [rel],
-            });
-            if (bgmPeople.length >= 20) break;
-          }
-          const bgmCharacters: OnlineSearchResult[] = [];
-          for (const c of (bgmChars || []).slice(0, 24)) {
-            const name = String(c.name || '').trim();
-            if (!name) continue;
-            const actorName = Array.isArray(c.actors)
-              ? String(c.actors[0]?.name || '').trim() || undefined
-              : undefined;
-            const rel = String(c.relation || '角色');
-            bgmCharacters.push({
-              externalId: `bgm-char-${c.id}`,
-              category: 'character',
-              title: name,
-              subtitle: actorName ? `${rel} · ${actorName}` : rel,
-              coverUrl: upgradeToHttpsUrl(c.images?.large || c.images?.medium),
-              summary: `《${params.title}》中的${rel}${actorName ? `，由 ${actorName} 饰演/配音` : ''}。`,
-              relatedWorkTitle: params.title,
-              portrayedBy: actorName,
-              sourceName: '番组计划 Bangumi',
-              sourceUrl: `https://bgm.tv/character/${c.id}`,
-              tags: [rel],
-            });
-          }
-          return { people: bgmPeople, characters: bgmCharacters };
-        })(),
-      ]);
+          { workYear: params.year, isLiveAction, limit: 28 }
+        );
+        return { people: bgmPeople, characters: bgmCharacters };
+      })(),
+      searchTvmazeCharactersBrowser(
+        [params.originalTitle || '', params.title],
+        signal
+      ),
+    ]);
 
     // Prefer Chinese sources first so canonical Chinese titles anchor the order,
     // followed by IMDb (which fuses into the Chinese entries & fills missing portraits/nm IDs).
@@ -1624,6 +1981,11 @@ export async function fetchOnlineRelations(
       }
     }
 
+    if (tvmazeOutcome.status === 'fulfilled' && tvmazeOutcome.value.length > 0) {
+      sources.push('TVMaze 剧集库');
+      rawCharacters.push(...tvmazeOutcome.value);
+    }
+
     if (imdbOutcome.status === 'fulfilled') {
       if (imdbOutcome.value.people.length > 0 || imdbOutcome.value.characters.length > 0) {
         sources.push('IMDb');
@@ -1632,8 +1994,20 @@ export async function fetchOnlineRelations(
       }
     }
 
-    const enrichedPeople = await enrichRelationsBrowser(rawPeople, 'person');
-    const mergedCharacters = mergeBilingualResults(rawCharacters);
+    const [enrichedPeople, enrichedCharacters] = await Promise.all([
+      enrichRelationsBrowser(rawPeople, 'person'),
+      enrichCharacterNamesBrowser(rawCharacters, signal),
+    ]);
+    const mergedCharacters = mergeBilingualResults(enrichedCharacters).sort(
+      (a, b) => {
+        const score = (it: OnlineSearchResult) =>
+          (it.coverUrl ? 10 : 0) +
+          (hasCjkChars(it.title) ? 4 : 0) +
+          (it.portrayedBy ? 2 : 0) +
+          (it.subtitle && /主角/.test(it.subtitle) ? 3 : 0);
+        return score(b) - score(a);
+      }
+    );
 
     return {
       films: [],
@@ -1643,30 +2017,110 @@ export async function fetchOnlineRelations(
     };
   } else {
     // Person -> Representative films & characters
-    const [doubanOutcome, baikeOutcome, iqiyiOutcome, wikiOutcome, imdbOutcome] =
-      await Promise.allSettled([
-        fetchDoubanPersonRelations(
-          params.title,
-          params.originalTitle,
-          params.sourceUrl,
-          doubanRelOpts
-        ),
-        fetchBaikeCardBrowser(params.title, 'person', signal),
-        fetchIqiyiSuggestBrowser(params.title, 'person', signal),
-        fetchJsonWithTimeout<{ parse?: { text?: { '*'?: string } } }>(
-          `https://zh.wikipedia.org/w/api.php?action=parse&format=json&origin=*&redirects=1&prop=text&page=${encodeURIComponent(
-            params.title
-          )}`,
+    const [
+      doubanOutcome,
+      baikeOutcome,
+      iqiyiOutcome,
+      wikiOutcome,
+      imdbOutcome,
+      bgmPersonOutcome,
+    ] = await Promise.allSettled([
+      fetchDoubanPersonRelations(
+        params.title,
+        params.originalTitle,
+        params.sourceUrl,
+        doubanRelOpts
+      ),
+      fetchBaikeCardBrowser(params.title, 'person', signal),
+      fetchIqiyiSuggestBrowser(params.title, 'person', signal),
+      fetchJsonWithTimeout<{ parse?: { text?: { '*'?: string } } }>(
+        `https://zh.wikipedia.org/w/api.php?action=parse&format=json&origin=*&redirects=1&prop=text&page=${encodeURIComponent(
+          params.title
+        )}`,
+        { signal },
+        3800
+      ),
+      fetchImdbPersonRelations(
+        params.title,
+        params.originalTitle,
+        params.sourceUrl,
+        { mode: 'browser', signal }
+      ),
+      (async () => {
+        let personId = bgmMatch?.[1] === 'person' ? Number(bgmMatch[2]) : null;
+        if (!personId) {
+          const queries = Array.from(
+            new Set([params.originalTitle || '', params.title].map((q) => q.trim()).filter(Boolean))
+          );
+          for (const q of queries) {
+            const pSearch = await fetchJsonWithTimeout<{
+              data?: Array<{ id: number; name?: string; infobox?: Array<any> }>;
+            }>(
+              'https://api.bgm.tv/v0/search/persons?limit=5',
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Accept: 'application/json',
+                },
+                body: JSON.stringify({ keyword: q }),
+                signal,
+              },
+              3600
+            );
+            const hit = (pSearch?.data || []).find((row) =>
+              hasStrictTitleOverlap(
+                [
+                  String(row.name || ''),
+                  ...(Array.isArray(row.infobox)
+                    ? row.infobox
+                        .map((r: any) => (typeof r?.value === 'string' ? r.value : ''))
+                        .filter(Boolean)
+                    : []),
+                ],
+                [params.title, params.originalTitle]
+              )
+            );
+            if (hit?.id) {
+              personId = hit.id;
+              break;
+            }
+          }
+        }
+        if (!personId) return [] as OnlineSearchResult[];
+        const rows = await fetchJsonWithTimeout<Array<Record<string, any>>>(
+          `https://api.bgm.tv/v0/persons/${personId}/characters`,
           { signal },
-          3800
-        ),
-        fetchImdbPersonRelations(
-          params.title,
-          params.originalTitle,
-          params.sourceUrl,
-          { mode: 'browser', signal }
-        ),
-      ]);
+          3600
+        );
+        const chars: OnlineSearchResult[] = [];
+        const seenChar = new Set<string>();
+        for (const row of (rows || []).slice(0, 24)) {
+          const name = cleanBangumiCharacterName(String(row.name || ''));
+          if (!name) continue;
+          const workName = String(row.subject_name_cn || row.subject_name || '').trim();
+          const key = `${name.toLowerCase()}::${workName.toLowerCase()}`;
+          if (seenChar.has(key)) continue;
+          seenChar.add(key);
+          chars.push({
+            externalId: `bgm-char-${row.id}`,
+            category: 'character',
+            title: name,
+            subtitle: workName ? `出自《${workName}》 · ${params.title}` : `饰演/配音 · ${params.title}`,
+            coverUrl: upgradeToHttpsUrl(row.images?.large || row.images?.medium || row.images?.grid),
+            summary: workName
+              ? `由 ${params.title} 在《${workName}》中饰演/配音的角色。`
+              : `由 ${params.title} 饰演/配音的角色。`,
+            relatedWorkTitle: workName || undefined,
+            portrayedBy: params.title,
+            sourceName: '番组计划 Bangumi',
+            sourceUrl: row.id ? `https://bgm.tv/character/${row.id}` : undefined,
+            tags: ['角色'],
+          });
+        }
+        return chars;
+      })(),
+    ]);
 
     if (doubanOutcome.status === 'fulfilled') {
       if (doubanOutcome.value.films.length > 0 || doubanOutcome.value.characters.length > 0) {
@@ -1739,6 +2193,11 @@ export async function fetchOnlineRelations(
       rawFilms.push(...iqiyiOutcome.value.relatedFilms);
     }
 
+    if (bgmPersonOutcome.status === 'fulfilled' && bgmPersonOutcome.value.length > 0) {
+      sources.push('番组计划 Bangumi');
+      rawCharacters.push(...bgmPersonOutcome.value);
+    }
+
     if (imdbOutcome.status === 'fulfilled') {
       if (imdbOutcome.value.films.length > 0 || imdbOutcome.value.characters.length > 0) {
         sources.push('IMDb');
@@ -1747,8 +2206,11 @@ export async function fetchOnlineRelations(
       }
     }
 
-    const enrichedFilms = await enrichRelationsBrowser(rawFilms, 'film');
-    const mergedCharacters = mergeBilingualResults(rawCharacters);
+    const [enrichedFilms, enrichedCharacters] = await Promise.all([
+      enrichRelationsBrowser(rawFilms, 'film'),
+      enrichCharacterNamesBrowser(rawCharacters, signal),
+    ]);
+    const mergedCharacters = mergeBilingualResults(enrichedCharacters);
 
     return {
       films: enrichedFilms.slice(0, 60),

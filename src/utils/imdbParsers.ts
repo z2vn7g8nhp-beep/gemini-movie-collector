@@ -1,5 +1,6 @@
 import type { ArchiveCategory, OnlineSearchResult } from '../types/archive';
 import type { CoverCandidate } from './coverPicker';
+import { latinPersonNamesMatch, splitCandidateAliases } from './bilingualMerge';
 import { normalizeEntityKey } from './wikiCast';
 
 export interface ImdbDirectRef {
@@ -487,7 +488,7 @@ function yearsClose(y1?: string, y2?: string): boolean {
   const n1 = Number(y1);
   const n2 = Number(y2);
   if (!Number.isFinite(n1) || !Number.isFinite(n2)) return true;
-  return Math.abs(n1 - n2) <= 1;
+  return Math.abs(n1 - n2) <= 2;
 }
 
 function extractMediaLabel(item: OnlineSearchResult): string {
@@ -557,25 +558,41 @@ function scoreImdbDoubanMatch(
     imdb.year && douban.year && imdb.year === douban.year ? 10 : 0;
   const yearOk = imdb.category === 'person' || yearsClose(imdb.year, douban.year);
 
-  const imdbKeys = [imdb.title, imdb.originalTitle]
+  const imdbRawValues = [imdb.title, imdb.originalTitle]
     .filter((s): s is string => Boolean(s && s.trim()))
-    .map((s) => normalizeEntityKey(s))
-    .filter(Boolean);
-  const dbKeys = [douban.title, douban.originalTitle]
+    .flatMap((s) => [s, ...splitCandidateAliases(s)]);
+  const dbRawValues = [douban.title, douban.originalTitle]
     .filter((s): s is string => Boolean(s && s.trim()))
-    .map((s) => normalizeEntityKey(s))
-    .filter(Boolean);
+    .flatMap((s) => [s, ...splitCandidateAliases(s)]);
+
+  const imdbKeys = Array.from(
+    new Set(imdbRawValues.map((s) => normalizeEntityKey(s)).filter(Boolean))
+  );
+  const dbKeys = Array.from(
+    new Set(dbRawValues.map((s) => normalizeEntityKey(s)).filter(Boolean))
+  );
   const wikiKey = wikiZhTitle ? normalizeEntityKey(wikiZhTitle) : '';
 
   if (imdbKeys.length === 0 || dbKeys.length === 0) return 0;
 
   let best = 0;
 
-  // 2. Exact normalized title/originalTitle match
+  // 2. Exact normalized title/originalTitle (including slash-separated aliases) match
   for (const ik of imdbKeys) {
     for (const dk of dbKeys) {
       if (ik === dk && yearOk) {
         best = Math.max(best, 95 + exactYearBonus);
+      }
+    }
+  }
+
+  // 2B. Person Latin name match (e.g. "Robert John Downey Jr." <-> "Robert Downey Jr.")
+  if (best === 0 && imdb.category === 'person') {
+    for (const ir of imdbRawValues) {
+      for (const dr of dbRawValues) {
+        if (latinPersonNamesMatch(ir, dr)) {
+          best = Math.max(best, 92);
+        }
       }
     }
   }

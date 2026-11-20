@@ -194,9 +194,23 @@ export function parseZhWikiCastHtml(html: string): ParsedCastEntry[] {
     const charName = entry.characterName.trim();
     if (!actor || actor.length > 36) return;
     if (!charName || charName.length > 48) return;
-    // Ignore table header words or boilerplate
-    if (/^(演员|角色|人物|简介|备注|配音|演出|集数|登场)$/.test(actor)) return;
-    if (/^(演员|角色|人物|简介|备注|配音|演出|集数|登场)$/.test(charName)) return;
+    // Ignore table header words or Wikipedia infobox/navbox boilerplate
+    if (
+      /^(演员|角色|人物|简介|备注|配音|演出|集数|登场|真名|创作者|首次登场|首次登場|伙伴关系|国际|各地|中国大陆|中國大陸|新加坡|香港|台湾|臺灣|电影|電影|动画电影|動畫電影|地区|地區|别名|別名|所属|所屬|能力|装备|裝備)$/.test(
+        actor
+      )
+    ) {
+      return;
+    }
+    if (
+      /^(演员|角色|人物|简介|备注|配音|演出|集数|登场|动画电影|動畫電影)$/.test(
+        charName
+      ) ||
+      /\b(FAST|VIAF|WorldCat|ISNI|LCCN|GND|BNF)\b/i.test(charName) ||
+      /\b(FAST|VIAF|WorldCat|ISNI|LCCN|GND|BNF)\b/i.test(actor)
+    ) {
+      return;
+    }
 
     const key = `${normalizeEntityKey(actor)}::${normalizeEntityKey(charName)}`;
     if (seenActors.has(key)) return;
@@ -261,17 +275,27 @@ export function parseZhWikiCastHtml(html: string): ParsedCastEntry[] {
     });
   }
 
-  // 2. Parse <table> rows (common in Chinese TV dramas / older movies)
-  const tableRegex = /<table\b[^>]*>([\s\S]*?)<\/table>/gi;
+  // 2. Parse <table> rows ONLY for genuine cast tables with explicit actor + character headers
+  // (never scrape Wikipedia infoboxes, navboxes, or authority control tables).
+  const tableRegex = /<table\b([^>]*)>([\s\S]*?)<\/table>/gi;
   let tableMatch: RegExpExecArray | null;
   while ((tableMatch = tableRegex.exec(html)) !== null) {
-    const tableHtml = tableMatch[1];
+    const tableAttrs = tableMatch[1] || '';
+    if (
+      /\b(infobox|navbox|vertical-navbox|sidebar|metadata|ambox|authority-control|toc|nowraplinks)\b/i.test(
+        tableAttrs
+      )
+    ) {
+      continue;
+    }
+
+    const tableHtml = tableMatch[2];
     const rowRegex = /<tr\b[^>]*>([\s\S]*?)<\/tr>/gi;
     let rowMatch: RegExpExecArray | null;
-    let actorCol = 0;
-    let charCol = 1;
-    let descCol = 2;
-    let headerParsed = false;
+    let actorCol = -1;
+    let charCol = -1;
+    let descCol = -1;
+    let hasCastHeader = false;
 
     while ((rowMatch = rowRegex.exec(tableHtml)) !== null) {
       const cells = [
@@ -283,23 +307,26 @@ export function parseZhWikiCastHtml(html: string): ParsedCastEntry[] {
       }));
       if (cells.length < 2) continue;
 
-      if (!headerParsed && cells.some((c) => c.isHeader)) {
-        const aIdx = cells.findIndex((c) => /演员|配音|声优|主演/.test(c.text));
-        const cIdx = cells.findIndex((c) => /角色|人物|饰演|剧中/.test(c.text));
-        const dIdx = cells.findIndex((c) => /简介|介绍|说明|备注/.test(c.text));
-        if (aIdx >= 0 && cIdx >= 0) {
+      if (!hasCastHeader && cells.some((c) => c.isHeader)) {
+        const aIdx = cells.findIndex((c) =>
+          /演员|演員|配音|声优|聲優|主演|演出|饰演者|飾演者/.test(c.text)
+        );
+        const cIdx = cells.findIndex((c) =>
+          /角色|人物|饰演|飾演|剧中|劇中/.test(c.text)
+        );
+        const dIdx = cells.findIndex((c) =>
+          /简介|簡介|介绍|介紹|说明|說明|备注|備註/.test(c.text)
+        );
+        if (aIdx >= 0 && cIdx >= 0 && aIdx !== cIdx) {
           actorCol = aIdx;
           charCol = cIdx;
           descCol = dIdx >= 0 ? dIdx : -1;
-          headerParsed = true;
-          continue;
-        }
-        if (cells.every((c) => c.isHeader)) {
-          headerParsed = true;
+          hasCastHeader = true;
           continue;
         }
       }
 
+      if (!hasCastHeader) continue;
       if (cells.every((c) => c.isHeader)) continue;
       const actorCell = cells[actorCol];
       const charCell = cells[charCol];

@@ -105,3 +105,24 @@ test('parseZhWikiCastHtml parses list-style and table-style Chinese Wikipedia ca
   assert.equal(normalizeEntityKey('山姆·威尔逊'), normalizeEntityKey('山姆 威尔逊'));
 });
 
+test('parseZhWikiCastHtml ignores Wikipedia infoboxes, authority control navboxes, and non-cast tables', () => {
+  const garbagePageHtml = `
+    <table class="infobox">
+      <tr><th>真名</th><td>安東尼·愛德華·“托尼”·史塔克</td></tr>
+      <tr><th>创作者</th><td>史丹·李</td></tr>
+      <tr><th>首次登场</th><td>《悬疑故事》</td></tr>
+    </table>
+    <table class="wikitable">
+      <tr><th>中国大陆</th><td>钢铁侠</td></tr>
+      <tr><th>香港</th><td>鐵甲奇俠</td></tr>
+    </table>
+    <table class="navbox authority-control">
+      <tr><th>国际</th><td>FAST VIAF 2 3 WorldCat</td></tr>
+      <tr><th>各地</th><td>德国 以色列 美国 波兰</td></tr>
+    </table>
+  `;
+
+  assert.deepEqual(parseZhWikiCastHtml(garbagePageHtml), []);
+});
+
+

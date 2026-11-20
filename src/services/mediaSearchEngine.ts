@@ -53,7 +53,18 @@ import {
   latinPersonNamesMatch,
   mergeBilingualResults,
 } from '../utils/bilingualMerge';
-import { parseBaiduBaikeCard } from '../utils/chinaSearchParsers';
+import {
+  parseBaiduBaikeCard,
+  parseMoegirlPages,
+} from '../utils/chinaSearchParsers';
+import {
+  cleanBangumiCharacterName,
+  isPlausibleCharacterBaikeBundle,
+  parseBangumiCharacterSearch,
+  parseBangumiSubjectCharacters,
+  parseTvmazeShowCharacters,
+  rankCharacterResults,
+} from '../utils/characterSearchParsers';
 
 export type MediaEngineMode = 'server' | 'browser';
 
@@ -680,6 +691,164 @@ function deduplicateResults(
   return out;
 }
 
+async function fetchBaikeCharacterServer(
+  query: string,
+  mode: MediaEngineMode,
+  signal?: AbortSignal
+): Promise<OnlineSearchResult[]> {
+  try {
+    const res = await fetchWithTimeout(
+      `https://baike.baidu.com/api/openapi/BaikeLemmaCardApi?scope=103&format=json&appid=379020&bk_key=${encodeURIComponent(
+        query
+      )}`,
+      {},
+      3800,
+      mode,
+      signal
+    );
+    if (!res.ok) return [];
+    const payload = (await res.json()) as Record<string, any>;
+    const bundle = parseBaiduBaikeCard(payload, 'character');
+    if (isPlausibleCharacterBaikeBundle(bundle, query) && bundle.searchResult) {
+      return [
+        {
+          ...bundle.searchResult,
+          coverUrl: formatEngineImageUrl(bundle.searchResult.coverUrl, mode),
+        },
+      ];
+    }
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+async function searchBangumiCharactersStrictServer(
+  query: string,
+  mode: MediaEngineMode,
+  signal?: AbortSignal
+): Promise<OnlineSearchResult[]> {
+  try {
+    const res = await fetchWithTimeout(
+      'https://api.bgm.tv/v0/search/characters?limit=12&offset=0',
+      {
+        method: 'POST',
+        headers: BGM_HEADERS,
+        body: JSON.stringify({ keyword: query }),
+      },
+      4500,
+      mode,
+      signal
+    );
+    if (!res.ok) return [];
+    const json = (await res.json()) as { data?: Array<Record<string, any>> };
+    return parseBangumiCharacterSearch(json, query).map((item) => ({
+      ...item,
+      coverUrl: formatEngineImageUrl(item.coverUrl, mode),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+async function searchMoegirlServer(
+  query: string,
+  category: ArchiveCategory,
+  mode: MediaEngineMode,
+  signal?: AbortSignal
+): Promise<OnlineSearchResult[]> {
+  try {
+    const url =
+      `https://zh.moegirl.org.cn/api.php?action=query&format=json&origin=*` +
+      `&generator=search&gsrsearch=${encodeURIComponent(query)}&gsrlimit=6` +
+      `&prop=pageimages|extracts|info&inprop=url` +
+      `&piprop=thumbnail&pithumbsize=480&exintro=1&explaintext=1&exsentences=2`;
+    const res = await fetchWithTimeout(url, { headers: WIKI_HEADERS }, 4200, mode, signal);
+    if (!res.ok) return [];
+    const payload = (await res.json()) as Record<string, any>;
+    return parseMoegirlPages(payload, category, query).map((item) => ({
+      ...item,
+      coverUrl: formatEngineImageUrl(item.coverUrl, mode),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+async function enrichCharacterNamesServer(
+  items: OnlineSearchResult[],
+  mode: MediaEngineMode,
+  signal?: AbortSignal
+): Promise<OnlineSearchResult[]> {
+  if (items.length === 0 || signal?.aborted) return items;
+  const cloned = items.map((it) => ({ ...it }));
+  const targets = cloned
+    .filter((it) => !hasCjkChars(it.title) || !it.coverUrl)
+    .slice(0, 8);
+  if (targets.length === 0) return cloned;
+
+  const CONCURRENCY = 4;
+  let cursor = 0;
+  const worker = async () => {
+    while (cursor < targets.length && !signal?.aborted) {
+      const item = targets[cursor++];
+      const bgmMatch = /^bgm-char-(\d+)$/.exec(item.externalId);
+      if (bgmMatch && !hasCjkChars(item.title)) {
+        try {
+          const res = await fetchWithTimeout(
+            `https://api.bgm.tv/v0/characters/${bgmMatch[1]}`,
+            { headers: BGM_HEADERS },
+            2800,
+            mode,
+            signal
+          );
+          if (res.ok) {
+            const detail = (await res.json()) as Record<string, any>;
+            if (Array.isArray(detail.infobox)) {
+              const zhRow = detail.infobox.find(
+                (r: any) => r?.key === '简体中文名' || r?.key === '中文名'
+              );
+              const zhName =
+                typeof zhRow?.value === 'string'
+                  ? cleanBangumiCharacterName(zhRow.value)
+                  : '';
+              if (zhName && hasCjkChars(zhName)) {
+                if (!item.originalTitle) item.originalTitle = item.title;
+                item.title = zhName;
+              }
+            }
+            if (typeof detail.summary === 'string' && detail.summary.trim().length > 20) {
+              item.summary = cleanText(detail.summary, 220);
+            }
+          }
+        } catch {
+          // Ignore individual character detail timeout
+        }
+      }
+
+      if ((!hasCjkChars(item.title) || !item.coverUrl) && !signal?.aborted) {
+        const lookupKey = item.title.split(/\s*[/／]\s*/)[0]?.trim() || item.title;
+        const baikeHits = await fetchBaikeCharacterServer(lookupKey, mode, signal);
+        const hit = baikeHits[0];
+        if (hit) {
+          if (!hasCjkChars(item.title) && hasCjkChars(hit.title)) {
+            if (!item.originalTitle) item.originalTitle = item.title;
+            item.title = hit.title;
+          }
+          if (!item.coverUrl && hit.coverUrl) {
+            item.coverUrl = hit.coverUrl;
+          }
+        }
+      }
+    }
+  };
+
+  await Promise.all(
+    Array.from({ length: Math.min(CONCURRENCY, targets.length) }, () => worker())
+  );
+  return cloned;
+}
+
 export async function searchOnlineMedia(params: {
   query: string;
   category?: string;
@@ -701,21 +870,124 @@ export async function searchOnlineMedia(params: {
     };
   }
 
-  // Unified IMDb primary + Douban Chinese info assist search pipeline
-  const bundle = await searchImdbMedia(query, category, {
-    mode,
-    doubanOptions: mode === 'server' ? { transport: 'server', signal } : undefined,
-    enableDoubanAssist: mode === 'server',
-    signal,
-  });
-  const activeSources: string[] = [];
-  if (bundle.results.length > 0) {
-    activeSources.push(bundle.hasDoubanAssist ? 'IMDb · 豆瓣辅助' : 'IMDb');
+  // Film & Person: strictly IMDb primary + Douban Chinese info assist
+  if (category !== 'character') {
+    const bundle = await searchImdbMedia(query, category, {
+      mode,
+      doubanOptions: mode === 'server' ? { transport: 'server', signal } : undefined,
+      enableDoubanAssist: mode === 'server',
+      signal,
+    });
+    const activeSources: string[] = [];
+    if (bundle.results.length > 0) {
+      activeSources.push(bundle.hasDoubanAssist ? 'IMDb · 豆瓣辅助' : 'IMDb');
+    }
+    return {
+      query,
+      category,
+      results: mergeBilingualResults(deduplicateResults(bundle.results)).slice(0, 22),
+      activeSources,
+      failedSources: [],
+    };
   }
+
+  // Character search: parallel multi-source character discovery
+  const [imdbOut, baikeOut, bgmCharOut, bgmWorkOut, tvmazeOut, moegirlOut] =
+    await Promise.allSettled([
+      searchImdbMedia(query, 'character', {
+        mode,
+        doubanOptions: mode === 'server' ? { transport: 'server', signal } : undefined,
+        enableDoubanAssist: mode === 'server',
+        signal,
+      }),
+      fetchBaikeCharacterServer(query, mode, signal),
+      searchBangumiCharactersStrictServer(query, mode, signal),
+      (async () => {
+        const subject = await resolveBangumiFilmSubject(query, undefined, mode, signal);
+        if (!subject) return [] as OnlineSearchResult[];
+        const rel = await fetchBangumiFilmRelations(
+          subject.id,
+          subject.workTitle,
+          mode,
+          signal,
+          { isLiveAction: subject.isLiveAction }
+        );
+        return rel.characters;
+      })(),
+      (async () => {
+        const res = await fetchWithTimeout(
+          `https://api.tvmaze.com/search/shows?q=${encodeURIComponent(query)}`,
+          {},
+          4200,
+          mode,
+          signal
+        );
+        if (!res.ok) return [] as OnlineSearchResult[];
+        const data = (await res.json()) as Array<{ show?: Record<string, any> }>;
+        const topShow = (data || [])
+          .map((row) => row.show)
+          .find(
+            (s) => s?.id && s?.name && hasStrictTitleOverlap([String(s.name)], [query])
+          );
+        if (!topShow?.id) return [] as OnlineSearchResult[];
+        const castRes = await fetchWithTimeout(
+          `https://api.tvmaze.com/shows/${topShow.id}/cast`,
+          {},
+          4200,
+          mode,
+          signal
+        );
+        if (!castRes.ok) return [] as OnlineSearchResult[];
+        const cast = (await castRes.json()) as Array<{
+          person?: Record<string, any>;
+          character?: Record<string, any>;
+        }>;
+        return parseTvmazeShowCharacters(topShow, cast, 16).map((item) => ({
+          ...item,
+          coverUrl: formatEngineImageUrl(item.coverUrl, mode),
+        }));
+      })(),
+      searchMoegirlServer(query, 'character', mode, signal),
+    ]);
+
+  const rawChars: OnlineSearchResult[] = [];
+  const activeSources: string[] = [];
+
+  if (baikeOut.status === 'fulfilled' && baikeOut.value.length > 0) {
+    activeSources.push('百度百科');
+    rawChars.push(...baikeOut.value);
+  }
+  if (bgmCharOut.status === 'fulfilled' && bgmCharOut.value.length > 0) {
+    activeSources.push('番组计划 Bangumi');
+    rawChars.push(...bgmCharOut.value);
+  }
+  if (bgmWorkOut.status === 'fulfilled' && bgmWorkOut.value.length > 0) {
+    if (!activeSources.includes('番组计划 Bangumi')) {
+      activeSources.push('番组计划 Bangumi');
+    }
+    rawChars.push(...bgmWorkOut.value);
+  }
+  if (imdbOut.status === 'fulfilled' && imdbOut.value.results.length > 0) {
+    activeSources.push(imdbOut.value.hasDoubanAssist ? 'IMDb · 豆瓣辅助' : 'IMDb');
+    rawChars.push(...imdbOut.value.results);
+  }
+  if (tvmazeOut.status === 'fulfilled' && tvmazeOut.value.length > 0) {
+    activeSources.push('TVMaze 剧集库');
+    rawChars.push(...tvmazeOut.value);
+  }
+  if (moegirlOut.status === 'fulfilled' && moegirlOut.value.length > 0) {
+    activeSources.push('萌娘百科');
+    rawChars.push(...moegirlOut.value);
+  }
+
+  const enriched = await enrichCharacterNamesServer(rawChars, mode, signal);
+  const merged = mergeBilingualResults(deduplicateResults(enriched));
+  const ranked = rankCharacterResults(merged, query);
+
   return {
     query,
     category,
-    results: deduplicateResults(bundle.results).slice(0, 22),
+    results: ranked.slice(0, 22),
     activeSources,
     failedSources: [],
   };
@@ -990,6 +1262,94 @@ function isIgnoredCrewRole(rel: string): boolean {
   );
 }
 
+async function resolveBangumiFilmSubject(
+  title: string,
+  sourceUrl: string | undefined,
+  mode: MediaEngineMode,
+  signal?: AbortSignal,
+  options?: { originalTitle?: string; year?: string }
+): Promise<{ id: number; isLiveAction: boolean; workTitle: string } | null> {
+  if (sourceUrl) {
+    const m = /bgm\.tv\/subject\/(\d+)/.exec(sourceUrl);
+    if (m) return { id: Number(m[1]), isLiveAction: false, workTitle: title };
+  }
+  try {
+    const queries = Array.from(
+      new Set(
+        [title, options?.originalTitle]
+          .map((q) => (q || '').trim())
+          .filter(Boolean)
+      )
+    );
+    for (const keyword of queries) {
+      // Search type [6] (live-action) and type [2] (anime) separately so anime
+      // spinoffs do not crowd out live-action films.
+      const [realRes, animeRes] = await Promise.all([
+        fetchWithTimeout(
+          'https://api.bgm.tv/v0/search/subjects?limit=6',
+          {
+            method: 'POST',
+            headers: BGM_HEADERS,
+            body: JSON.stringify({ keyword, filter: { type: [6] } }),
+          },
+          4800,
+          mode,
+          signal
+        ),
+        fetchWithTimeout(
+          'https://api.bgm.tv/v0/search/subjects?limit=6',
+          {
+            method: 'POST',
+            headers: BGM_HEADERS,
+            body: JSON.stringify({ keyword, filter: { type: [2] } }),
+          },
+          4800,
+          mode,
+          signal
+        ),
+      ]);
+
+      const realData = realRes.ok
+        ? ((await realRes.json()) as { data?: Array<Record<string, any>> }).data || []
+        : [];
+      const animeData = animeRes.ok
+        ? ((await animeRes.json()) as { data?: Array<Record<string, any>> }).data || []
+        : [];
+
+      const realId = matchBangumiSubjectCandidate(realData as any, {
+        title,
+        originalTitle: options?.originalTitle,
+        year: options?.year,
+      });
+      if (realId) {
+        const hit = realData.find((d) => d.id === realId);
+        return {
+          id: realId,
+          isLiveAction: true,
+          workTitle: String(hit?.name_cn || hit?.name || title).trim(),
+        };
+      }
+
+      const animeId = matchBangumiSubjectCandidate(animeData as any, {
+        title,
+        originalTitle: options?.originalTitle,
+        year: options?.year,
+      });
+      if (animeId) {
+        const hit = animeData.find((d) => d.id === animeId);
+        return {
+          id: animeId,
+          isLiveAction: false,
+          workTitle: String(hit?.name_cn || hit?.name || title).trim(),
+        };
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 async function resolveBangumiId(
   category: ArchiveCategory,
   title: string,
@@ -998,42 +1358,21 @@ async function resolveBangumiId(
   signal?: AbortSignal,
   options?: { originalTitle?: string; year?: string }
 ): Promise<number | null> {
+  if (category === 'film') {
+    const resolved = await resolveBangumiFilmSubject(
+      title,
+      sourceUrl,
+      mode,
+      signal,
+      options
+    );
+    return resolved?.id ?? null;
+  }
   if (sourceUrl) {
     const m = /bgm\.tv\/(subject|person|character)\/(\d+)/.exec(sourceUrl);
     if (m) return Number(m[2]);
   }
   try {
-    if (category === 'film') {
-      const queries = Array.from(
-        new Set(
-          [title, options?.originalTitle]
-            .map((q) => (q || '').trim())
-            .filter(Boolean)
-        )
-      );
-      for (const keyword of queries) {
-        const res = await fetchWithTimeout(
-          'https://api.bgm.tv/v0/search/subjects?limit=6',
-          {
-            method: 'POST',
-            headers: BGM_HEADERS,
-            body: JSON.stringify({ keyword, filter: { type: [6, 2] } }),
-          },
-          5500,
-          mode,
-          signal
-        );
-        if (!res.ok) continue;
-        const json = (await res.json()) as { data?: Array<Record<string, any>> };
-        const matchedId = matchBangumiSubjectCandidate(json.data as any, {
-          title,
-          originalTitle: options?.originalTitle,
-          year: options?.year,
-        });
-        if (matchedId) return matchedId;
-      }
-      return null;
-    }
     if (category === 'person') {
       const res = await fetchWithTimeout(
         'https://api.bgm.tv/v0/search/persons?limit=5',
@@ -1091,7 +1430,8 @@ async function fetchBangumiFilmRelations(
   subjectId: number,
   filmTitle: string,
   mode: MediaEngineMode,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  options?: { isLiveAction?: boolean; workYear?: string }
 ): Promise<{ people: OnlineSearchResult[]; characters: OnlineSearchResult[] }> {
   const [pRes, cRes] = await Promise.allSettled([
     fetchWithTimeout(
@@ -1151,38 +1491,24 @@ async function fetchBangumiFilmRelations(
     })
     .slice(0, 30);
 
-  const characters: OnlineSearchResult[] = rawChars
-    .sort((a: any, b: any) => {
-      const pa = a.relation === '主角' ? 0 : 1;
-      const pb = b.relation === '主角' ? 0 : 1;
-      return pa - pb;
-    })
-    .slice(0, 40)
-    .flatMap((c: any) => {
-      const name = String(c.name || '').trim();
-      if (!name) return [];
-      const actor = Array.isArray(c.actors) ? c.actors[0] : undefined;
-      const actorName = actor?.name ? String(actor.name).trim() : undefined;
-      const rel = String(c.relation || '角色');
-      const img = c.images?.large || c.images?.medium || c.images?.grid;
-      return [
-        {
-          externalId: `bgm-char-${c.id}`,
-          category: 'character' as const,
-          title: name,
-          subtitle: actorName ? `${rel} · ${actorName}` : rel,
-          coverUrl: formatEngineImageUrl(img, mode),
-          summary: `《${filmTitle}》中的${rel}${
-            actorName ? `，由 ${actorName} 饰演/配音` : ''
-          }。`,
-          relatedWorkTitle: filmTitle,
-          portrayedBy: actorName,
-          sourceName: '番组计划 Bangumi',
-          sourceUrl: `https://bgm.tv/character/${c.id}`,
-          tags: [rel],
-        },
-      ];
-    });
+  const sortedChars = [...rawChars].sort((a: any, b: any) => {
+    const pa = a.relation === '主角' ? 0 : 1;
+    const pb = b.relation === '主角' ? 0 : 1;
+    return pa - pb;
+  });
+
+  const characters: OnlineSearchResult[] = parseBangumiSubjectCharacters(
+    sortedChars,
+    filmTitle,
+    {
+      workYear: options?.workYear,
+      isLiveAction: Boolean(options?.isLiveAction),
+      limit: 40,
+    }
+  ).map((ch) => ({
+    ...ch,
+    coverUrl: formatEngineImageUrl(ch.coverUrl, mode),
+  }));
 
   return { people, characters };
 }
@@ -2268,8 +2594,7 @@ export async function fetchOnlineRelations(params: {
   const sources: string[] = [];
 
   if (category === 'film') {
-    const bgmId = await resolveBangumiId(
-      'film',
+    const bgmSubject = await resolveBangumiFilmSubject(
       title,
       sourceUrl,
       mode,
@@ -2295,8 +2620,11 @@ export async function fetchOnlineRelations(params: {
           sourceUrl,
           year,
         }),
-        bgmId
-          ? fetchBangumiFilmRelations(bgmId, title, mode, signal)
+        bgmSubject
+          ? fetchBangumiFilmRelations(bgmSubject.id, title, mode, signal, {
+              isLiveAction: bgmSubject.isLiveAction,
+              workYear: year,
+            })
           : Promise.resolve({ people: [], characters: [] }),
         fetchTVMazeFilmRelations(title, sourceUrl, mode, signal),
       ]);
@@ -2358,18 +2686,16 @@ export async function fetchOnlineRelations(params: {
       rawChars.push(...tvOutcome.value.characters);
     }
 
-    const enrichedPeople = await enrichRelationsWithBaikeServer(
-      rawPeople,
-      'person',
-      mode,
-      signal
-    );
+    const [enrichedPeople, enrichedChars] = await Promise.all([
+      enrichRelationsWithBaikeServer(rawPeople, 'person', mode, signal),
+      enrichCharacterNamesServer(rawChars, mode, signal),
+    ]);
 
     return {
       films: [],
       people: enrichedPeople.slice(0, 60),
-      characters: mergeUniqueByTitle(rawChars).slice(0, 60),
-      sources,
+      characters: mergeUniqueByTitle(enrichedChars).slice(0, 60),
+      sources: Array.from(new Set(sources)),
     };
   }
 

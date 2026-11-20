@@ -16,6 +16,7 @@ import {
 } from '../utils/imdbParsers';
 import { normalizeEntityKey } from '../utils/wikiCast';
 import {
+  hasStrictTitleOverlap,
   matchFilmRelationCandidate,
   normalizeStrictTitleKey,
 } from '../utils/relationMatching';
@@ -441,7 +442,7 @@ export async function searchImdbMedia(
   const trimmed = query.trim();
   if (!trimmed) return { results: [], hasDoubanAssist: false };
 
-  const doubanGraceMs = options.mode === 'server' ? 2800 : 2000;
+  const doubanGraceMs = options.mode === 'server' ? 3500 : 4800;
 
   // 0A. Direct IMDb URL / ID paste (`tt...` or `nm...`)
   const directImdb = parseImdbUrlOrId(trimmed);
@@ -691,23 +692,145 @@ export async function searchImdbMedia(
       }
     }
 
-    const imdbResults: OnlineSearchResult[] = orderedIds
+    let imdbResults: OnlineSearchResult[] = orderedIds
       .slice(0, 12)
       .map((id) => hydratedById.get(id) || byId.get(id)!.result);
 
-    // Wait briefly for parallel Douban assist (already started at t=0!)
+    // Wait for parallel Douban assist (already started at t=0!) so Chinese titles fuse reliably
     const doubanHits = await waitWithGrace(
       doubanPromise,
-      imdbResults.length > 0 ? doubanGraceMs : 4200,
+      imdbResults.length > 0 ? doubanGraceMs : 5500,
       []
     );
 
-    const fused = mergeImdbWithDoubanAssist(imdbResults, doubanHits, {
+    // If the user searched in Chinese (e.g. on mainland China network where Wikidata is blocked)
+    // and IMDb had 0 hits (or none matched Douban), bridge via Douban's Latin originalTitle -> Cinemeta!
+    const hasAnyDoubanOverlap =
+      imdbResults.length > 0 &&
+      doubanHits.length > 0 &&
+      mergeImdbWithDoubanAssist(imdbResults, doubanHits, {
+        crossIdMap: wdMap.crossIdMap,
+        zhTitleMap: wdMap.zhTitleMap,
+        fallbackThreshold: 0,
+      }).some((item) => item.sourceName === 'IMDb · 豆瓣辅助');
+
+    if (
+      (imdbResults.length === 0 || (hasCjkCharacters(trimmed) && !hasAnyDoubanOverlap)) &&
+      doubanHits.length > 0
+    ) {
+      const latinFilmQueries = Array.from(
+        new Set(
+          doubanHits
+            .map((d) => (d.originalTitle || '').split(/\s*[/／]\s*/)[0]?.trim() || '')
+            .filter((t) => Boolean(t) && !hasCjkCharacters(t))
+        )
+      ).slice(0, 2);
+
+      if (latinFilmQueries.length > 0) {
+        const extraBatches = await Promise.all(
+          latinFilmQueries.map(async (qLatin) => {
+            const [mRaw, sRaw, sugRaw] = await Promise.all([
+              fetchJsonCached<Record<string, any>>(
+                `https://v3-cinemeta.strem.io/catalog/movie/top/search=${encodeURIComponent(
+                  qLatin
+                )}.json`,
+                { mode: options.mode, timeoutMs: 3600, signal: options.signal }
+              ),
+              fetchJsonCached<Record<string, any>>(
+                `https://v3-cinemeta.strem.io/catalog/series/top/search=${encodeURIComponent(
+                  qLatin
+                )}.json`,
+                { mode: options.mode, timeoutMs: 3600, signal: options.signal }
+              ),
+              fetchImdbSuggestRaw(qLatin, 'titles', options),
+            ]);
+            return [
+              ...parseImdbSuggestPayload(sugRaw).titles.slice(0, 3),
+              ...parseCinemetaSearchPayload(mRaw, 'movie').slice(0, 3),
+              ...parseCinemetaSearchPayload(sRaw, 'series').slice(0, 2),
+            ];
+          })
+        );
+
+        const newlyAddedIds: string[] = [];
+        for (const entry of extraBatches.flat()) {
+          if (!byId.has(entry.imdbId)) {
+            register(entry);
+            newlyAddedIds.push(entry.imdbId);
+          }
+        }
+
+        if (newlyAddedIds.length > 0) {
+          const extraHydrated = await Promise.all(
+            newlyAddedIds.slice(0, 4).map((id) => {
+              const entry = byId.get(id)!;
+              return fetchCinemetaTitleMeta(id, entry.mediaType, options);
+            })
+          );
+          for (const meta of extraHydrated) {
+            if (meta) {
+              const orig = byId.get(meta.imdbId);
+              hydratedById.set(meta.imdbId, {
+                ...meta.result,
+                coverUrl: orig?.result.coverUrl || meta.result.coverUrl,
+              });
+            }
+          }
+          imdbResults = orderedIds
+            .slice(0, 12)
+            .map((id) => hydratedById.get(id) || byId.get(id)!.result);
+        }
+      }
+    }
+
+    let fused = mergeImdbWithDoubanAssist(imdbResults, doubanHits, {
       crossIdMap: wdMap.crossIdMap,
       zhTitleMap: wdMap.zhTitleMap,
       fallbackThreshold: 4,
       query: trimmed,
     });
+
+    // Prefer Douban Chinese titles first for top unmatched English IMDb hits (e.g. indirect queries);
+    // fall back cleanly to IMDb English when Douban has no match.
+    if (options.enableDoubanAssist !== false && options.doubanOptions) {
+      const normalizedQuery = normalizeEntityKey(trimmed);
+      const unmatchedTargets = fused
+        .slice(0, 4)
+        .filter(
+          (item) =>
+            item.sourceName === 'IMDb' &&
+            !hasCjkCharacters(item.title) &&
+            normalizeEntityKey(item.title) !== normalizedQuery
+        )
+        .slice(0, 3);
+
+      if (unmatchedTargets.length > 0) {
+        const extraDoubanArrays = await Promise.all(
+          unmatchedTargets.map((item) =>
+            runDoubanAssistSafe(item.title, 'film', options, 3400)
+          )
+        );
+        const extraDouban = extraDoubanArrays.flat();
+        if (extraDouban.length > 0) {
+          const enrichedSubset = mergeImdbWithDoubanAssist(
+            unmatchedTargets,
+            extraDouban,
+            {
+              crossIdMap: wdMap.crossIdMap,
+              zhTitleMap: wdMap.zhTitleMap,
+              fallbackThreshold: 0,
+            }
+          );
+          const enrichedById = new Map(
+            enrichedSubset.map((item) => [item.externalId, item])
+          );
+          fused = rankImdbResults(
+            fused.map((item) => enrichedById.get(item.externalId) || item),
+            trimmed
+          );
+        }
+      }
+    }
 
     return {
       results: fused.slice(0, 12),
@@ -764,7 +887,7 @@ export async function searchImdbMedia(
     // Wait for Douban celebrity assist (gives Chinese bio, roles, birthplace, AND English name fallback!)
     const doubanHits = await waitWithGrace(
       doubanPromise,
-      imdbPeople.length > 0 ? doubanGraceMs : 4200,
+      imdbPeople.length > 0 ? doubanGraceMs : 5500,
       []
     );
 
@@ -786,11 +909,51 @@ export async function searchImdbMedia(
       }
     }
 
-    const fused = mergeImdbWithDoubanAssist(imdbPeople, doubanHits, {
+    let fused = mergeImdbWithDoubanAssist(imdbPeople, doubanHits, {
       zhTitleMap: wdMap.zhTitleMap,
       fallbackThreshold: 3,
       query: trimmed,
     });
+
+    // Prefer Douban Chinese names for top unmatched English person results (e.g. partial English search)
+    if (options.enableDoubanAssist !== false && options.doubanOptions) {
+      const normalizedQuery = normalizeEntityKey(trimmed);
+      const unmatchedPeople = fused
+        .slice(0, 3)
+        .filter(
+          (item) =>
+            item.sourceName === 'IMDb' &&
+            !hasCjkCharacters(item.title) &&
+            normalizeEntityKey(item.title) !== normalizedQuery
+        )
+        .slice(0, 2);
+
+      if (unmatchedPeople.length > 0) {
+        const extraDoubanArrays = await Promise.all(
+          unmatchedPeople.map((item) =>
+            runDoubanAssistSafe(item.title, 'person', options, 3200)
+          )
+        );
+        const extraDouban = extraDoubanArrays.flat();
+        if (extraDouban.length > 0) {
+          const enrichedSubset = mergeImdbWithDoubanAssist(
+            unmatchedPeople,
+            extraDouban,
+            {
+              zhTitleMap: wdMap.zhTitleMap,
+              fallbackThreshold: 0,
+            }
+          );
+          const enrichedById = new Map(
+            enrichedSubset.map((item) => [item.externalId, item])
+          );
+          fused = rankImdbResults(
+            fused.map((item) => enrichedById.get(item.externalId) || item),
+            trimmed
+          );
+        }
+      }
+    }
 
     return {
       results: fused.slice(0, 10),
@@ -829,10 +992,15 @@ export async function searchImdbMedia(
     ...parseCinemetaSearchPayload(cinMovieRaw, 'movie'),
     ...parseCinemetaSearchPayload(cinSeriesRaw, 'series'),
   ];
-  const topWorkMeta = matchedWorks[0]
+  const strictWorkHit = matchedWorks.find(
+    (w) =>
+      wdMap.titleIds.includes(w.imdbId) ||
+      hasStrictTitleOverlap([w.result.title], [trimmed])
+  );
+  const topWorkMeta = strictWorkHit
     ? await fetchCinemetaTitleMeta(
-        matchedWorks[0].imdbId,
-        matchedWorks[0].mediaType,
+        strictWorkHit.imdbId,
+        strictWorkHit.mediaType,
         options
       )
     : null;
