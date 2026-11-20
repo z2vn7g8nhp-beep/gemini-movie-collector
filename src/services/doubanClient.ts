@@ -405,7 +405,39 @@ async function searchDoubanStaticDirect(
       return [];
     }
 
-    return rankStaticDoubanFilmResults(merged, trimmed).slice(0, 12);
+    const ranked = rankStaticDoubanFilmResults(merged, trimmed).slice(0, 12);
+
+    // When Douban subject_suggest matched a newer work (e.g. 2025/2026 release) that WMDB
+    // doesn't index yet, quickly enrich the top hit with `subject_abstract` for Douban rating,
+    // director, region, and Chinese genre tags.
+    const lead = ranked[0];
+    const leadId = lead ? extractSubjectIdFromUrl(lead.sourceUrl) : null;
+    if (lead && leadId && !/豆瓣\s*\d/.test(lead.subtitle || '') && !options.signal?.aborted) {
+      const absRes = await waitWithGrace(
+        fetchViaStaticBridgeDetailed<Record<string, any>>(
+          `https://movie.douban.com/j/subject_abstract?subject_id=${encodeURIComponent(leadId)}`,
+          options,
+          4500
+        ),
+        2800,
+        { data: null }
+      );
+      const abs = parseDoubanSubjectAbstract(absRes.data);
+      if (abs) {
+        ranked[0] = {
+          ...lead,
+          subtitle: abs.result.subtitle || lead.subtitle,
+          year: lead.year || abs.result.year,
+          region: lead.region || abs.result.region,
+          tags:
+            abs.result.tags && abs.result.tags.length > 0
+              ? abs.result.tags
+              : lead.tags,
+        };
+      }
+    }
+
+    return ranked;
   }
 
   // 2. Person Search: Prioritize Douban Suggest celebrity hits, with WMDB `actor=` fallback
@@ -814,14 +846,14 @@ export async function searchDoubanMedia(
       )}`,
       'web',
       options,
-      2400
+      3800
     );
 
     const rexxarRaw = await rexxarPromise;
     const rexxarItems = parseDoubanMovieSearch(rexxarRaw, formatImg);
     const suggestRaw =
       rexxarItems.length > 0
-        ? await waitWithGrace(suggestPromise, 1200, null)
+        ? await waitWithGrace(suggestPromise, 1500, null)
         : await suggestPromise;
     const suggestParsed = parseDoubanSuggest(suggestRaw, formatImg);
 
@@ -854,9 +886,9 @@ export async function searchDoubanMedia(
 
     if (merged.length === 0) return [];
 
-    // Hydrate top 3 hits in parallel for full Chinese plot synopsis, exact year, genres & directors
+    // Hydrate top 2 hits in parallel for full Chinese plot synopsis, exact year, genres & directors
     const topIds = merged
-      .slice(0, 3)
+      .slice(0, 2)
       .map((m) => extractSubjectIdFromUrl(m.sourceUrl))
       .filter((id): id is string => Boolean(id));
 

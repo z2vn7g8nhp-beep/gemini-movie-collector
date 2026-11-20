@@ -683,7 +683,7 @@ function deduplicateResults(
   const out: OnlineSearchResult[] = [];
   for (const item of results) {
     if (!item.title) continue;
-    const key = `${item.category}::${item.title.toLowerCase()}::${item.sourceName}`;
+    const key = `${item.category}::${item.title.toLowerCase()}::${item.year || ''}::${item.sourceName}`;
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(item);
@@ -880,7 +880,13 @@ export async function searchOnlineMedia(params: {
     });
     const activeSources: string[] = [];
     if (bundle.results.length > 0) {
-      activeSources.push(bundle.hasDoubanAssist ? 'IMDb · 豆瓣辅助' : 'IMDb');
+      activeSources.push(
+        bundle.hasDoubanAssist
+          ? 'IMDb · 豆瓣辅助'
+          : bundle.hasChineseAssist
+            ? 'IMDb · 中文资料'
+            : 'IMDb'
+      );
     }
     return {
       query,

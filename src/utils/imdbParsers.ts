@@ -505,11 +505,113 @@ function extractDirectorSnippet(subtitle?: string): string | undefined {
 
 function isRichChineseSynopsis(summary?: string): boolean {
   if (!summary) return false;
-  if (!hasCjkCharacters(summary)) return false;
-  if (/豆瓣(?:电影|剧集|影视条目|影人档案)[。）)]?$/.test(summary.trim())) {
+  const trimmed = summary.trim();
+  if (!hasCjkCharacters(trimmed)) return false;
+  if (
+    /(?:豆瓣(?:电影|剧集|影视条目|影人档案)|影视作品|动画作品|百度百科词条|IMDb\s*(?:电影|剧集)?(?:条目|档案))[。）)\s。]*$/.test(
+      trimmed
+    ) &&
+    trimmed.length < 48
+  ) {
     return false;
   }
-  return summary.trim().length >= 24;
+  return trimmed.length >= 24;
+}
+
+const NON_MEDIA_BAIKE_RE =
+  /(?:游戏|手游|网游|端游|单机|iphone游戏|android游戏|网络小说|言情小说|轻小说|文学作品|诗歌|散文|音乐专辑|单曲|歌曲|唱片|乐队|植物|动物|昆虫|成语|词语|汉语词汇|地名|行政区|软件|应用程序|手机应用|车型|汽车品牌|公司|企业|品牌|工具|器具|家具|服饰)/i;
+
+const FILM_MEDIA_BAIKE_RE =
+  /(?:电影|影片|剧集|电视剧|美剧|英剧|日剧|韩剧|港剧|台剧|国产剧|网剧|网络剧|迷你剧|动画|番剧|动漫|纪录片|短片|执导|主演|导演|编剧|播出|首播|上映|出品|HBO|Netflix|DC|漫威|影业)/i;
+
+const PERSON_MEDIA_BAIKE_RE =
+  /(?:演员|导演|编剧|制片|监制|配音|声优|歌手|主持人|电影人|影星|男演员|女演员|影视)/i;
+
+/**
+ * Validates whether a Baidu Baike lemma card genuinely represents a film/TV work
+ * or film person rather than an unrelated homonym (e.g. "Lanterns" -> "灯笼 iphone游戏").
+ */
+export function isPlausibleBaikeFilmOrPerson(
+  item: OnlineSearchResult | null | undefined,
+  category: ArchiveCategory
+): boolean {
+  if (!item || !item.title || !hasCjkCharacters(item.title)) return false;
+  const combined = `${item.subtitle || ''} ${item.summary || ''} ${(item.tags || []).join(' ')}`;
+  if (!combined.trim()) return false;
+
+  if (category === 'film') {
+    if (NON_MEDIA_BAIKE_RE.test(item.subtitle || '') && !FILM_MEDIA_BAIKE_RE.test(item.subtitle || '')) {
+      return false;
+    }
+    if (NON_MEDIA_BAIKE_RE.test(combined) && !FILM_MEDIA_BAIKE_RE.test(combined)) {
+      return false;
+    }
+    return FILM_MEDIA_BAIKE_RE.test(combined);
+  }
+
+  if (category === 'person') {
+    if (NON_MEDIA_BAIKE_RE.test(item.subtitle || '') && !PERSON_MEDIA_BAIKE_RE.test(item.subtitle || '')) {
+      return false;
+    }
+    return PERSON_MEDIA_BAIKE_RE.test(combined);
+  }
+
+  return true;
+}
+
+const BAIDU_SUGGEST_NOISE_RE =
+  /(?:在线观看|免费观看|百度网盘|网盘|下载|剧情介绍|剧情|演员表|豆瓣|评分|预告片|预告|高清|完整版|资源|评价|影评|好看吗|什么时候|播出时间|更新时间|第一季|第二季|第三季|第[一二三四五六七八九十\d]+[集季期]|什么意思|是什么意思|怎么读|怎么念|翻译|百科|官网|美剧|英剧|日剧|韩剧|电影|电视剧|剧集|动漫|动画|英文|中文|名字|叫什么)/g;
+
+/**
+ * Extracts a clean Chinese title alias from Baidu Search Suggest entries paired
+ * with a Latin work title (e.g. `"LANTERNS绿灯军团"` for `"Lanterns"` -> `"绿灯军团"`).
+ */
+export function extractBaiduSuggestZhAlias(
+  suggestions: string[],
+  latinTitle: string
+): string | null {
+  const normLatin = normalizeEntityKey(latinTitle);
+  if (!normLatin || normLatin.length < 3) return null;
+
+  const escapedWords = latinTitle
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const latinPrefixRe =
+    escapedWords.length > 0
+      ? new RegExp(escapedWords.join('[\\s:：\\-—·]*'), 'gi')
+      : null;
+
+  const counts = new Map<string, number>();
+  const order: string[] = [];
+
+  for (const raw of suggestions) {
+    if (!raw || !hasCjkCharacters(raw)) continue;
+    const normRaw = normalizeEntityKey(raw);
+    if (!normRaw.includes(normLatin)) continue;
+
+    let stripped = latinPrefixRe ? raw.replace(latinPrefixRe, ' ') : raw;
+    stripped = stripped
+      .replace(BAIDU_SUGGEST_NOISE_RE, ' ')
+      .replace(/[A-Za-z0-9\-_:：·•()（）《》「」『』\[\]【】/\\.,!?！？\s]+/g, ' ')
+      .trim();
+
+    // Pick the longest contiguous CJK segment remaining (2..14 chars)
+    const cjkSegments = stripped.match(/[\u4e00-\u9fff]{2,14}/g) || [];
+    for (const seg of cjkSegments) {
+      if (seg.length < 2 || seg.length > 14) continue;
+      if (/^(?:大结局|分集|全集|解说|结局|主演|导演|海报|剧照|壁纸|片尾曲|主题曲)$/.test(seg)) {
+        continue;
+      }
+      if (!counts.has(seg)) order.push(seg);
+      counts.set(seg, (counts.get(seg) || 0) + 1);
+    }
+  }
+
+  if (order.length === 0) return null;
+  order.sort((a, b) => (counts.get(b) || 0) - (counts.get(a) || 0));
+  return order[0];
 }
 
 const MAKING_OF_RE =
@@ -629,6 +731,8 @@ export interface MergeImdbDoubanOptions {
   crossIdMap?: Map<string, string>;
   /** Optional map of IMDb ttId/nmId -> Chinese display title (e.g. from Wikidata zh-cn label) */
   zhTitleMap?: Map<string, string>;
+  /** Optional secondary Chinese assist candidates (Bangumi / Baidu Baike) used when Douban misses or lacks synopsis */
+  secondaryZhItems?: OnlineSearchResult[];
   /** Append unmatched Douban items when IMDb has fewer than this count (default: 4) */
   fallbackThreshold?: number;
   /** Original search query for final ranking */
@@ -636,19 +740,47 @@ export interface MergeImdbDoubanOptions {
 }
 
 /**
- * Core Fusion Engine: IMDb Primary + Douban Assist.
+ * Core Fusion Engine: IMDb Primary + Douban & Chinese Assist.
  * - Preserves IMDb canonical ID, IMDb rating, awards, and anti-hotlink-free posters
  * - Enriches matched entries with Douban Chinese title, Douban rating, Chinese synopsis,
  *   Chinese region & genres, and marks source as `'IMDb · 豆瓣辅助'`.
- * - Never loses IMDb results when Douban assist is empty or throttled.
+ * - Falls back cleanly to secondary Chinese sources (Bangumi / Baidu Baike / Wikidata)
+ *   for Chinese title and synopsis when Douban is throttled or lacks a plot summary.
  */
 export function mergeImdbWithDoubanAssist(
   imdbItems: OnlineSearchResult[],
   doubanItems: OnlineSearchResult[],
   options: MergeImdbDoubanOptions = {}
 ): OnlineSearchResult[] {
-  const { crossIdMap, zhTitleMap, fallbackThreshold = 4, query = '' } = options;
+  const {
+    crossIdMap,
+    zhTitleMap,
+    secondaryZhItems = [],
+    fallbackThreshold = 4,
+    query = '',
+  } = options;
   const usedDoubanIndexes = new Set<number>();
+  const usedSecondaryIndexes = new Set<number>();
+
+  const findBestSecondary = (
+    target: OnlineSearchResult,
+    wikiZhTitle?: string
+  ): { item: OnlineSearchResult; idx: number } | null => {
+    let bestIdx = -1;
+    let bestScore = 0;
+    for (let i = 0; i < secondaryZhItems.length; i += 1) {
+      if (usedSecondaryIndexes.has(i)) continue;
+      const cand = secondaryZhItems[i];
+      if (!hasCjkCharacters(cand.title)) continue;
+      const score = scoreImdbDoubanMatch(target, cand, undefined, wikiZhTitle);
+      // Require strong title/name match (>= 80) so secondary sources never mis-match
+      if (score >= 80 && score > bestScore) {
+        bestScore = score;
+        bestIdx = i;
+      }
+    }
+    return bestIdx >= 0 ? { item: secondaryZhItems[bestIdx], idx: bestIdx } : null;
+  };
 
   const fused: OnlineSearchResult[] = imdbItems.map((imdb) => {
     const imdbId =
@@ -668,7 +800,48 @@ export function mergeImdbWithDoubanAssist(
     }
 
     if (matchIdx === -1) {
-      // No Douban match, but apply Wikidata Chinese title if available
+      // No Douban match — try secondary Chinese assist (Bangumi / Baidu Baike) first!
+      const secMatch = findBestSecondary(imdb, wikiZhTitle);
+      if (secMatch) {
+        usedSecondaryIndexes.add(secMatch.idx);
+        const sec = secMatch.item;
+        const preferZhTitle = hasCjkCharacters(sec.title)
+          ? sec.title
+          : wikiZhTitle && hasCjkCharacters(wikiZhTitle)
+            ? wikiZhTitle
+            : imdb.title;
+        const canonicalOriginal =
+          normalizeEntityKey(imdb.title) !== normalizeEntityKey(preferZhTitle)
+            ? imdb.title
+            : imdb.originalTitle || sec.originalTitle;
+
+        const mergedTags = Array.from(
+          new Set([
+            ...(sec.tags || []).filter((t) => hasCjkCharacters(t)),
+            ...(imdb.tags || []),
+          ])
+        ).slice(0, 4);
+
+        const summary = isRichChineseSynopsis(sec.summary)
+          ? sec.summary
+          : imdb.summary || sec.summary;
+
+        return {
+          ...imdb,
+          title: preferZhTitle,
+          originalTitle: canonicalOriginal,
+          year: imdb.year || sec.year,
+          region: sec.region || imdb.region,
+          subtitle: imdb.subtitle || sec.subtitle,
+          coverUrl: imdb.coverUrl || sec.coverUrl,
+          summary,
+          sourceName: 'IMDb · 中文资料',
+          sourceUrl: imdb.sourceUrl || sec.sourceUrl,
+          tags: mergedTags.length > 0 ? mergedTags : imdb.tags,
+        };
+      }
+
+      // Fallback: apply Wikidata Chinese title if available
       if (
         wikiZhTitle &&
         hasCjkCharacters(wikiZhTitle) &&
@@ -685,6 +858,25 @@ export function mergeImdbWithDoubanAssist(
 
     usedDoubanIndexes.add(matchIdx);
     const db = doubanItems[matchIdx];
+
+    // Always consume any matching secondary Chinese entry (e.g. Bangumi / Baike) that corresponds
+    // to this same entity so an older homonym film (e.g. Lanterns 2014) or namesake actor never
+    // steals it, while also borrowing its rich Chinese synopsis if Douban only had a short stub.
+    let secForSynopsis: OnlineSearchResult | undefined;
+    if (secondaryZhItems.length > 0) {
+      const probeTarget: OnlineSearchResult = {
+        ...imdb,
+        title: hasCjkCharacters(db.title) ? db.title : imdb.title,
+        originalTitle: imdb.title,
+      };
+      const secMatch = findBestSecondary(probeTarget, wikiZhTitle || db.title);
+      if (secMatch) {
+        usedSecondaryIndexes.add(secMatch.idx);
+        if (!isRichChineseSynopsis(db.summary)) {
+          secForSynopsis = secMatch.item;
+        }
+      }
+    }
 
     const preferZhTitle = hasCjkCharacters(db.title)
       ? db.title
@@ -711,22 +903,25 @@ export function mergeImdbWithDoubanAssist(
       const mergedTags = Array.from(
         new Set([
           ...(db.tags || []).filter((t) => hasCjkCharacters(t)),
+          ...(secForSynopsis?.tags || []).filter((t) => hasCjkCharacters(t)),
           ...(imdb.tags || []),
         ])
       ).slice(0, 4);
 
       const summary = isRichChineseSynopsis(db.summary)
         ? db.summary
-        : imdb.summary || db.summary;
+        : isRichChineseSynopsis(secForSynopsis?.summary)
+          ? secForSynopsis!.summary
+          : imdb.summary || db.summary;
 
       return {
         ...imdb,
         title: preferZhTitle,
         originalTitle: canonicalOriginal,
-        year: imdb.year || db.year,
-        region: db.region || imdb.region,
+        year: imdb.year || db.year || secForSynopsis?.year,
+        region: db.region || secForSynopsis?.region || imdb.region,
         subtitle: subtitle || imdb.subtitle,
-        coverUrl: imdb.coverUrl || db.coverUrl,
+        coverUrl: imdb.coverUrl || db.coverUrl || secForSynopsis?.coverUrl,
         summary,
         sourceName: 'IMDb · 豆瓣辅助',
         sourceUrl: imdb.sourceUrl || db.sourceUrl,
@@ -746,7 +941,9 @@ export function mergeImdbWithDoubanAssist(
 
     const summary = isRichChineseSynopsis(db.summary)
       ? db.summary
-      : imdb.summary || db.summary;
+      : isRichChineseSynopsis(secForSynopsis?.summary)
+        ? secForSynopsis!.summary
+        : imdb.summary || db.summary;
 
     return {
       ...imdb,
@@ -812,6 +1009,7 @@ export function rankImdbResults(
     }
 
     if (item.sourceName === 'IMDb · 豆瓣辅助') score += 35;
+    else if (item.sourceName === 'IMDb · 中文资料') score += 30;
     else if (item.sourceName === 'IMDb') score += 20;
 
     const imdbMatch = /IMDb\s*(\d+(?:\.\d+)?)/i.exec(item.subtitle || '');

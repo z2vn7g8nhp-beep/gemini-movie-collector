@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildImdbCoverCandidates,
+  extractBaiduSuggestZhAlias,
+  isPlausibleBaikeFilmOrPerson,
   mergeImdbWithDoubanAssist,
   normalizeImdbImageUrl,
   parseCinemetaMeta,
@@ -405,5 +407,238 @@ test('mergeImdbWithDoubanAssist matches Latin person names with middle names and
   assert.equal(fused[1].title, 'Obscure Indie Actor');
   assert.equal(fused[1].sourceName, 'IMDb');
 });
+
+test('mergeImdbWithDoubanAssist fuses Bangumi Chinese title & synopsis when Douban static bridge returns empty (Lanterns regression)', () => {
+  const imdbItems: OnlineSearchResult[] = [
+    {
+      externalId: 'imdb-tt26545992',
+      category: 'film',
+      title: 'Lanterns',
+      year: '2026',
+      subtitle: '剧集 · IMDb 7.8 · 动作 / 犯罪',
+      coverUrl: 'https://images.metahub.space/poster/medium/tt26545992/img',
+      summary: 'Lanterns follows new recruit John Stewart and Lantern legend Hal Jordan.',
+      sourceName: 'IMDb',
+      sourceUrl: 'https://www.imdb.com/title/tt26545992/',
+      tags: ['动作', '犯罪'],
+    },
+  ];
+
+  const bangumiItems: OnlineSearchResult[] = [
+    {
+      externalId: 'bgm-subj-298360',
+      category: 'film',
+      title: '绿灯军团',
+      originalTitle: 'Lanterns',
+      subtitle: '影视',
+      summary: '该剧将讲述灯侠新人约翰·斯图尔特，和绿灯侠中的传奇人物哈尔·乔丹搭档的故事，这两名星际警察在调查美国中心地带的一起谋杀案时，被意外卷入了地球上的黑暗谜团当中。',
+      sourceName: '番组计划 Bangumi',
+      sourceUrl: 'https://bgm.tv/subject/298360',
+      tags: ['影视'],
+    },
+  ];
+
+  const fused = mergeImdbWithDoubanAssist(imdbItems, [], {
+    secondaryZhItems: bangumiItems,
+    query: 'lanterns',
+  });
+
+  assert.equal(fused.length, 1);
+  assert.equal(fused[0].title, '绿灯军团');
+  assert.equal(fused[0].originalTitle, 'Lanterns');
+  assert.equal(fused[0].sourceName, 'IMDb · 中文资料');
+  assert.match(fused[0].subtitle || '', /IMDb 7\.8/);
+  assert.match(fused[0].summary, /约翰·斯图尔特/);
+});
+
+test('mergeImdbWithDoubanAssist upgrades stub Douban static-direct summary with secondary Bangumi Chinese synopsis', () => {
+  const imdbItems: OnlineSearchResult[] = [
+    {
+      externalId: 'imdb-tt26545992',
+      category: 'film',
+      title: 'Lanterns',
+      year: '2026',
+      subtitle: '剧集 · IMDb 7.8',
+      coverUrl: 'https://images.metahub.space/poster/medium/tt26545992/img',
+      summary: 'Lanterns follows new recruit John Stewart and Lantern legend Hal Jordan.',
+      sourceName: 'IMDb',
+      sourceUrl: 'https://www.imdb.com/title/tt26545992/',
+      tags: ['动作'],
+    },
+  ];
+
+  const doubanStub: OnlineSearchResult[] = [
+    {
+      externalId: 'douban-subj-36225837',
+      category: 'film',
+      title: '绿灯军团',
+      originalTitle: 'Lanterns',
+      year: '2026',
+      subtitle: '剧集 · 豆瓣 7.9',
+      summary: '绿灯军团（Lanterns），豆瓣影视条目。',
+      sourceName: '豆瓣影视',
+      sourceUrl: 'https://movie.douban.com/subject/36225837/',
+      tags: ['剧集'],
+    },
+  ];
+
+  const bangumiItems: OnlineSearchResult[] = [
+    {
+      externalId: 'bgm-subj-298360',
+      category: 'film',
+      title: '绿灯军团',
+      originalTitle: 'Lanterns',
+      subtitle: '影视',
+      summary: '该剧将讲述灯侠新人约翰·斯图尔特，和绿灯侠中的传奇人物哈尔·乔丹搭档的故事，被意外卷入了地球上的黑暗谜团当中。',
+      sourceName: '番组计划 Bangumi',
+      sourceUrl: 'https://bgm.tv/subject/298360',
+      tags: ['影视'],
+    },
+  ];
+
+  const fused = mergeImdbWithDoubanAssist(imdbItems, doubanStub, {
+    secondaryZhItems: bangumiItems,
+    query: 'lanterns',
+  });
+
+  assert.equal(fused.length, 1);
+  assert.equal(fused[0].title, '绿灯军团');
+  assert.equal(fused[0].sourceName, 'IMDb · 豆瓣辅助');
+  assert.match(fused[0].subtitle || '', /IMDb 7\.8/);
+  assert.match(fused[0].subtitle || '', /豆瓣 7\.9/);
+  assert.match(fused[0].summary, /约翰·斯图尔特/);
+});
+
+test('isPlausibleBaikeFilmOrPerson rejects non-media homonyms and accepts films & actors', () => {
+  assert.equal(
+    isPlausibleBaikeFilmOrPerson(
+      {
+        externalId: 'baike-1',
+        category: 'film',
+        title: '灯笼',
+        subtitle: 'iphone游戏',
+        summary: '《灯笼》是一款休闲益智类手机游戏。',
+        sourceName: '百度百科',
+        tags: ['游戏'],
+      },
+      'film'
+    ),
+    false
+  );
+
+  assert.equal(
+    isPlausibleBaikeFilmOrPerson(
+      {
+        externalId: 'baike-2',
+        category: 'film',
+        title: '盗梦空间',
+        subtitle: '美国2010年克里斯托弗·诺兰执导的电影',
+        summary: '《盗梦空间》是由克里斯托弗·诺兰执导的科幻悬疑电影。',
+        sourceName: '百度百科',
+        tags: ['科幻'],
+      },
+      'film'
+    ),
+    true
+  );
+
+  assert.equal(
+    isPlausibleBaikeFilmOrPerson(
+      {
+        externalId: 'baike-3',
+        category: 'person',
+        title: '凯尔·钱德勒',
+        subtitle: '美国男演员',
+        summary: '凯尔·钱德勒，美国影视男演员。',
+        sourceName: '百度百科',
+        tags: ['演员'],
+      },
+      'person'
+    ),
+    true
+  );
+});
+
+test('extractBaiduSuggestZhAlias extracts Chinese title from English+Chinese Baidu suggestions', () => {
+  assert.equal(
+    extractBaiduSuggestZhAlias(
+      ['LANTERNS美剧', 'LANTERNS第三集', 'LANTERNS绿灯军团', 'LANTERNS什么意思'],
+      'Lanterns'
+    ),
+    '绿灯军团'
+  );
+  assert.equal(
+    extractBaiduSuggestZhAlias(['LANTERNS什么意思', 'LANTERNS美剧评价'], 'Lanterns'),
+    null
+  );
+});
+
+test('mergeImdbWithDoubanAssist prevents older homonym film from stealing yearless Bangumi entry already matched by Douban', () => {
+  const imdbItems: OnlineSearchResult[] = [
+    {
+      externalId: 'imdb-tt26545992',
+      category: 'film',
+      title: 'Lanterns',
+      year: '2026',
+      subtitle: '剧集 · IMDb 7.8',
+      summary: 'Lanterns follows John Stewart and Hal Jordan.',
+      sourceName: 'IMDb',
+      sourceUrl: 'https://www.imdb.com/title/tt26545992/',
+      tags: ['动作'],
+    },
+    {
+      externalId: 'imdb-tt10994580',
+      category: 'film',
+      title: 'Lanterns',
+      year: '2014',
+      subtitle: '电影',
+      summary: 'In the 1920s, young people embarked on a new life.',
+      sourceName: 'IMDb',
+      sourceUrl: 'https://www.imdb.com/title/tt10994580/',
+      tags: ['剧情'],
+    },
+  ];
+  const doubanItems: OnlineSearchResult[] = [
+    {
+      externalId: 'douban-subj-36225837',
+      category: 'film',
+      title: '绿灯军团',
+      originalTitle: 'Lanterns',
+      year: '2026',
+      subtitle: '剧集 · 豆瓣 7.9',
+      summary: '星际和平守护者绿灯侠所戴的戒指赋予他们非凡的力量。传奇绿灯侠哈尔·乔丹和新人绿灯侠约翰·斯图尔特联手调查谋杀案。',
+      sourceName: '豆瓣影视',
+      sourceUrl: 'https://movie.douban.com/subject/36225837/',
+      tags: ['剧情', '科幻'],
+    },
+  ];
+  const bangumiItems: OnlineSearchResult[] = [
+    {
+      externalId: 'bgm-subj-298360',
+      category: 'film',
+      title: '绿灯军团',
+      originalTitle: 'Lanterns',
+      subtitle: '影视',
+      summary: '该剧将讲述灯侠新人约翰·斯图尔特和哈尔·乔丹搭档的故事。',
+      sourceName: '番组计划 Bangumi',
+      sourceUrl: 'https://bgm.tv/subject/298360',
+      tags: ['影视'],
+    },
+  ];
+
+  const fused = mergeImdbWithDoubanAssist(imdbItems, doubanItems, {
+    secondaryZhItems: bangumiItems,
+    query: 'lanterns',
+  });
+
+  const item2026 = fused.find((r) => r.externalId === 'imdb-tt26545992');
+  const item2014 = fused.find((r) => r.externalId === 'imdb-tt10994580');
+  assert.equal(item2026?.title, '绿灯军团');
+  assert.equal(item2026?.sourceName, 'IMDb · 豆瓣辅助');
+  assert.equal(item2014?.title, 'Lanterns');
+  assert.equal(item2014?.sourceName, 'IMDb');
+});
+
+
 
 

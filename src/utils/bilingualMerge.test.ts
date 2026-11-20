@@ -207,3 +207,33 @@ test('mergeBilingualResults never collapses distinct characters sharing the same
   assert.equal(merged[2].title, '詹姆斯·罗德斯 / 战争机器（地球199999）');
 });
 
+test('mergeBilingualResults keeps distinct same-title films with different IMDb IDs or years separate', () => {
+  const raw: OnlineSearchResult[] = [
+    {
+      externalId: 'imdb-tt26545992',
+      category: 'film',
+      title: 'Lanterns',
+      year: '2026',
+      subtitle: '剧集 · IMDb 7.8',
+      summary: '2026 HBO series',
+      sourceName: 'IMDb',
+      sourceUrl: 'https://www.imdb.com/title/tt26545992/',
+      tags: ['剧集'],
+    },
+    {
+      externalId: 'imdb-tt10994580',
+      category: 'film',
+      title: 'Lanterns',
+      year: '2014',
+      subtitle: '剧集',
+      summary: '2014 series',
+      sourceName: 'IMDb',
+      sourceUrl: 'https://www.imdb.com/title/tt10994580/',
+      tags: ['剧集'],
+    },
+  ];
+  const merged = mergeBilingualResults(raw);
+  assert.equal(merged.length, 2);
+});
+
+

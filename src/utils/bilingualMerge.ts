@@ -277,12 +277,34 @@ export function mergeBilingualResults(
     const keys = extractMatchKeys(item, extraAliases);
 
     let existingIdx: number | undefined;
+    const itemImdbTt =
+      item.category === 'film'
+        ? /imdb\.com\/title\/(tt\d{5,10})/i.exec(item.sourceUrl || '')?.[1]?.toLowerCase()
+        : undefined;
+    const itemYearNum = item.year ? Number(item.year) : NaN;
+
     for (const k of keys) {
       const idx = keyToIndex.get(k);
-      if (idx !== undefined) {
-        existingIdx = idx;
-        break;
+      if (idx === undefined) continue;
+      const candidate = out[idx];
+      if (item.category === 'film' && candidate.category === 'film') {
+        const candImdbTt = /imdb\.com\/title\/(tt\d{5,10})/i
+          .exec(candidate.sourceUrl || '')?.[1]
+          ?.toLowerCase();
+        if (itemImdbTt && candImdbTt && itemImdbTt !== candImdbTt) {
+          continue;
+        }
+        const candYearNum = candidate.year ? Number(candidate.year) : NaN;
+        if (
+          Number.isFinite(itemYearNum) &&
+          Number.isFinite(candYearNum) &&
+          Math.abs(itemYearNum - candYearNum) > 2
+        ) {
+          continue;
+        }
       }
+      existingIdx = idx;
+      break;
     }
 
     if (existingIdx !== undefined) {
