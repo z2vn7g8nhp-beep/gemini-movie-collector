@@ -5,6 +5,7 @@ import { normalizeEntityKey } from './wikiCast';
 
 // Mainland theatrical titles for entries whose Wikidata label uses the Taiwan release name.
 const mainlandTitles: Record<string, string> = {
+  tt13623126: '钢铁之心',
   tt1951265: '饥饿游戏3：嘲笑鸟（上）',
   tt1951266: '饥饿游戏3：嘲笑鸟（下）',
   tt10545296: '饥饿游戏：鸣鸟与蛇之歌',

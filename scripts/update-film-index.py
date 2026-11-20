@@ -40,6 +40,8 @@ if __name__ == "__main__":
         rows = csv.DictReader(io.TextIOWrapper(gzip.GzipFile(fileobj=response)), delimiter="\t")
         popular = heapq.nlargest(2000, rows, key=lambda r: int(r["numVotes"]))
     ids = [r["tconst"] for r in popular]
+    if "tt13623126" not in ids:
+        ids.append("tt13623126")  # Ironheart series, distinct from the 1992 film
     records = {}
     for start in range(0, len(ids), 100):
         for row in labels(ids[start:start + 100]):

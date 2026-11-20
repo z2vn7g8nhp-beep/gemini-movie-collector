@@ -16,6 +16,9 @@ test('offline film search preserves IMDb identities and ranks the exact Chinese 
     assert.equal(new Set(results.map(r => r.externalId)).size, results.length);
     const direct = await searchImdbMedia('https://www.imdb.com/title/tt1951264/', 'film', { mode: 'server' });
     assert.deepEqual(direct.results.map(r => r.externalId), ['imdb-tt1951264']);
+    const ironheart = await searchImdbMedia('Ironheart', 'film', { mode: 'server' });
+    assert.equal(ironheart.results[0].title, '钢铁之心');
+    assert.equal(ironheart.results[0].externalId, 'imdb-tt13623126');
     assert.equal(searchFilmIndex('Inception')[0].title, '盗梦空间');
   } finally {
     globalThis.fetch = originalFetch;

@@ -567,21 +567,18 @@ async function fetchBaikeChineseAssist(
     });
   };
 
-  const out: OnlineSearchResult[] = [];
-  const directPayload = await fetchCard(trimmed);
-  const directParsed = parseBaiduBaikeCard(directPayload, category);
-  if (
-    directParsed.searchResult &&
-    isPlausibleBaikeFilmOrPerson(directParsed.searchResult, category)
-  ) {
-    out.push({
-      ...directParsed.searchResult,
-      originalTitle:
-        directParsed.searchResult.originalTitle ||
-        (!hasCjkCharacters(trimmed) ? trimmed : undefined),
-    });
-    return out;
-  }
+  const verifiedCard = async (keyword: string) => {
+    const { searchResult } = parseBaiduBaikeCard(await fetchCard(keyword), category);
+    if (!searchResult || !isPlausibleBaikeFilmOrPerson(searchResult, category)) return null;
+    if (category === 'film') {
+      if (!hasStrictTitleOverlap([searchResult.title, searchResult.originalTitle], [trimmed])) return null;
+      if (hintYear && searchResult.year !== hintYear) return null;
+    }
+    return searchResult;
+  };
+
+  const direct = await verifiedCard(trimmed);
+  if (direct) return [direct];
 
   // For English film/series queries where direct Baike hit a homonym (e.g. "Lanterns" -> game),
   // query Baidu Suggest (`Lanterns 2026` / `Lanterns 美剧`) to uncover the Chinese alias ("绿灯军团").
@@ -608,34 +605,12 @@ async function fetchBaikeChineseAssist(
     const zhAlias = extractBaiduSuggestZhAlias(suggestions, trimmed);
 
     if (zhAlias) {
-      const aliasPayload = await fetchCard(zhAlias);
-      const aliasParsed = parseBaiduBaikeCard(aliasPayload, 'film');
-      if (
-        aliasParsed.searchResult &&
-        isPlausibleBaikeFilmOrPerson(aliasParsed.searchResult, 'film')
-      ) {
-        out.push({
-          ...aliasParsed.searchResult,
-          originalTitle: aliasParsed.searchResult.originalTitle || trimmed,
-        });
-      } else {
-        // Still provide the verified Baidu Suggest Chinese alias so IMDb's English title upgrades cleanly
-        out.push({
-          externalId: `baidu-alias-${normalizeEntityKey(trimmed)}`,
-          category: 'film',
-          title: zhAlias,
-          originalTitle: trimmed,
-          year: hintYear,
-          subtitle: '中文译名',
-          summary: '',
-          sourceName: '中文资料',
-          tags: [],
-        });
-      }
+      const match = await verifiedCard(zhAlias);
+      if (match) return [match];
     }
   }
 
-  return out;
+  return [];
 }
 
 /**
