@@ -36,6 +36,8 @@ import {
   type DoubanClientOptions,
 } from './doubanClient';
 
+import { localizeFilm, searchFilmIndex } from '../utils/filmIndex';
+
 export interface ImdbClientOptions {
   mode: 'server' | 'browser';
   doubanOptions?: DoubanClientOptions;
@@ -750,6 +752,41 @@ export async function searchImdbMedia(
   category: ArchiveCategory,
   options: ImdbClientOptions
 ): Promise<ImdbSearchBundle> {
+  if (category !== 'film') return searchLiveMedia(query, category, options);
+  const indexed = searchFilmIndex(query);
+  const controller = new AbortController();
+  const cancel = () => controller.abort();
+  if (options.signal?.aborted) cancel();
+  options.signal?.addEventListener('abort', cancel, { once: true });
+  try {
+    const localResults = new Map(indexed.map(item => [item.externalId, item]));
+    const remember = (item: OnlineSearchResult) => {
+      if (localResults.has(item.externalId)) localResults.set(item.externalId, localizeFilm(item));
+    };
+    const live = searchLiveMedia(query, category, { ...options, signal: controller.signal }, indexed, remember);
+    const bundle = indexed.length
+      ? await waitWithGrace<ImdbSearchBundle>(live, 5500, { results: [], hasDoubanAssist: false })
+      : await live;
+    const results = new Map(bundle.results.map(item => [item.externalId, localizeFilm(item)]));
+    for (const item of localResults.values()) {
+      if (!results.has(item.externalId)) results.set(item.externalId, item);
+    }
+    return {
+      ...bundle,
+      results: rankImdbResults([...results.values()], query).slice(0, 12),
+      hasChineseAssist: bundle.hasChineseAssist || indexed.length > 0,
+    };
+  } finally {
+    cancel();
+    options.signal?.removeEventListener('abort', cancel);
+  }
+}
+
+async function searchLiveMedia(
+  query: string, category: ArchiveCategory, options: ImdbClientOptions,
+  indexed: OnlineSearchResult[] = [],
+  remember?: (item: OnlineSearchResult) => void
+): Promise<ImdbSearchBundle> {
   const trimmed = query.trim();
   if (!trimmed) return { results: [], hasDoubanAssist: false };
 
@@ -773,6 +810,7 @@ export async function searchImdbMedia(
           }
         : suggestHit?.result || null;
 
+      if (baseResult) remember?.(baseResult);
       if (!baseResult) return { results: [], hasDoubanAssist: false };
 
       if (category === 'person' && meta) {
@@ -880,10 +918,13 @@ export async function searchImdbMedia(
         ...parseCinemetaSearchPayload(cinMovie, 'movie'),
         ...parseCinemetaSearchPayload(cinSeries, 'series'),
       ];
-      if (candidates.length > 0) {
+      const matched = matchFilmRelationCandidate(
+        candidates.map(entry => ({ ...entry.result, entry })), lead
+      );
+      if (matched) {
         const meta = await fetchCinemetaTitleMeta(
-          candidates[0].imdbId,
-          candidates[0].mediaType,
+          matched.entry.imdbId,
+          matched.entry.mediaType,
           options
         );
         if (meta) {
@@ -994,6 +1035,14 @@ export async function searchImdbMedia(
     for (const m of cinMovies.slice(0, 8)) register(m);
     for (const s of cinSeries.slice(0, 6)) register(s);
 
+    for (const item of indexed) {
+      const imdbId = item.externalId.slice(5);
+      register({ imdbId, mediaType: 'movie', result: item });
+      wdMap.zhTitleMap.set(imdbId, item.title);
+    }
+
+    for (const entry of byId.values()) remember?.(entry.result);
+
     // Pre-rank exact title matches to the front BEFORE picking top 6 to hydrate via Cinemeta `/meta`,
     // so an exact TV series match (e.g. "Lanterns" 2026) is never pushed out by partial movie matches.
     const qNormForHydrate = normalizeEntityKey(trimmed);
@@ -1016,9 +1065,11 @@ export async function searchImdbMedia(
     // Hydrate top 6 IMDb titles in parallel via Cinemeta `/meta/{type}/{ttId}.json` for IMDb ratings, awards, director & cast
     const toHydrate = hydratePriorityIds.slice(0, 6);
     const hydratedMeta = await Promise.all(
-      toHydrate.map((id) => {
+      toHydrate.map(async (id) => {
         const entry = byId.get(id)!;
-        return fetchCinemetaTitleMeta(id, entry.mediaType, options);
+        const meta = await fetchCinemetaTitleMeta(id, entry.mediaType, options);
+        if (meta) remember?.(meta.result);
+        return meta;
       })
     );
 
@@ -1142,6 +1193,7 @@ export async function searchImdbMedia(
       .slice(0, 3)
       .filter((item) => !hasCjkCharacters(item.title));
 
+    for (const result of fused) remember?.(result);
     if (unmatchedTop.length > 0 && !options.signal?.aborted) {
       const topIsUnmatched = !hasCjkCharacters(fused[0]?.title || '');
       const elapsedMs = Date.now() - searchStartedAt;

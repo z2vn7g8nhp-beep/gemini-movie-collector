@@ -18,7 +18,7 @@ interface SearchTabViewProps {
   onJumpToManual: (prefillTitle: string, category: ArchiveCategory) => void;
 }
 
-const SEARCH_SESSION_KEY = 'cinearchive.searchSession.v2';
+const SEARCH_SESSION_KEY = 'cinearchive.searchSession.v3';
 
 interface CachedSearchSession {
   category: ArchiveCategory;
@@ -92,6 +92,17 @@ export function SearchTabView({
   );
   const [collectingId, setCollectingId] = useState<string | null>(null);
 
+  const searchVersion = useRef(0);
+  const clearSearch = () => {
+    searchVersion.current++;
+    setLoading(false);
+    setResults([]);
+    setActiveSources([]);
+    setHasSearched(false);
+    setError('');
+    saveSearchSession({ category, query: '', results: [], activeSources: [], hasSearched: false });
+  };
+
   const runSearch = async (
     q: string,
     cat: ArchiveCategory = category
@@ -103,11 +114,13 @@ export function SearchTabView({
       return;
     }
 
+    const version = ++searchVersion.current;
     setLoading(true);
     setError('');
     setHasSearched(true);
     try {
       const data = await searchOnline(trimmed, cat, 'imdb');
+      if (version !== searchVersion.current) return;
       if (data.error) {
         setError(data.error);
         setResults([]);
@@ -123,10 +136,11 @@ export function SearchTabView({
         hasSearched: true,
       });
     } catch {
+      if (version !== searchVersion.current) return;
       setError('网络连接中断，请检查网络后重试。');
       setResults([]);
     } finally {
-      setLoading(false);
+      if (version === searchVersion.current) setLoading(false);
     }
   };
 
@@ -171,7 +185,9 @@ export function SearchTabView({
                 key={cat}
                 type="button"
                 aria-pressed={active}
-                onClick={() => setCategory(cat)}
+                onClick={() => {
+                  if (!active) { clearSearch(); setCategory(cat); }
+                }}
                 className={`min-h-[44px] rounded-lg text-[15px] font-medium whitespace-nowrap cursor-pointer transition-colors md:min-h-[40px] md:text-sm ${
                   active
                     ? 'bg-white text-[#1A1816] shadow-xs'
@@ -221,9 +237,7 @@ export function SearchTabView({
                 type="button"
                 onClick={() => {
                   setQuery('');
-                  setResults([]);
-                  setHasSearched(false);
-                  setError('');
+                  clearSearch();
                   inputRef.current?.focus();
                 }}
                 aria-label="清空搜索内容"
@@ -247,7 +261,7 @@ export function SearchTabView({
         </form>
 
         <p className="mt-3 text-[13px] leading-relaxed text-[#7A7268] md:text-[12px]">
-          直连 IMDb 资料库（评分 · 奖项 · 高清海报与主创）并自动融合豆瓣中文片名、评分与简介，支持直接粘贴 IMDb / 豆瓣链接建档。
+          支持中英文片名和 IMDb / 豆瓣链接。常见影片可用内置中文片名索引查询，评分、海报与简介按联网结果显示。
         </p>
       </div>
 

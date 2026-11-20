@@ -683,7 +683,7 @@ function deduplicateResults(
   const out: OnlineSearchResult[] = [];
   for (const item of results) {
     if (!item.title) continue;
-    const key = `${item.category}::${item.title.toLowerCase()}::${item.year || ''}::${item.sourceName}`;
+    const key = item.externalId || `${item.category}::${item.title.toLowerCase()}::${item.year || ''}::${item.sourceName}`;
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(item);

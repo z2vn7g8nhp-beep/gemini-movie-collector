@@ -1001,7 +1001,7 @@ export function rankImdbResults(
     let score = 0;
 
     if (tNorm === qNorm || (oNorm && oNorm === qNorm)) {
-      score += 140;
+      score += 220;
     } else if (tNorm.startsWith(qNorm) || (oNorm && oNorm.startsWith(qNorm))) {
       score += 75;
     } else if (tNorm.includes(qNorm) || (oNorm && oNorm.includes(qNorm))) {
