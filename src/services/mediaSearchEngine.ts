@@ -42,11 +42,18 @@ import {
 import { extractImdbIdFromUrl } from '../utils/imdbParsers';
 import {
   extractYearNumber,
+  hasStrictTitleOverlap,
   isRelevantFilmCrewRole,
   matchBangumiCharacterCandidate,
   matchBangumiSubjectCandidate,
   yearsAreCompatible,
 } from '../utils/relationMatching';
+import {
+  hasCjkChars,
+  latinPersonNamesMatch,
+  mergeBilingualResults,
+} from '../utils/bilingualMerge';
+import { parseBaiduBaikeCard } from '../utils/chinaSearchParsers';
 
 export type MediaEngineMode = 'server' | 'browser';
 
@@ -2117,80 +2124,125 @@ async function fetchBangumiPersonOrCharRelations(
   return { films, people, characters };
 }
 
-function hasChineseChars(text: string): boolean {
-  return /[\u4e00-\u9fff]/.test(text);
+function mergeUniqueByTitle(
+  list: OnlineSearchResult[],
+  aliasMap?: Map<string, string[]>
+): OnlineSearchResult[] {
+  const isCharacterList = list.length > 0 && list[0].category === 'character';
+  return mergeBilingualResults(list, {
+    aliasMap,
+    ...(isCharacterList
+      ? {
+          pickCover: (prev, next) => {
+            if (!prev) return next;
+            if (!next) return prev;
+            return pickBetterCharacterImage(prev, next);
+          },
+        }
+      : {}),
+  });
 }
 
-function mergeUniqueByTitle(
-  list: OnlineSearchResult[]
-): OnlineSearchResult[] {
-  const out: OnlineSearchResult[] = [];
-  const keyToIndex = new Map<string, number>();
-
-  const getMatchKeys = (item: OnlineSearchResult): string[] => {
-    const keys: string[] = [];
-    const titleKey = normalizeEntityKey(item.title);
-    if (titleKey) keys.push(`${item.category}::${titleKey}`);
-    for (const part of item.title.split(/[／/]/)) {
-      const pk = normalizeEntityKey(part);
-      if (pk.length >= 2) keys.push(`${item.category}::${pk}`);
-    }
-    if (item.originalTitle) {
-      for (const part of item.originalTitle.split(/[／/]/)) {
-        const ok = normalizeEntityKey(part);
-        if (ok.length >= 3) keys.push(`${item.category}::orig::${ok}`);
-      }
-    }
-    if (!hasChineseChars(item.title) && titleKey.length >= 3) {
-      keys.push(`${item.category}::orig::${titleKey}`);
-    }
-    return keys;
-  };
-
-  for (const item of list) {
-    const keys = getMatchKeys(item);
-    let existingIdx: number | undefined;
-    for (const k of keys) {
-      const idx = keyToIndex.get(k);
-      if (idx !== undefined) {
-        existingIdx = idx;
-        break;
-      }
-    }
-
-    if (existingIdx !== undefined) {
-      const prev = out[existingIdx];
-      const upgradedTitle =
-        !hasChineseChars(prev.title) && hasChineseChars(item.title)
-          ? item.title
-          : prev.title;
-      const mergedCover =
-        prev.category === 'character'
-          ? pickBetterCharacterImage(prev.coverUrl, item.coverUrl)
-          : prev.coverUrl || item.coverUrl;
-      out[existingIdx] = {
-        ...prev,
-        title: upgradedTitle,
-        originalTitle:
-          prev.originalTitle ||
-          (upgradedTitle !== prev.title ? prev.title : item.originalTitle),
-        coverUrl: mergedCover,
-        summary:
-          item.summary.length > prev.summary.length
-            ? item.summary
-            : prev.summary,
-        portrayedBy: prev.portrayedBy || item.portrayedBy,
-      };
-      for (const k of keys) keyToIndex.set(k, existingIdx);
-      continue;
-    }
-
-    const nextIdx = out.length;
-    out.push(item);
-    for (const k of keys) keyToIndex.set(k, nextIdx);
+async function enrichRelationsWithBaikeServer(
+  list: OnlineSearchResult[],
+  targetCategory: 'film' | 'person',
+  mode: MediaEngineMode,
+  signal?: AbortSignal
+): Promise<OnlineSearchResult[]> {
+  const preMerged = mergeUniqueByTitle(list);
+  if (mode !== 'server' || preMerged.length === 0 || signal?.aborted) {
+    return preMerged;
   }
 
-  return out;
+  const candidateIndices: number[] = [];
+  for (let i = 0; i < preMerged.length && candidateIndices.length < 14; i += 1) {
+    const it = preMerged[i];
+    if (!hasCjkChars(it.title) || !it.coverUrl || !it.originalTitle) {
+      candidateIndices.push(i);
+    }
+  }
+  if (candidateIndices.length === 0) return preMerged;
+
+  const cloned = preMerged.map((entry) => ({ ...entry }));
+  const aliasMap = new Map<string, string[]>();
+
+  const CONCURRENCY = 6;
+  let cursor = 0;
+  const worker = async () => {
+    while (cursor < candidateIndices.length && !signal?.aborted) {
+      const idx = candidateIndices[cursor++];
+      const item = cloned[idx];
+      try {
+        const res = await fetchWithTimeout(
+          `https://baike.baidu.com/api/openapi/BaikeLemmaCardApi?scope=103&format=json&appid=379020&bk_key=${encodeURIComponent(
+            item.title
+          )}`,
+          {},
+          3000,
+          mode,
+          signal
+        );
+        if (!res.ok) continue;
+        const payload = (await res.json()) as Record<string, any>;
+        const baike = parseBaiduBaikeCard(payload, targetCategory);
+        const hit = baike.searchResult;
+        if (!hit) continue;
+
+        const contextText = `${hit.subtitle || ''} ${hit.summary || ''}`;
+        const hasMediaSignal =
+          targetCategory === 'person'
+            ? /(演员|导演|编剧|制片|影人|电影|电视剧|配音|声优|好莱坞|明星|男演员|女演员)/.test(
+                contextText
+              )
+            : /(电影|电视剧|剧集|动画|影片|导演|主演|上映|播出)/.test(contextText);
+
+        const plausible = !hasCjkChars(item.title)
+          ? latinPersonNamesMatch(item.title, hit.originalTitle) ||
+            hasStrictTitleOverlap([item.title], [hit.title, hit.originalTitle]) ||
+            (hasCjkChars(hit.title) && hasMediaSignal)
+          : hasStrictTitleOverlap(
+              [item.title, item.originalTitle],
+              [hit.title, hit.originalTitle]
+            ) && (hasMediaSignal || Boolean(hit.coverUrl));
+
+        if (!plausible) continue;
+
+        const aliases: string[] = [];
+        if (hit.originalTitle) aliases.push(hit.originalTitle);
+        if (baike.characterProfile.alias) aliases.push(baike.characterProfile.alias);
+        if (hit.title && hit.title !== item.title) aliases.push(hit.title);
+        if (aliases.length > 0) aliasMap.set(item.externalId, aliases);
+
+        if (!hasCjkChars(item.title) && hasCjkChars(hit.title)) {
+          const prevLatin = item.title;
+          item.title = hit.title;
+          if (!item.originalTitle) item.originalTitle = prevLatin;
+        } else if (
+          hasCjkChars(item.title) &&
+          !item.originalTitle &&
+          hit.originalTitle &&
+          !hasCjkChars(hit.originalTitle)
+        ) {
+          item.originalTitle = hit.originalTitle;
+        }
+
+        if (!item.coverUrl && hit.coverUrl) {
+          item.coverUrl = formatEngineImageUrl(hit.coverUrl, mode);
+        }
+      } catch {
+        // Ignore individual Baike lookup timeout
+      }
+    }
+  };
+
+  await Promise.all(
+    Array.from(
+      { length: Math.min(CONCURRENCY, candidateIndices.length) },
+      () => worker()
+    )
+  );
+
+  return mergeUniqueByTitle(cloned, aliasMap);
 }
 
 export async function fetchOnlineRelations(params: {
@@ -2306,9 +2358,16 @@ export async function fetchOnlineRelations(params: {
       rawChars.push(...tvOutcome.value.characters);
     }
 
+    const enrichedPeople = await enrichRelationsWithBaikeServer(
+      rawPeople,
+      'person',
+      mode,
+      signal
+    );
+
     return {
       films: [],
-      people: mergeUniqueByTitle(rawPeople).slice(0, 60),
+      people: enrichedPeople.slice(0, 60),
       characters: mergeUniqueByTitle(rawChars).slice(0, 60),
       sources,
     };
@@ -2864,8 +2923,15 @@ export async function fetchOnlineRelations(params: {
       rawChars.push(...tvOutcome.value.characters);
     }
 
+    const enrichedFilms = await enrichRelationsWithBaikeServer(
+      rawFilms,
+      'film',
+      mode,
+      signal
+    );
+
     return {
-      films: mergeUniqueByTitle(rawFilms).slice(0, 80),
+      films: enrichedFilms.slice(0, 80),
       people: [],
       characters: mergeUniqueByTitle(rawChars).slice(0, 80),
       sources,

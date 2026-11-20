@@ -77,9 +77,15 @@ export function resolveDisplayImageUrl(
     return resolveBaseAssetUrl(trimmed, baseUrl);
   }
 
+  const normalizeRemoteProtocol = (u: string): string => {
+    if (u.startsWith('//')) return `https:${u}`;
+    if (/^http:\/\//i.test(u)) return `https://${u.slice(7)}`;
+    return u;
+  };
+
   if (trimmed.startsWith('/api/img-proxy?')) {
     if (mode === 'static') {
-      const unwrapped = unwrapProxyImageUrl(trimmed);
+      const unwrapped = normalizeRemoteProtocol(unwrapProxyImageUrl(trimmed));
       if (doubanRelayUrl && /doubanio\.com/i.test(unwrapped)) {
         return `${doubanRelayUrl.replace(/\/+$/, '')}/img?url=${encodeURIComponent(unwrapped)}`;
       }
@@ -88,11 +94,12 @@ export function resolveDisplayImageUrl(
     return trimmed;
   }
 
-  if (mode === 'static' && doubanRelayUrl && /doubanio\.com/i.test(trimmed)) {
-    return `${doubanRelayUrl.replace(/\/+$/, '')}/img?url=${encodeURIComponent(trimmed)}`;
+  const normalized = normalizeRemoteProtocol(trimmed);
+  if (mode === 'static' && doubanRelayUrl && /doubanio\.com/i.test(normalized)) {
+    return `${doubanRelayUrl.replace(/\/+$/, '')}/img?url=${encodeURIComponent(normalized)}`;
   }
 
-  return trimmed;
+  return normalized;
 }
 
 /**
@@ -105,7 +112,7 @@ export function getDirectImageFallbackUrl(rawUrl: string | undefined): string | 
   if (!trimmed.startsWith('/api/img-proxy?')) return null;
   const unwrapped = unwrapProxyImageUrl(trimmed);
   if (unwrapped && /^https?:\/\//i.test(unwrapped)) {
-    return unwrapped;
+    return unwrapped.replace(/^http:\/\//i, 'https://');
   }
   return null;
 }

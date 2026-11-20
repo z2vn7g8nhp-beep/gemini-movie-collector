@@ -44,6 +44,10 @@ import {
   findRecommendedUnlinkedItems,
   isExplicitlyLinked,
 } from '../utils/smartLink';
+import {
+  readCachedRelations,
+  writeCachedRelations,
+} from '../utils/relationsCache';
 import { ArchivalImage } from './ArchivalImage';
 import { CharacterDossierSection } from './CharacterDossierSection';
 import { CoverPickerModal } from './CoverPickerModal';
@@ -271,10 +275,36 @@ export function DetailDrawer({
   }, [item?.id, dossierReloadTick]);
 
   // Auto-discover online cast / characters / filmography for Films & People (skipped for Characters!)
+  // Uses persistent localStorage cache so re-opening the app or detail drawer displays immediately without reloading.
   useEffect(() => {
     if (!item || item.category === 'character') {
       setOnlineRelations(EMPTY_RELATIONS);
       setRelationsLoading(false);
+      return;
+    }
+
+    const reqParams = {
+      category: (item.category === 'film' ? 'film' : 'person') as 'film' | 'person',
+      title: item.title,
+      originalTitle: item.originalTitle,
+      sourceUrl: item.sourceUrl,
+      year: item.year,
+    };
+
+    const isManualRefresh = relationsReloadTick > 0;
+    const cached = !isManualRefresh ? readCachedRelations(reqParams) : null;
+    if (cached) {
+      setOnlineRelations(cached);
+      setRelationsLoading(false);
+      setRelationsError('');
+      const primaryCount =
+        item.category === 'film' ? cached.people.length : cached.films.length;
+      const secondaryCount = cached.characters.length;
+      if (primaryCount === 0 && secondaryCount > 0) {
+        setRelationsTab('secondary');
+      } else {
+        setRelationsTab('primary');
+      }
       return;
     }
 
@@ -284,21 +314,15 @@ export function DetailDrawer({
     async function fetchRelations() {
       setRelationsLoading(true);
       setRelationsError('');
-      setOnlineRelations(EMPTY_RELATIONS);
+      if (!isManualRefresh) {
+        setOnlineRelations(EMPTY_RELATIONS);
+      }
 
       try {
-        const next = await fetchOnlineRelations(
-          {
-            category: item!.category === 'film' ? 'film' : 'person',
-            title: item!.title,
-            originalTitle: item!.originalTitle,
-            sourceUrl: item!.sourceUrl,
-            year: item!.year,
-          },
-          controller.signal
-        );
+        const next = await fetchOnlineRelations(reqParams, controller.signal);
         if (cancelled) return;
         setOnlineRelations(next);
+        writeCachedRelations(reqParams, next);
 
         const primaryCount =
           item!.category === 'film' ? next.people.length : next.films.length;

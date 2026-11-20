@@ -59,6 +59,10 @@ import {
   type MedalTier,
 } from './utils/medals';
 import { collectTagRegistry } from './utils/tags';
+import {
+  loadPersistedUiState,
+  savePersistedUiState,
+} from './utils/relationsCache';
 
 const LOCAL_STORAGE_KEY = 'cinearchive.collection.v2';
 const COLLECTOR_STORAGE_KEY = 'cinearchive.collector.v1';
@@ -119,21 +123,43 @@ const LIBRARY_CATS: Array<{ id: 'all' | ArchiveCategory; label: string }> = [
 ];
 
 export default function App() {
-  const [items, setItems] = useState<ArchiveItem[]>(() => {
-    return loadLocalFallback() ?? [];
-  });
-  const [collector, setCollector] = useState<CollectorState>(() =>
-    loadLocalCollector()
+  const initialLocalItemsRef = useRef<ArchiveItem[] | null>(null);
+  if (initialLocalItemsRef.current === null) {
+    initialLocalItemsRef.current = loadLocalFallback() ?? [];
+  }
+  const initialLocalCollectorRef = useRef<CollectorState | null>(null);
+  if (initialLocalCollectorRef.current === null) {
+    initialLocalCollectorRef.current = loadLocalCollector();
+  }
+  const initialUiStateRef = useRef(loadPersistedUiState());
+
+  const [items, setItems] = useState<ArchiveItem[]>(
+    () => initialLocalItemsRef.current ?? []
   );
-  const [activeTab, setActiveTab] = useState<AppTab>('library');
+  const [collector, setCollector] = useState<CollectorState>(
+    () => initialLocalCollectorRef.current ?? EMPTY_COLLECTOR
+  );
+  const [activeTab, setActiveTab] = useState<AppTab>(
+    () => initialUiStateRef.current.activeTab ?? 'library'
+  );
 
   // Library filters
-  const [activeCategory, setActiveCategory] = useState<'all' | ArchiveCategory>('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | CollectionStatus>('all');
-  const [activeTag, setActiveTag] = useState('');
-  const [activeAlbumId, setActiveAlbumId] = useState('');
+  const [activeCategory, setActiveCategory] = useState<'all' | ArchiveCategory>(
+    () => initialUiStateRef.current.activeCategory ?? 'all'
+  );
+  const [statusFilter, setStatusFilter] = useState<'all' | CollectionStatus>(
+    () => initialUiStateRef.current.statusFilter ?? 'all'
+  );
+  const [activeTag, setActiveTag] = useState(
+    () => initialUiStateRef.current.activeTag ?? ''
+  );
+  const [activeAlbumId, setActiveAlbumId] = useState(
+    () => initialUiStateRef.current.activeAlbumId ?? ''
+  );
   const [libraryQuery, setLibraryQuery] = useState('');
-  const [sortBy, setSortBy] = useState<SortOption>('recent');
+  const [sortBy, setSortBy] = useState<SortOption>(
+    () => initialUiStateRef.current.sortBy ?? 'recent'
+  );
 
   // Handoff state to Search / Create tabs
   const [pendingSearchQuery, setPendingSearchQuery] = useState('');
@@ -143,7 +169,12 @@ export default function App() {
   const [pendingCreateRelatedIds, setPendingCreateRelatedIds] = useState<string[]>([]);
   const [pendingCreateWorkTitle, setPendingCreateWorkTitle] = useState('');
 
-  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(() => {
+    const savedId = initialUiStateRef.current.selectedItemId;
+    if (!savedId) return null;
+    const localItems = initialLocalItemsRef.current ?? [];
+    return localItems.some((it) => it.id === savedId) ? savedId : null;
+  });
   const [cardModalItemId, setCardModalItemId] = useState<string | null>(null);
   const [encounterItemId, setEncounterItemId] = useState<string | null>(null);
   const [encounterDrawCount, setEncounterDrawCount] = useState(0);
@@ -152,9 +183,13 @@ export default function App() {
     recommendations: LinkRecommendation[];
   } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [hydrated, setHydrated] = useState(false);
   const [runtimeMode, setRuntimeMode] = useState<RuntimeMode>(() =>
     getRuntimeModeSync()
+  );
+  const [hydrated, setHydrated] = useState(
+    () =>
+      getRuntimeModeSync() === 'static' ||
+      (initialLocalItemsRef.current?.length ?? 0) > 0
   );
   const runtimeModeRef = useRef<RuntimeMode>(runtimeMode);
   const [todayKey, setTodayKey] = useState(() => formatLocalDateKey());
@@ -165,12 +200,54 @@ export default function App() {
     useState<BrowserNotificationPermissionState>(() =>
       getBrowserNotificationPermission()
     );
-  const hydratedRef = useRef(false);
-  const unlockedStampsRef = useRef<Set<string>>(new Set());
-  const medalTiersRef = useRef<Map<string, MedalTier>>(new Map());
+  const hydratedRef = useRef(
+    getRuntimeModeSync() === 'static' ||
+      (initialLocalItemsRef.current?.length ?? 0) > 0
+  );
+  const unlockedStampsRef = useRef<Set<string>>(
+    new Set(
+      computeCollectorStamps(
+        initialLocalItemsRef.current ?? [],
+        initialLocalCollectorRef.current ?? EMPTY_COLLECTOR,
+        formatLocalDateKey()
+      )
+        .filter((s) => s.unlocked)
+        .map((s) => s.id)
+    )
+  );
+  const medalTiersRef = useRef<Map<string, MedalTier>>(
+    new Map(
+      computeCinemaMedals(initialLocalItemsRef.current ?? []).map((m) => [
+        m.id,
+        m.tier,
+      ])
+    )
+  );
+
+  // Persist lightweight UI session state so returning to the iOS PWA restores
+  // the exact tab, filters, and open detail drawer without feeling like a reload.
+  useEffect(() => {
+    savePersistedUiState({
+      activeTab,
+      activeCategory,
+      statusFilter,
+      activeTag,
+      activeAlbumId,
+      sortBy,
+      selectedItemId,
+    });
+  }, [
+    activeTab,
+    activeCategory,
+    statusFilter,
+    activeTag,
+    activeAlbumId,
+    sortBy,
+    selectedItemId,
+  ]);
 
   // Sync collection & collector rituals with Express backend when available,
-  // or operate purely on browser localStorage when deployed statically (GitHub Pages).
+  // or operate instantaneously on browser localStorage when deployed statically (GitHub Pages / PWA).
   useEffect(() => {
     let cancelled = false;
     async function hydrate() {
@@ -178,7 +255,7 @@ export default function App() {
         const mode = await detectRuntimeMode();
         if (cancelled) return;
         runtimeModeRef.current = mode;
-        setRuntimeMode(mode);
+        setRuntimeMode((prev) => (prev === mode ? prev : mode));
 
         let loadedItems = loadLocalFallback() ?? [];
         let loadedCollector = loadLocalCollector();
@@ -196,11 +273,14 @@ export default function App() {
               items: ArchiveItem[];
             };
             if (data.initialized) {
+              const prevJson = JSON.stringify(loadedItems);
+              const nextJson = JSON.stringify(data.items);
               loadedItems = data.items;
-              setItems(data.items);
-              saveLocalFallback(data.items);
+              if (prevJson !== nextJson) {
+                setItems(data.items);
+                saveLocalFallback(data.items);
+              }
             } else {
-              setItems(loadedItems);
               saveLocalFallback(loadedItems);
               await fetch('/api/collection/init', {
                 method: 'POST',
@@ -219,17 +299,19 @@ export default function App() {
               ? cData.albums
               : [];
             if (serverDates.length > 0 || serverAlbums.length > 0) {
-              loadedCollector = {
+              const nextCollector = {
                 checkInDates: serverDates,
                 albums: serverAlbums,
               };
+              if (
+                JSON.stringify(loadedCollector) !== JSON.stringify(nextCollector)
+              ) {
+                loadedCollector = nextCollector;
+                setCollector(loadedCollector);
+                saveLocalCollector(loadedCollector);
+              }
             }
-            setCollector(loadedCollector);
-            saveLocalCollector(loadedCollector);
           }
-        } else {
-          setItems(loadedItems);
-          setCollector(loadedCollector);
         }
 
         const initialStamps = computeCollectorStamps(

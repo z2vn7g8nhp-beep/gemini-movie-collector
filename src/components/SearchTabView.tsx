@@ -18,6 +18,49 @@ interface SearchTabViewProps {
   onJumpToManual: (prefillTitle: string, category: ArchiveCategory) => void;
 }
 
+const SEARCH_SESSION_KEY = 'cinearchive.searchSession.v1';
+
+interface CachedSearchSession {
+  category: ArchiveCategory;
+  query: string;
+  results: OnlineSearchResult[];
+  activeSources: string[];
+  hasSearched: boolean;
+}
+
+function loadSearchSession(): CachedSearchSession | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.sessionStorage.getItem(SEARCH_SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<CachedSearchSession>;
+    if (!parsed || typeof parsed.query !== 'string') return null;
+    return {
+      category:
+        parsed.category === 'person' || parsed.category === 'character'
+          ? parsed.category
+          : 'film',
+      query: parsed.query,
+      results: Array.isArray(parsed.results) ? parsed.results : [],
+      activeSources: Array.isArray(parsed.activeSources)
+        ? parsed.activeSources
+        : [],
+      hasSearched: Boolean(parsed.hasSearched),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function saveSearchSession(session: CachedSearchSession): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.setItem(SEARCH_SESSION_KEY, JSON.stringify(session));
+  } catch {
+    // Ignore sessionStorage errors
+  }
+}
+
 export function SearchTabView({
   existingItems,
   initialQuery = '',
@@ -26,14 +69,27 @@ export function SearchTabView({
   onCollectResult,
   onJumpToManual,
 }: SearchTabViewProps) {
+  const cachedSession = useRef(loadSearchSession()).current;
   const inputRef = useRef<HTMLInputElement>(null);
-  const [category, setCategory] = useState<ArchiveCategory>(initialCategory);
-  const [query, setQuery] = useState(initialQuery);
+  const [category, setCategory] = useState<ArchiveCategory>(() =>
+    initialQuery.trim()
+      ? initialCategory
+      : cachedSession?.category ?? initialCategory
+  );
+  const [query, setQuery] = useState(() =>
+    initialQuery.trim() ? initialQuery.trim() : cachedSession?.query ?? ''
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [results, setResults] = useState<OnlineSearchResult[]>([]);
-  const [activeSources, setActiveSources] = useState<string[]>([]);
-  const [hasSearched, setHasSearched] = useState(false);
+  const [results, setResults] = useState<OnlineSearchResult[]>(
+    () => (initialQuery.trim() ? [] : cachedSession?.results ?? [])
+  );
+  const [activeSources, setActiveSources] = useState<string[]>(
+    () => (initialQuery.trim() ? [] : cachedSession?.activeSources ?? [])
+  );
+  const [hasSearched, setHasSearched] = useState(
+    () => (initialQuery.trim() ? false : cachedSession?.hasSearched ?? false)
+  );
   const [collectingId, setCollectingId] = useState<string | null>(null);
 
   const runSearch = async (
@@ -59,6 +115,13 @@ export function SearchTabView({
       }
       setResults(data.results);
       setActiveSources(data.activeSources);
+      saveSearchSession({
+        category: cat,
+        query: trimmed,
+        results: data.results,
+        activeSources: data.activeSources,
+        hasSearched: true,
+      });
     } catch {
       setError('网络连接中断，请检查网络后重试。');
       setResults([]);
@@ -68,8 +131,8 @@ export function SearchTabView({
   };
 
   useEffect(() => {
-    setCategory(initialCategory);
     if (initialQuery && initialQuery.trim()) {
+      setCategory(initialCategory);
       setQuery(initialQuery.trim());
       void runSearch(initialQuery.trim(), initialCategory);
       onConsumeInitialQuery?.();

@@ -31,7 +31,6 @@ import {
 } from '../utils/runtimeEnv';
 import {
   isAcceptablePhoto,
-  normalizeEntityKey,
   parseZhWikiCastHtml,
 } from '../utils/wikiCast';
 import {
@@ -59,6 +58,15 @@ import {
   matchBangumiSubjectCandidate,
   yearsAreCompatible,
 } from '../utils/relationMatching';
+import {
+  hasCjkChars,
+  latinPersonNamesMatch,
+  mergeBilingualResults,
+} from '../utils/bilingualMerge';
+import {
+  loadPersistedRuntimeMode,
+  savePersistedRuntimeMode,
+} from '../utils/relationsCache';
 
 export interface OnlineSearchResponse {
   results: OnlineSearchResult[];
@@ -140,6 +148,10 @@ export function getRuntimeModeSync(): RuntimeMode {
     cachedMode = 'static';
     return 'static';
   }
+  const remembered = loadPersistedRuntimeMode();
+  if (remembered) {
+    return remembered;
+  }
   if (softStaticUntil > Date.now()) {
     return 'static';
   }
@@ -150,12 +162,17 @@ export function getRuntimeModeSync(): RuntimeMode {
  * Probes whether the Express `/api/*` backend is available.
  * - On GitHub Pages (`*.github.io`, `VITE_STATIC_MODE=true`, or `?static=1`),
  *   resolves immediately to `'static'` without triggering a 404 request.
- * - On mobile cellular / Cloud Run cold starts, uses a generous 6.5s timeout and
- *   NEVER permanently locks into `'static'` on a transient network timeout.
+ * - Remembers confirmed origin mode in localStorage so subsequent PWA launches
+ *   boot instantaneously without waiting on `/api/health`.
  */
 export async function detectRuntimeMode(): Promise<RuntimeMode> {
   if (cachedMode) return cachedMode;
   if (detectInitialStaticHint(getInitialSignals())) {
+    cachedMode = 'static';
+    return 'static';
+  }
+  const remembered = loadPersistedRuntimeMode();
+  if (remembered === 'static') {
     cachedMode = 'static';
     return 'static';
   }
@@ -167,7 +184,7 @@ export async function detectRuntimeMode(): Promise<RuntimeMode> {
   modeProbePromise = (async () => {
     try {
       const controller = new AbortController();
-      const timer = window.setTimeout(() => controller.abort(), 6500);
+      const timer = window.setTimeout(() => controller.abort(), 4500);
       try {
         const res = await fetch('/api/health', {
           signal: controller.signal,
@@ -176,6 +193,7 @@ export async function detectRuntimeMode(): Promise<RuntimeMode> {
         });
         if (res.status === 404 || res.status === 405) {
           cachedMode = 'static';
+          savePersistedRuntimeMode('static');
           return 'static';
         }
         if (!res.ok) {
@@ -185,15 +203,18 @@ export async function detectRuntimeMode(): Promise<RuntimeMode> {
         const contentType = res.headers.get('content-type') || '';
         if (!contentType.includes('application/json')) {
           cachedMode = 'static';
+          savePersistedRuntimeMode('static');
           return 'static';
         }
         const json = (await res.json()) as { ok?: boolean };
         if (json?.ok) {
           cachedMode = 'server';
           softStaticUntil = 0;
+          savePersistedRuntimeMode('server');
           return 'server';
         }
         cachedMode = 'static';
+        savePersistedRuntimeMode('static');
         return 'static';
       } finally {
         window.clearTimeout(timer);
@@ -330,21 +351,36 @@ function extractYear(raw?: string | null): string | undefined {
 
 // ---------- China-Native Zero-VPN Browser Sources ----------
 
+const baikeBrowserCache = new Map<string, ParsedBaikeBundle>();
+
 async function fetchBaikeCardBrowser(
   keyword: string,
   category: ArchiveCategory,
   signal?: AbortSignal
 ): Promise<ParsedBaikeBundle> {
+  const cleanKey = keyword.trim();
+  const cacheKey = `${category}::${cleanKey.toLowerCase()}`;
+  const cached = baikeBrowserCache.get(cacheKey);
+  if (cached) return cached;
+
   const url = `https://baike.baidu.com/api/openapi/BaikeLemmaCardApi?scope=103&format=json&appid=379020&bk_key=${encodeURIComponent(
-    keyword.trim()
+    cleanKey
   )}`;
   const payload = await fetchJsonpWithTimeout<Record<string, any>>(
     url,
     'callback',
-    4500,
+    4000,
     signal
   );
-  return parseBaiduBaikeCard(payload, category);
+  const parsed = parseBaiduBaikeCard(payload, category);
+  if (parsed.searchResult) {
+    if (baikeBrowserCache.size > 200) {
+      const firstKey = baikeBrowserCache.keys().next().value;
+      if (firstKey !== undefined) baikeBrowserCache.delete(firstKey);
+    }
+    baikeBrowserCache.set(cacheKey, parsed);
+  }
+  return parsed;
 }
 
 async function fetchBaiduSuggestTerms(
@@ -925,18 +961,42 @@ export async function searchOnline(
     ? ({ transport: 'relay', relayBaseUrl: relayUrl } as const)
     : ({ transport: 'static-direct' } as const);
 
-  const bundle = await searchImdbMedia(trimmed, category, {
-    mode: 'browser',
-    doubanOptions: doubanOpts,
-    enableDoubanAssist: true,
-  });
-  const activeSources: string[] = [];
-  if (bundle.results.length > 0) {
-    activeSources.push(bundle.hasDoubanAssist ? 'IMDb · 豆瓣辅助' : 'IMDb');
+  const tasks: Array<NamedSourceTask<OnlineSearchResult>> = [
+    {
+      name: 'IMDb',
+      promise: searchImdbMedia(trimmed, category, {
+        mode: 'browser',
+        doubanOptions: doubanOpts,
+        enableDoubanAssist: true,
+      })
+        .then((b) => b.results)
+        .catch(() => []),
+    },
+    {
+      name: '百度百科',
+      promise: searchBaiduBaikeBrowser(trimmed, category).catch(() => []),
+    },
+  ];
+  if (category !== 'character') {
+    tasks.push({
+      name: '爱奇艺影视库',
+      promise: searchIqiyiBrowser(trimmed, category).catch(() => []),
+    });
+  } else {
+    tasks.push({
+      name: '萌娘百科',
+      promise: searchMoegirlBrowser(trimmed, category).catch(() => []),
+    });
   }
+
+  const settled = await settleSourcesWithFastWindow(tasks, 1800);
+  const merged = mergeBilingualResults(
+    deduplicateSearchResults(settled.items)
+  ).slice(0, 16);
+
   return {
-    results: deduplicateSearchResults(bundle.results).slice(0, 16),
-    activeSources,
+    results: merged,
+    activeSources: settled.activeSources,
     mode,
   };
 }
@@ -1184,24 +1244,11 @@ export async function fetchOnlineRelations(
     }
   }
 
-  // Browser-direct static discovery: China-native (Baidu Baike + iQIYI) + Global (Bangumi + zh.Wikipedia)
-  const films: OnlineSearchResult[] = [];
-  const people: OnlineSearchResult[] = [];
-  const characters: OnlineSearchResult[] = [];
+  // Browser-direct static discovery: China-native (Baidu Baike + iQIYI) + Global (IMDb + Douban + Bangumi + zh.Wikipedia)
+  const rawFilms: OnlineSearchResult[] = [];
+  const rawPeople: OnlineSearchResult[] = [];
+  const rawCharacters: OnlineSearchResult[] = [];
   const sources: string[] = [];
-
-  const pushUnique = (
-    target: OnlineSearchResult[],
-    incoming: OnlineSearchResult[]
-  ) => {
-    const seen = new Set(target.map((x) => normalizeEntityKey(x.title)));
-    for (const item of incoming) {
-      const k = normalizeEntityKey(item.title);
-      if (!k || seen.has(k)) continue;
-      seen.add(k);
-      target.push(item);
-    }
-  };
 
   const bgmMatch = params.sourceUrl
     ? /bgm\.tv\/(subject|person)\/(\d+)/.exec(params.sourceUrl)
@@ -1212,35 +1259,166 @@ export async function fetchOnlineRelations(
     ? ({ transport: 'relay', relayBaseUrl: relayUrl, signal } as const)
     : ({ transport: 'static-direct', signal } as const);
 
-  if (params.category === 'film') {
-    const targetYear = extractYearNumber(params.year);
-    const [imdbRel, doubanRel] = await Promise.all([
-      fetchImdbFilmRelations(
-        params.title,
-        params.originalTitle,
-        params.sourceUrl,
-        { mode: 'browser', year: params.year, signal }
-      ).catch(() => ({ people: [], characters: [] })),
-      fetchDoubanFilmRelations(
-        params.title,
-        params.originalTitle,
-        params.sourceUrl,
-        { ...doubanRelOpts, year: params.year }
-      ).catch(() => ({ people: [], characters: [] })),
-    ]);
-    if (doubanRel.people.length > 0 || doubanRel.characters.length > 0) {
-      sources.push('豆瓣影视');
-      pushUnique(people, doubanRel.people);
-      pushUnique(characters, doubanRel.characters);
+  const isPlausibleBaikeEnrichment = (
+    item: OnlineSearchResult,
+    baikeItem: OnlineSearchResult,
+    category: 'film' | 'person'
+  ): boolean => {
+    const contextText = `${baikeItem.subtitle || ''} ${baikeItem.summary || ''}`;
+    const hasMediaSignal =
+      category === 'person'
+        ? /(演员|导演|编剧|制片|影人|电影|电视剧|配音|声优|喜剧|奥斯卡|好莱坞|明星|男演员|女演员|监制|摄影|作曲)/.test(
+            contextText
+          )
+        : /(电影|电视剧|剧集|动画|影片|导演|主演|上映|播出|漫威|科幻|动作|剧情|喜剧|悬疑|奇幻)/.test(
+            contextText
+          );
+    if (!hasCjkChars(item.title)) {
+      const latinMatch =
+        latinPersonNamesMatch(item.title, baikeItem.originalTitle) ||
+        hasStrictTitleOverlap(
+          [item.title],
+          [baikeItem.title, baikeItem.originalTitle]
+        );
+      return latinMatch || (hasCjkChars(baikeItem.title) && hasMediaSignal);
     }
-    if (imdbRel.people.length > 0 || imdbRel.characters.length > 0) {
-      sources.push('IMDb');
-      pushUnique(people, imdbRel.people);
-      pushUnique(characters, imdbRel.characters);
+    const titleMatch = hasStrictTitleOverlap(
+      [item.title, item.originalTitle],
+      [baikeItem.title, baikeItem.originalTitle]
+    );
+    return titleMatch && (hasMediaSignal || Boolean(baikeItem.coverUrl));
+  };
+
+  /**
+   * Enriches top relation items via China-accessible Baidu Baike JSONP (+ iQIYI Suggest fallback)
+   * so English-only IMDb entries resolve Chinese titles + portraits and Chinese entries get
+   * bilingual English `originalTitle` + real portraits before final bilingual deduplication.
+   */
+  const enrichRelationsBrowser = async (
+    items: OnlineSearchResult[],
+    targetCategory: 'film' | 'person'
+  ): Promise<OnlineSearchResult[]> => {
+    const preMerged = mergeBilingualResults(items);
+    if (preMerged.length === 0 || signal?.aborted) return preMerged;
+
+    const aliasMap = new Map<string, string[]>();
+    const cloned = preMerged.map((entry) => ({ ...entry }));
+
+    // Prioritize items missing Chinese title, missing coverUrl, or missing originalTitle (top 16)
+    const candidateIndices: number[] = [];
+    for (let i = 0; i < cloned.length && candidateIndices.length < 16; i += 1) {
+      const it = cloned[i];
+      if (!hasCjkChars(it.title) || !it.coverUrl || !it.originalTitle) {
+        candidateIndices.push(i);
+      }
     }
 
-    const [baikeOutcome, iqiyiOutcome, wikiOutcome, bgmOutcome] =
+    const CONCURRENCY = 6;
+    let cursor = 0;
+    const worker = async () => {
+      while (cursor < candidateIndices.length && !signal?.aborted) {
+        const idx = candidateIndices[cursor++];
+        const item = cloned[idx];
+        const aliases: string[] = [];
+
+        try {
+          const baike = await fetchBaikeCardBrowser(
+            item.title,
+            targetCategory,
+            signal
+          );
+          const hit = baike.searchResult;
+          if (hit && isPlausibleBaikeEnrichment(item, hit, targetCategory)) {
+            if (hit.originalTitle) aliases.push(hit.originalTitle);
+            if (baike.characterProfile.alias) {
+              aliases.push(baike.characterProfile.alias);
+            }
+            if (hit.title && hit.title !== item.title) {
+              aliases.push(hit.title);
+            }
+
+            if (!hasCjkChars(item.title) && hasCjkChars(hit.title)) {
+              const prevLatin = item.title;
+              item.title = hit.title;
+              if (!item.originalTitle) {
+                item.originalTitle = prevLatin;
+              }
+            } else if (
+              hasCjkChars(item.title) &&
+              !item.originalTitle &&
+              hit.originalTitle &&
+              !hasCjkChars(hit.originalTitle)
+            ) {
+              item.originalTitle = hit.originalTitle;
+            }
+
+            if (!item.coverUrl && hit.coverUrl) {
+              item.coverUrl = hit.coverUrl;
+            }
+            if (!item.year && hit.year) {
+              item.year = hit.year;
+            }
+          }
+        } catch {
+          // Ignore individual Baike timeout
+        }
+
+        // Fallback portrait/poster lookup via China-native CORS iQIYI Suggest
+        if (!item.coverUrl && !signal?.aborted) {
+          try {
+            const iqiyi = await fetchIqiyiSuggestBrowser(
+              item.title,
+              targetCategory,
+              signal
+            );
+            const match = iqiyi.searchResults.find(
+              (cand) =>
+                cand.coverUrl &&
+                hasStrictTitleOverlap(
+                  [item.title, item.originalTitle],
+                  [cand.title, cand.originalTitle]
+                )
+            );
+            if (match?.coverUrl) {
+              item.coverUrl = match.coverUrl;
+            }
+          } catch {
+            // Ignore iQIYI fallback error
+          }
+        }
+
+        if (aliases.length > 0) {
+          aliasMap.set(item.externalId, aliases);
+        }
+      }
+    };
+
+    await Promise.all(
+      Array.from(
+        { length: Math.min(CONCURRENCY, candidateIndices.length) },
+        () => worker()
+      )
+    );
+
+    return mergeBilingualResults(cloned, { aliasMap });
+  };
+
+  if (params.category === 'film') {
+    const targetYear = extractYearNumber(params.year);
+    const [imdbOutcome, doubanOutcome, baikeOutcome, iqiyiOutcome, wikiOutcome, bgmOutcome] =
       await Promise.allSettled([
+        fetchImdbFilmRelations(
+          params.title,
+          params.originalTitle,
+          params.sourceUrl,
+          { mode: 'browser', year: params.year, signal }
+        ),
+        fetchDoubanFilmRelations(
+          params.title,
+          params.originalTitle,
+          params.sourceUrl,
+          { ...doubanRelOpts, year: params.year }
+        ),
         fetchBaikeCardBrowser(params.title, 'film', signal),
         fetchIqiyiSuggestBrowser(params.title, 'film', signal),
         fetchJsonWithTimeout<{
@@ -1250,7 +1428,7 @@ export async function fetchOnlineRelations(
             params.title
           )}`,
           { signal },
-          4500
+          3800
         ),
         (async () => {
           let subjectId =
@@ -1279,7 +1457,7 @@ export async function fetchOnlineRelations(
                 }),
                 signal,
               },
-              4500
+              3800
             );
             subjectId = matchBangumiSubjectCandidate(searchRes?.data, {
               title: params.title,
@@ -1292,12 +1470,12 @@ export async function fetchOnlineRelations(
             fetchJsonWithTimeout<Array<Record<string, any>>>(
               `https://api.bgm.tv/v0/subjects/${subjectId}/persons`,
               { signal },
-              4500
+              3800
             ),
             fetchJsonWithTimeout<Array<Record<string, any>>>(
               `https://api.bgm.tv/v0/subjects/${subjectId}/characters`,
               { signal },
-              4500
+              3800
             ),
           ]);
           const bgmPeople: OnlineSearchResult[] = [];
@@ -1349,11 +1527,51 @@ export async function fetchOnlineRelations(
         })(),
       ]);
 
-    if (bgmOutcome.status === 'fulfilled') {
-      if (bgmOutcome.value.people.length > 0 || bgmOutcome.value.characters.length > 0) {
-        sources.push('番组计划 Bangumi');
-        pushUnique(people, bgmOutcome.value.people);
-        pushUnique(characters, bgmOutcome.value.characters);
+    // Prefer Chinese sources first so canonical Chinese titles anchor the order,
+    // followed by IMDb (which fuses into the Chinese entries & fills missing portraits/nm IDs).
+    if (doubanOutcome.status === 'fulfilled') {
+      if (doubanOutcome.value.people.length > 0 || doubanOutcome.value.characters.length > 0) {
+        sources.push('豆瓣影视');
+        rawPeople.push(...doubanOutcome.value.people);
+        rawCharacters.push(...doubanOutcome.value.characters);
+      }
+    }
+
+    if (
+      baikeOutcome.status === 'fulfilled' &&
+      baikeOutcome.value.relatedPeople.length > 0
+    ) {
+      const baikeItem = baikeOutcome.value.searchResult;
+      const baikeTitleMatches =
+        !baikeItem ||
+        hasStrictTitleOverlap(
+          [baikeItem.title, baikeItem.originalTitle],
+          [params.title, params.originalTitle]
+        );
+      const baikeYearMatches =
+        !baikeItem || yearsAreCompatible(params.year, baikeItem.year, 2);
+      if (baikeTitleMatches && baikeYearMatches) {
+        sources.push('百度百科');
+        rawPeople.push(...baikeOutcome.value.relatedPeople);
+      }
+    }
+
+    if (
+      iqiyiOutcome.status === 'fulfilled' &&
+      iqiyiOutcome.value.relatedPeople.length > 0
+    ) {
+      const iqiyiItem = iqiyiOutcome.value.searchResults[0];
+      const iqiyiTitleMatches =
+        Boolean(iqiyiItem) &&
+        hasStrictTitleOverlap(
+          [iqiyiItem.title, iqiyiItem.originalTitle],
+          [params.title, params.originalTitle]
+        );
+      const iqiyiYearMatches =
+        !iqiyiItem || yearsAreCompatible(params.year, iqiyiItem.year, 2);
+      if (iqiyiTitleMatches && iqiyiYearMatches) {
+        sources.push('爱奇艺影视库');
+        rawPeople.push(...iqiyiOutcome.value.relatedPeople);
       }
     }
 
@@ -1369,9 +1587,8 @@ export async function fetchOnlineRelations(
         const parsedCast = parseZhWikiCastHtml(html);
         if (parsedCast.length > 0) {
           sources.push('中文维基百科');
-          pushUnique(
-            people,
-            parsedCast.slice(0, 30).flatMap((entry) =>
+          rawPeople.push(
+            ...parsedCast.slice(0, 30).flatMap((entry) =>
               entry.actorName
                 ? [
                     {
@@ -1393,9 +1610,8 @@ export async function fetchOnlineRelations(
                 : []
             )
           );
-          pushUnique(
-            characters,
-            parsedCast.slice(0, 30).flatMap((entry) =>
+          rawCharacters.push(
+            ...parsedCast.slice(0, 30).flatMap((entry) =>
               entry.characterName
                 ? [
                     {
@@ -1422,56 +1638,65 @@ export async function fetchOnlineRelations(
       }
     }
 
-    if (
-      baikeOutcome.status === 'fulfilled' &&
-      baikeOutcome.value.relatedPeople.length > 0
-    ) {
-      const baikeItem = baikeOutcome.value.searchResult;
-      const baikeTitleMatches =
-        !baikeItem ||
-        hasStrictTitleOverlap(
-          [baikeItem.title, baikeItem.originalTitle],
-          [params.title, params.originalTitle]
-        );
-      const baikeYearMatches =
-        !baikeItem || yearsAreCompatible(params.year, baikeItem.year, 2);
-      if (baikeTitleMatches && baikeYearMatches) {
-        sources.push('百度百科');
-        pushUnique(people, baikeOutcome.value.relatedPeople);
+    if (bgmOutcome.status === 'fulfilled') {
+      if (bgmOutcome.value.people.length > 0 || bgmOutcome.value.characters.length > 0) {
+        sources.push('番组计划 Bangumi');
+        rawPeople.push(...bgmOutcome.value.people);
+        rawCharacters.push(...bgmOutcome.value.characters);
       }
     }
 
-    if (
-      iqiyiOutcome.status === 'fulfilled' &&
-      iqiyiOutcome.value.relatedPeople.length > 0
-    ) {
-      const iqiyiItem = iqiyiOutcome.value.searchResults[0];
-      const iqiyiTitleMatches =
-        Boolean(iqiyiItem) &&
-        hasStrictTitleOverlap(
-          [iqiyiItem.title, iqiyiItem.originalTitle],
-          [params.title, params.originalTitle]
-        );
-      const iqiyiYearMatches =
-        !iqiyiItem || yearsAreCompatible(params.year, iqiyiItem.year, 2);
-      if (iqiyiTitleMatches && iqiyiYearMatches) {
-        sources.push('爱奇艺影视库');
-        pushUnique(people, iqiyiOutcome.value.relatedPeople);
+    if (imdbOutcome.status === 'fulfilled') {
+      if (imdbOutcome.value.people.length > 0 || imdbOutcome.value.characters.length > 0) {
+        sources.push('IMDb');
+        rawPeople.push(...imdbOutcome.value.people);
+        rawCharacters.push(...imdbOutcome.value.characters);
       }
     }
+
+    const enrichedPeople = await enrichRelationsBrowser(rawPeople, 'person');
+    const mergedCharacters = mergeBilingualResults(rawCharacters);
+
+    return {
+      films: [],
+      people: enrichedPeople.slice(0, 60),
+      characters: mergedCharacters.slice(0, 60),
+      sources: Array.from(new Set(sources)),
+    };
   } else {
     // Person -> Representative films & characters
-    const [baikeOutcome, iqiyiOutcome, wikiOutcome] = await Promise.allSettled([
-      fetchBaikeCardBrowser(params.title, 'person', signal),
-      fetchIqiyiSuggestBrowser(params.title, 'person', signal),
-      fetchJsonWithTimeout<{ parse?: { text?: { '*'?: string } } }>(
-        `https://zh.wikipedia.org/w/api.php?action=parse&format=json&origin=*&redirects=1&prop=text&page=${encodeURIComponent(
-          params.title
-        )}`,
-        { signal },
-        4500
-      ),
-    ]);
+    const [doubanOutcome, baikeOutcome, iqiyiOutcome, wikiOutcome, imdbOutcome] =
+      await Promise.allSettled([
+        fetchDoubanPersonRelations(
+          params.title,
+          params.originalTitle,
+          params.sourceUrl,
+          doubanRelOpts
+        ),
+        fetchBaikeCardBrowser(params.title, 'person', signal),
+        fetchIqiyiSuggestBrowser(params.title, 'person', signal),
+        fetchJsonWithTimeout<{ parse?: { text?: { '*'?: string } } }>(
+          `https://zh.wikipedia.org/w/api.php?action=parse&format=json&origin=*&redirects=1&prop=text&page=${encodeURIComponent(
+            params.title
+          )}`,
+          { signal },
+          3800
+        ),
+        fetchImdbPersonRelations(
+          params.title,
+          params.originalTitle,
+          params.sourceUrl,
+          { mode: 'browser', signal }
+        ),
+      ]);
+
+    if (doubanOutcome.status === 'fulfilled') {
+      if (doubanOutcome.value.films.length > 0 || doubanOutcome.value.characters.length > 0) {
+        sources.push('豆瓣影视');
+        rawFilms.push(...doubanOutcome.value.films);
+        rawCharacters.push(...doubanOutcome.value.characters);
+      }
+    }
 
     if (wikiOutcome.status === 'fulfilled') {
       const html = wikiOutcome.value?.parse?.text?.['*'];
@@ -1479,9 +1704,8 @@ export async function fetchOnlineRelations(
         const filmography = parseZhWikiFilmographyHtml(html);
         if (filmography.length > 0) {
           sources.push('中文维基百科');
-          pushUnique(
-            films,
-            filmography.slice(0, 30).map((row) => ({
+          rawFilms.push(
+            ...filmography.slice(0, 30).map((row) => ({
               externalId: `zhwiki-work-${row.filmTitle}-${row.year || ''}`,
               category: 'film' as const,
               title: row.filmTitle,
@@ -1502,9 +1726,8 @@ export async function fetchOnlineRelations(
           );
 
           const aggregatedChars = aggregatePersonCharacters(filmography);
-          pushUnique(
-            characters,
-            aggregatedChars.slice(0, 24).map((ch) => ({
+          rawCharacters.push(
+            ...aggregatedChars.slice(0, 24).map((ch) => ({
               externalId: `zhwiki-pchar-${ch.characterName}`,
               category: 'character' as const,
               title: ch.characterName,
@@ -1530,53 +1753,32 @@ export async function fetchOnlineRelations(
 
     if (baikeOutcome.status === 'fulfilled' && baikeOutcome.value.relatedFilms.length > 0) {
       sources.push('百度百科');
-      pushUnique(films, baikeOutcome.value.relatedFilms);
+      rawFilms.push(...baikeOutcome.value.relatedFilms);
     }
 
     if (iqiyiOutcome.status === 'fulfilled' && iqiyiOutcome.value.relatedFilms.length > 0) {
       sources.push('爱奇艺影视库');
-      pushUnique(films, iqiyiOutcome.value.relatedFilms);
+      rawFilms.push(...iqiyiOutcome.value.relatedFilms);
     }
-    const [imdbRel, doubanRel] = await Promise.all([
-      fetchImdbPersonRelations(
-        params.title,
-        params.originalTitle,
-        params.sourceUrl,
-        { mode: 'browser', signal }
-      ).catch(() => ({ films: [], characters: [] })),
-      fetchDoubanPersonRelations(
-        params.title,
-        params.originalTitle,
-        params.sourceUrl,
-        doubanRelOpts
-      ).catch(() => ({ films: [], characters: [] })),
-    ]);
-    if (imdbRel.films.length > 0 || imdbRel.characters.length > 0) {
-      sources.unshift('IMDb');
-      const nextFilms = [...imdbRel.films, ...films];
-      const nextChars = [...imdbRel.characters, ...characters];
-      films.length = 0;
-      characters.length = 0;
-      pushUnique(films, nextFilms);
-      pushUnique(characters, nextChars);
-    }
-    if (doubanRel.films.length > 0 || doubanRel.characters.length > 0) {
-      sources.unshift('豆瓣影视');
-      const nextFilms = [...doubanRel.films, ...films];
-      const nextChars = [...doubanRel.characters, ...characters];
-      films.length = 0;
-      characters.length = 0;
-      pushUnique(films, nextFilms);
-      pushUnique(characters, nextChars);
-    }
-  }
 
-  return {
-    films,
-    people,
-    characters,
-    sources: Array.from(new Set(sources)),
-  };
+    if (imdbOutcome.status === 'fulfilled') {
+      if (imdbOutcome.value.films.length > 0 || imdbOutcome.value.characters.length > 0) {
+        sources.push('IMDb');
+        rawFilms.push(...imdbOutcome.value.films);
+        rawCharacters.push(...imdbOutcome.value.characters);
+      }
+    }
+
+    const enrichedFilms = await enrichRelationsBrowser(rawFilms, 'film');
+    const mergedCharacters = mergeBilingualResults(rawCharacters);
+
+    return {
+      films: enrichedFilms.slice(0, 60),
+      people: [],
+      characters: mergedCharacters.slice(0, 60),
+      sources: Array.from(new Set(sources)),
+    };
+  }
 }
 
 // ---------- Character Dossier Auto-Enrichment ----------

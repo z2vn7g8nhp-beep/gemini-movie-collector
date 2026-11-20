@@ -4,7 +4,7 @@ import App from './App.tsx';
 import './index.css';
 
 if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-  registerSW({ immediate: true });
+  registerSW({ immediate: false });
 }
 
 createRoot(document.getElementById('root')!).render(<App />);

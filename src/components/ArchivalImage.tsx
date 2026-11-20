@@ -109,6 +109,7 @@ export function ArchivalImage({
             ref={imgRef}
             src={effectiveSrc}
             alt={alt}
+            decoding="async"
             referrerPolicy="no-referrer"
             onLoad={() => setLoaded(true)}
             onError={() => {

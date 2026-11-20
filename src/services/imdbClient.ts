@@ -20,6 +20,10 @@ import {
   normalizeStrictTitleKey,
 } from '../utils/relationMatching';
 import {
+  buildImdbSingleTokenSlug,
+  latinPersonNamesMatch,
+} from '../utils/bilingualMerge';
+import {
   searchDoubanMedia,
   type DoubanClientOptions,
 } from './doubanClient';
@@ -239,13 +243,11 @@ async function fetchImdbSuggestRaw(
     );
   }
 
-  // Browser mode: clean alphanumeric single-word or exact tt.../nm... IDs via IMDb JSONP
-  const singleToken = trimmed.toLowerCase().replace(/[^a-z0-9]/g, '');
-  if (
-    /^(?:tt|nm)\d{5,10}$/.test(trimmed.toLowerCase()) ||
-    (/^[a-z0-9]+$/i.test(trimmed) && singleToken.length >= 2)
-  ) {
-    return fetchImdbSuggestJsonp(singleToken, 4200, options.signal);
+  // Browser mode: convert exact tt.../nm... IDs or Latin names (e.g. "Robert Downey Jr." -> "robertdowney")
+  // into a clean single-token ASCII slug safe for IMDb JSONP callback syntax.
+  const singleToken = buildImdbSingleTokenSlug(trimmed);
+  if (singleToken) {
+    return fetchImdbSuggestJsonp(singleToken, 3800, options.signal);
   }
   return null;
 }
@@ -1094,9 +1096,9 @@ export async function fetchImdbFilmRelations(
   for (const w of meta.writers) addPerson(w, '编剧', '编剧');
   for (const a of meta.cast) addPerson(a, '主演', '演员');
 
-  // Enrich top cast & directors with IMDb Suggest portraits and real nm... URLs on server mode
-  if (options.mode === 'server' && people.length > 0) {
-    const enrichTargets = people.slice(0, 8);
+  // Enrich top cast & directors with IMDb Suggest portraits and real nm... URLs in BOTH server & browser modes
+  if (people.length > 0) {
+    const enrichTargets = people.slice(0, 10);
     await Promise.allSettled(
       enrichTargets.map(async (person) => {
         if (hasCjkCharacters(person.title)) return;
@@ -1107,7 +1109,9 @@ export async function fetchImdbFilmRelations(
         );
         const targetKey = normalizeStrictTitleKey(person.title);
         const hit = parseImdbSuggestPayload(suggestRaw).names.find(
-          (cand) => normalizeStrictTitleKey(cand.title) === targetKey
+          (cand) =>
+            normalizeStrictTitleKey(cand.title) === targetKey ||
+            latinPersonNamesMatch(cand.title, person.title)
         );
         if (!hit) return;
         if (hit.coverUrl && !person.coverUrl) {

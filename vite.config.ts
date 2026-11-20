@@ -14,7 +14,7 @@ export default defineConfig(() => {
       react(),
       tailwindcss(),
       VitePWA({
-        registerType: 'autoUpdate',
+        registerType: 'prompt',
         includeAssets: [
           'favicon.ico',
           'icon.svg',
@@ -57,6 +57,7 @@ export default defineConfig(() => {
           ],
         },
         workbox: {
+          cleanupOutdatedCaches: true,
           globPatterns: ['**/*.{js,css,html,ico,png,jpg,svg,woff,woff2}'],
           navigateFallback: 'index.html',
           navigateFallbackDenylist: [/^\/api\//, /^\/douban/, /^\/img/],
@@ -95,12 +96,12 @@ export default defineConfig(() => {
             },
             {
               urlPattern:
-                /^https:\/\/(img\.wmdb\.tv|upload\.wikimedia\.org|lain\.bgm\.tv|static\.tvmaze\.com|bkimg\.cdn\.bcebos\.com|pic\d*\.iqiyipic\.com|storage\.moegirl\.org\.cn)\/.*/i,
+                /^https:\/\/(m\.media-amazon\.com|images\.metahub\.space|is\d+-ssl\.mzstatic\.com|img\.wmdb\.tv|upload\.wikimedia\.org|lain\.bgm\.tv|static\.tvmaze\.com|bkimg\.cdn\.bcebos\.com|pic\d*\.iqiyipic\.com|storage\.moegirl\.org\.cn)\/.*/i,
               handler: 'CacheFirst',
               options: {
                 cacheName: 'archival-posters-cache',
                 expiration: {
-                  maxEntries: 120,
+                  maxEntries: 300,
                   maxAgeSeconds: 60 * 60 * 24 * 30,
                 },
                 cacheableResponse: {
@@ -111,8 +112,7 @@ export default defineConfig(() => {
           ],
         },
         devOptions: {
-          enabled: true,
-          type: 'module',
+          enabled: false,
         },
       }),
       // Copies src/assets into dist/ and emits GitHub Pages SPA fallback files
