@@ -49,18 +49,18 @@ export function PostCollectLinkSheet({
       role="region"
       aria-label="智能关联推荐"
       data-testid="post-collect-link-sheet"
-      className="fixed inset-x-3 bottom-[72px] z-40 mx-auto max-w-[460px] overflow-hidden rounded-2xl border border-[#3B352D] bg-[#1C1A17] text-[#F5F1E8] shadow-[0_18px_48px_rgba(20,18,15,0.34)] md:inset-x-auto md:right-6 md:bottom-6 md:w-[420px]"
+      className="fixed inset-x-3 bottom-[calc(74px+env(safe-area-inset-bottom))] z-40 mx-auto max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-2xl border border-[#3B352D] bg-[#1C1A17] text-[#F5F1E8] shadow-[0_18px_48px_rgba(20,18,15,0.34)] sm:max-w-[440px] md:inset-x-auto md:right-6 md:bottom-6 md:w-[420px]"
     >
       {/* Header */}
       <div className="flex items-start justify-between gap-2 border-b border-white/10 px-4 py-3">
         <div className="min-w-0 flex-1">
-          <p className="flex items-center gap-1.5 text-xs font-medium text-[#E4C37A]">
+          <p className="flex items-center gap-1.5 text-[13px] font-medium text-[#E4C37A] md:text-xs">
             <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-            <span>
+            <span className="truncate">
               已收录「{liveSource.title}」· 发现 {enriched.length} 项馆内关联
             </span>
           </p>
-          <p className="mt-0.5 text-[11px] text-[#B8AE9E]">
+          <p className="mt-0.5 text-[12px] text-[#B8AE9E] md:text-[11px]">
             根据作品名称与演员脉络自动匹配，轻点即可一键建立双向链接
           </p>
         </div>
@@ -70,14 +70,14 @@ export function PostCollectLinkSheet({
           onClick={onClose}
           data-testid="smart-link-close-btn"
           aria-label="关闭关联推荐"
-          className="-mr-1 -mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#A59D90] transition-colors hover:bg-white/10 hover:text-white cursor-pointer"
+          className="-mr-1.5 -mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[#A59D90] transition-colors hover:bg-white/10 hover:text-white cursor-pointer"
         >
           <X className="h-4 w-4" aria-hidden="true" />
         </button>
       </div>
 
       {/* Recommended Unlinked Library Items */}
-      <ul className="max-h-[240px] divide-y divide-white/10 overflow-y-auto px-3 py-1">
+      <ul className="max-h-[240px] divide-y divide-white/10 overflow-y-auto overflow-x-hidden overscroll-contain px-3.5 py-1">
         {enriched.map(({ item: target, reason, linked }) => (
           <li
             key={target.id}
@@ -101,10 +101,10 @@ export function PostCollectLinkSheet({
                 className="h-12 w-9 shrink-0 rounded-lg border border-white/10"
               />
               <div className="min-w-0 flex-1">
-                <p className="truncate font-editorial text-sm font-medium text-[#FAF7F0]">
+                <p className="truncate font-editorial text-[15px] font-medium text-[#FAF7F0] md:text-sm">
                   {target.title}
                 </p>
-                <p className="mt-0.5 truncate text-[11px] text-[#B8AE9E]">
+                <p className="mt-0.5 truncate text-[12px] text-[#B8AE9E] md:text-[11px]">
                   <span className="text-[#E4C37A]">
                     {CATEGORY_LABELS[target.category]}
                   </span>
@@ -117,7 +117,7 @@ export function PostCollectLinkSheet({
             {linked ? (
               <span
                 data-testid={`smart-link-done-${target.id}`}
-                className="inline-flex min-h-[36px] shrink-0 items-center gap-1 rounded-xl border border-[#C9A45C]/45 bg-[#C9A45C]/15 px-3 text-xs font-medium text-[#E4C37A] whitespace-nowrap"
+                className="inline-flex min-h-[40px] shrink-0 items-center gap-1 rounded-xl border border-[#C9A45C]/45 bg-[#C9A45C]/15 px-3 text-[13px] font-medium text-[#E4C37A] whitespace-nowrap md:min-h-[36px] md:text-xs"
               >
                 <Check className="h-3.5 w-3.5" aria-hidden="true" />
                 <span>已关联</span>
@@ -127,7 +127,7 @@ export function PostCollectLinkSheet({
                 type="button"
                 data-testid={`smart-link-btn-${target.id}`}
                 onClick={() => void onLinkOne(liveSource.id, target.id)}
-                className="inline-flex min-h-[36px] shrink-0 items-center gap-1 rounded-xl bg-[#B43B2B] px-3 text-xs font-medium text-white whitespace-nowrap cursor-pointer transition-colors hover:bg-[#932D20] active:scale-[0.97]"
+                className="inline-flex min-h-[40px] shrink-0 items-center gap-1 rounded-xl bg-[#B43B2B] px-3 text-[13px] font-medium text-white whitespace-nowrap cursor-pointer transition-colors hover:bg-[#932D20] active:scale-[0.97] md:min-h-[36px] md:text-xs"
               >
                 <Link2 className="h-3.5 w-3.5" aria-hidden="true" />
                 <span>一键关联</span>
@@ -145,7 +145,7 @@ export function PostCollectLinkSheet({
             onClose();
             onOpenDetail(liveSource);
           }}
-          className="min-h-[36px] text-xs text-[#C9C1B4] underline-offset-2 hover:text-white hover:underline cursor-pointer"
+          className="min-h-[40px] text-[13px] text-[#C9C1B4] underline-offset-2 hover:text-white hover:underline cursor-pointer md:min-h-[36px] md:text-xs"
         >
           查看新档案详情
         </button>
@@ -154,7 +154,7 @@ export function PostCollectLinkSheet({
           <button
             type="button"
             onClick={onClose}
-            className="min-h-[36px] rounded-xl border border-white/15 bg-white/10 px-3.5 text-xs font-medium text-[#FAF7F0] whitespace-nowrap cursor-pointer"
+            className="min-h-[40px] rounded-xl border border-white/15 bg-white/10 px-3.5 text-[13px] font-medium text-[#FAF7F0] whitespace-nowrap cursor-pointer md:min-h-[36px] md:text-xs"
           >
             完成
           </button>
@@ -163,7 +163,7 @@ export function PostCollectLinkSheet({
             type="button"
             data-testid="smart-link-all-btn"
             onClick={() => void onLinkAll(liveSource.id, unlinkedIds)}
-            className="min-h-[36px] rounded-xl bg-[#FAF7F0] px-3.5 text-xs font-medium text-[#1A1816] whitespace-nowrap cursor-pointer transition-colors hover:bg-[#EFE9DC] active:scale-[0.97]"
+            className="min-h-[40px] rounded-xl bg-[#FAF7F0] px-3.5 text-[13px] font-medium text-[#1A1816] whitespace-nowrap cursor-pointer transition-colors hover:bg-[#EFE9DC] active:scale-[0.97] md:min-h-[36px] md:text-xs"
           >
             全部一键关联（{unlinkedIds.length}）
           </button>

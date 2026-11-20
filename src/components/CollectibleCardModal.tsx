@@ -107,14 +107,14 @@ export function CollectibleCardModal({
       aria-modal="true"
       aria-label={`实体藏卡赏析：${item.title}`}
       data-testid="collectible-card-modal"
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#141210]/85 px-4 py-6"
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center overflow-hidden bg-[#141210]/85 px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       {/* Top Bar */}
-      <div className="mb-3 flex w-full max-w-[348px] items-center justify-between text-[#E8E2D7]">
-        <div className="flex items-center gap-2 font-mono text-xs tabular-nums">
+      <div className="mb-3 flex w-full max-w-[388px] items-center justify-between text-[#E8E2D7] md:max-w-[360px]">
+        <div className="flex items-center gap-2 font-mono text-[13px] tabular-nums md:text-xs">
           <span>{item.accessionNo}</span>
           <span className="opacity-40">/</span>
           <span>
@@ -132,9 +132,9 @@ export function CollectibleCardModal({
       </div>
 
       {/* 3D Flip Card Stage */}
-      <div className="card-perspective w-full max-w-[348px]">
+      <div className="card-perspective w-full max-w-[388px] md:max-w-[360px]">
         <div
-          className={`card-preserve-3d relative h-[504px] w-full transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+          className={`card-preserve-3d relative h-[min(548px,calc(100dvh-180px))] w-full transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
             flipped ? 'card-rotate-y-180' : ''
           }`}
         >
@@ -147,12 +147,12 @@ export function CollectibleCardModal({
             }`}
           >
             {/* Card Serial Header */}
-            <div className="flex items-center justify-between gap-2 pb-2.5 text-[11px]">
-              <span className="font-mono tracking-[0.12em] text-[#B8AFA2] tabular-nums">
+            <div className="flex items-center justify-between gap-2 pb-2.5 text-[12px] md:text-[11px]">
+              <span className="min-w-0 truncate font-mono tracking-[0.1em] text-[#B8AFA2] tabular-nums">
                 {item.accessionNo} · {CATEGORY_LABELS[item.category]}
               </span>
               <span
-                className={`rounded-lg border px-2 py-0.5 font-editorial text-[11px] tracking-[0.12em] ${
+                className={`shrink-0 rounded-lg border px-2 py-0.5 font-editorial text-[12px] tracking-[0.12em] md:text-[11px] ${
                   isMasterpiece
                     ? 'border-[#C9A45C] text-[#E4C37A]'
                     : completeness.tier === 'curated'
@@ -191,11 +191,11 @@ export function CollectibleCardModal({
             <div className="pt-3.5">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <h2 className="truncate font-editorial text-xl font-medium leading-tight text-[#FAF7F0]">
+                  <h2 className="truncate font-editorial text-[22px] font-medium leading-tight text-[#FAF7F0] md:text-xl">
                     {item.title}
                   </h2>
                   {(item.originalTitle || item.year) && (
-                    <p className="mt-0.5 truncate text-xs text-[#A59D90]">
+                    <p className="mt-1 truncate text-[13px] text-[#A59D90] md:mt-0.5 md:text-xs">
                       {[item.originalTitle, item.year, item.region]
                         .filter(Boolean)
                         .join(' · ')}
@@ -203,7 +203,7 @@ export function CollectibleCardModal({
                   )}
                 </div>
                 {item.rating > 0 && (
-                  <span className="inline-flex shrink-0 items-center gap-1 pt-0.5 font-mono text-sm font-medium tabular-nums text-[#E4C37A]">
+                  <span className="inline-flex shrink-0 items-center gap-1 pt-0.5 font-mono text-[15px] font-medium tabular-nums text-[#E4C37A] md:text-sm">
                     <Star
                       className="h-3.5 w-3.5 fill-[#E4C37A] text-[#E4C37A]"
                       aria-hidden="true"
@@ -229,7 +229,7 @@ export function CollectibleCardModal({
                     />
                   ))}
                 </div>
-                <span className="font-mono text-[11px] tabular-nums text-[#9C9488]">
+                <span className="font-mono text-[12px] tabular-nums text-[#9C9488] md:text-[11px]">
                   完备 {completeness.score}/5 · 点击翻面
                 </span>
               </div>
@@ -246,15 +246,15 @@ export function CollectibleCardModal({
           >
             <div className="flex items-center justify-between gap-2 border-b border-[#E4DFD5] pb-3">
               <div className="min-w-0 flex-1">
-                <p className="font-mono text-[11px] tracking-[0.1em] text-[#7A7268] tabular-nums">
+                <p className="font-mono text-[12px] tracking-[0.08em] text-[#7A7268] tabular-nums md:text-[11px]">
                   {item.accessionNo} · 馆藏鉴定卡
                 </p>
-                <h3 className="mt-0.5 truncate font-editorial text-lg font-medium text-[#1A1816]">
+                <h3 className="mt-0.5 truncate font-editorial text-[19px] font-medium text-[#1A1816] md:text-lg">
                   {item.title}
                 </h3>
               </div>
               <span
-                className={`shrink-0 whitespace-nowrap rounded-lg border px-2 py-0.5 font-editorial text-xs ${
+                className={`shrink-0 whitespace-nowrap rounded-lg border px-2 py-0.5 font-editorial text-[13px] md:text-xs ${
                   isMasterpiece
                     ? 'border-[#A67C37] text-[#8E6523]'
                     : 'border-[#CFC7B9] text-[#625C54]'
@@ -266,17 +266,17 @@ export function CollectibleCardModal({
 
             {/* Quote / Story Excerpt */}
             <div className="mt-3.5 border-b border-[#EFECE5] pb-3.5">
-              <p className="font-editorial text-sm italic leading-relaxed text-[#2E2A26] line-clamp-4">
+              <p className="font-editorial text-[15px] italic leading-relaxed text-[#2E2A26] line-clamp-4 md:text-sm">
                 {item.quote ? `“${item.quote}”` : backStory}
               </p>
             </div>
 
             {/* 5-Point Completeness Checklist */}
             <div className="mt-3.5">
-              <p className="text-[11px] font-medium tracking-[0.06em] text-[#7A7268]">
+              <p className="text-[12px] font-medium tracking-[0.06em] text-[#7A7268] md:text-[11px]">
                 典藏级打磨清单
               </p>
-              <ul className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+              <ul className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2 text-[13px] md:text-xs">
                 {checklist.map((row) => (
                   <li
                     key={row.key}
@@ -302,7 +302,7 @@ export function CollectibleCardModal({
             </div>
 
             {/* Metadata Footer */}
-            <div className="mt-auto space-y-1.5 border-t border-[#E4DFD5] pt-3 text-xs text-[#625C54]">
+            <div className="mt-auto space-y-1.5 border-t border-[#E4DFD5] pt-3 text-[13px] text-[#625C54] md:text-xs">
               <p className="truncate">
                 <span className="text-[#8C857B]">状态：</span>
                 {getStatusLabel(item.status, item.category)}
@@ -323,7 +323,7 @@ export function CollectibleCardModal({
                     .join(' · ')}
                 </p>
               )}
-              <p className="pt-1 font-mono text-[10px] tabular-nums text-[#8C857B]">
+              <p className="pt-1 font-mono text-[11px] tabular-nums text-[#8C857B] md:text-[10px]">
                 入藏日期：{item.createdAt.slice(0, 10)} · 点击翻回正面
               </p>
             </div>
@@ -332,13 +332,13 @@ export function CollectibleCardModal({
       </div>
 
       {/* Bottom Controls */}
-      <div className="mt-4 flex w-full max-w-[348px] items-center justify-between gap-2">
+      <div className="mt-4 flex w-full max-w-[388px] items-center justify-between gap-2 md:max-w-[360px]">
         <button
           type="button"
           disabled={!hasSiblings}
           onClick={goPrev}
           aria-label="上一张藏卡"
-          className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/15 bg-white/10 text-[#F5F1E8] cursor-pointer disabled:opacity-30"
+          className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/10 text-[#F5F1E8] cursor-pointer disabled:opacity-30 md:h-11 md:w-11"
         >
           <ChevronLeft className="h-5 w-5" />
         </button>
@@ -347,18 +347,18 @@ export function CollectibleCardModal({
           type="button"
           onClick={() => setFlipped((f) => !f)}
           aria-label={flipped ? '翻回正面封面' : '翻面查看档案'}
-          className="inline-flex h-11 flex-1 items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-white/10 px-3 text-xs font-medium text-[#F5F1E8] whitespace-nowrap cursor-pointer active:scale-[0.98]"
+          className="inline-flex h-[46px] flex-1 items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-white/10 px-3 text-[13px] font-medium text-[#F5F1E8] whitespace-nowrap cursor-pointer active:scale-[0.98] md:h-11 md:text-xs"
         >
-          <RotateCw className="h-3.5 w-3.5" aria-hidden="true" />
+          <RotateCw className="h-4 w-4 md:h-3.5 md:w-3.5" aria-hidden="true" />
           <span>{flipped ? '翻回正面' : '翻面查看'}</span>
         </button>
 
         <button
           type="button"
           onClick={() => onOpenDetailEdit(item)}
-          className="inline-flex h-11 flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#B43B2B] px-3 text-xs font-medium text-white whitespace-nowrap cursor-pointer active:scale-[0.98]"
+          className="inline-flex h-[46px] flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#B43B2B] px-3 text-[13px] font-medium text-white whitespace-nowrap cursor-pointer active:scale-[0.98] md:h-11 md:text-xs"
         >
-          <Edit3 className="h-3.5 w-3.5" aria-hidden="true" />
+          <Edit3 className="h-4 w-4 md:h-3.5 md:w-3.5" aria-hidden="true" />
           <span>{isMasterpiece ? '打开档案' : '去打磨'}</span>
         </button>
 
@@ -367,7 +367,7 @@ export function CollectibleCardModal({
           disabled={!hasSiblings}
           onClick={goNext}
           aria-label="下一张藏卡"
-          className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/15 bg-white/10 text-[#F5F1E8] cursor-pointer disabled:opacity-30"
+          className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/10 text-[#F5F1E8] cursor-pointer disabled:opacity-30 md:h-11 md:w-11"
         >
           <ChevronRight className="h-5 w-5" />
         </button>

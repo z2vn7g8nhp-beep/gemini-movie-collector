@@ -325,6 +325,22 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [notice]);
 
+  // Prevent background page scroll / horizontal drift on iOS Safari while full-screen sheet or modal is open
+  const hasBlockingOverlay = Boolean(
+    selectedItemId || cardModalItemId || encounterItemId
+  );
+  useEffect(() => {
+    if (!hasBlockingOverlay) return;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    const prevBodyOverflow = document.body.style.overflow;
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.documentElement.style.overflow = prevHtmlOverflow;
+      document.body.style.overflow = prevBodyOverflow;
+    };
+  }, [hasBlockingOverlay]);
+
   const dailyReminder = useMemo(
     () =>
       evaluateDailyCheckInReminder(
@@ -940,7 +956,7 @@ export default function App() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#F7F5F0] text-[#1A1816]">
+    <div className="flex min-h-[100dvh] w-full max-w-full flex-col overflow-x-clip bg-[#F7F5F0] text-[#1A1816]">
       <AppTopBar
         activeTab={activeTab}
         onSelectTab={setActiveTab}
@@ -949,7 +965,7 @@ export default function App() {
         onQuickCheckIn={() => void handleCheckInToday()}
       />
 
-      <main className="flex-1">
+      <main className="w-full min-w-0 flex-1">
         {hydrated && (
           <DailyCheckInBanner
             reminder={dailyReminder}
@@ -983,18 +999,18 @@ export default function App() {
             />
 
             {/* Top Mobile-First Search + Category Control Zone */}
-            <section className="mx-auto max-w-[1160px] px-4 pt-3.5 pb-2 md:px-8 md:pt-6">
+            <section className="mx-auto max-w-[1160px] px-4 pt-4 pb-2 min-[420px]:px-5 md:px-8 md:pt-6">
               {/* Prominent Dual-Purpose Search Bar (Filter Library OR Submit to Online Search!) */}
               <form
                 onSubmit={handleQuickBarSubmit}
-                className="flex items-center gap-2"
+                className="flex min-w-0 items-center gap-2.5"
               >
-                <div className="relative flex-1">
+                <div className="relative min-w-0 flex-1">
                   <label htmlFor="library-quick-search" className="sr-only">
                     搜片名、影人、角色或筛查馆藏
                   </label>
                   <Search
-                    className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8C857B]"
+                    className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[#8C857B]"
                     aria-hidden="true"
                   />
                   <input
@@ -1008,7 +1024,7 @@ export default function App() {
                         ? '搜片名、影人或角色，回车直接联网收录…'
                         : '筛查馆藏，或回车直连全网搜片…'
                     }
-                    className="h-12 w-full rounded-2xl border border-[#DCD6CB] bg-white pl-10 pr-10 text-[15px] text-[#1A1816] placeholder:text-[#8C857B] focus:border-[#1A1816] focus:outline-none"
+                    className="h-12 w-full rounded-2xl border border-[#DCD6CB] bg-white pl-10 pr-10 text-[16px] text-[#1A1816] placeholder:text-[#8C857B] focus:border-[#1A1816] focus:outline-none md:text-[15px]"
                   />
                   {libraryQuery && (
                     <button
@@ -1024,7 +1040,7 @@ export default function App() {
 
                 <button
                   type="submit"
-                  className="h-12 shrink-0 rounded-2xl bg-[#1A1816] px-4 text-sm font-medium text-white whitespace-nowrap cursor-pointer active:scale-[0.97] transition-transform hover:bg-[#B43B2B]"
+                  className="h-12 shrink-0 rounded-2xl bg-[#1A1816] px-4 min-[420px]:px-5 text-[15px] font-medium text-white whitespace-nowrap cursor-pointer active:scale-[0.97] transition-transform hover:bg-[#B43B2B] md:text-sm"
                 >
                   联网搜
                 </button>
@@ -1053,14 +1069,14 @@ export default function App() {
                         type="button"
                         aria-pressed={active}
                         onClick={() => setActiveCategory(cat.id)}
-                        className={`min-h-[38px] rounded-lg px-2 text-xs font-medium whitespace-nowrap cursor-pointer transition-colors ${
+                        className={`min-h-[42px] rounded-lg px-1.5 text-[13px] min-[420px]:text-[14px] font-medium whitespace-nowrap cursor-pointer transition-colors md:min-h-[38px] md:text-xs ${
                           active
                             ? 'bg-white text-[#1A1816] shadow-xs'
                             : 'text-[#625C54]'
                         }`}
                       >
                         {cat.label}
-                        <span className="ml-1 font-mono text-[11px] tabular-nums opacity-75">
+                        <span className="ml-1 font-mono text-[12px] tabular-nums opacity-75 md:text-[11px]">
                           {count}
                         </span>
                       </button>
@@ -1071,9 +1087,13 @@ export default function App() {
 
               {/* Compact Status, Tag & Sort Bar (shown once user has collected items) */}
               {items.length > 0 && (
-                <div className="mt-3 border-b border-[#E4DFD5] pb-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                <div className="mt-3 border-b border-[#E4DFD5] pb-3.5">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div
+                      className={`grid w-full min-w-0 gap-2 sm:flex sm:w-auto sm:flex-1 sm:items-center ${
+                        tagRegistry.length > 0 ? 'grid-cols-3' : 'grid-cols-2'
+                      }`}
+                    >
                       <label htmlFor="mobile-status-filter" className="sr-only">
                         按状态筛选
                       </label>
@@ -1085,7 +1105,7 @@ export default function App() {
                             e.target.value as 'all' | CollectionStatus
                           )
                         }
-                        className="h-9 min-w-0 flex-1 rounded-xl border border-[#DCD6CB] bg-white px-2 text-xs font-medium text-[#1A1816] focus:border-[#1A1816] focus:outline-none sm:flex-none sm:px-2.5"
+                        className="h-11 min-w-0 w-full rounded-xl border border-[#DCD6CB] bg-white px-2.5 text-[16px] font-medium text-[#1A1816] focus:border-[#1A1816] focus:outline-none sm:h-9 sm:w-auto sm:px-3 md:text-xs"
                       >
                         <option value="all">全部状态</option>
                         <option value="favorite">挚爱</option>
@@ -1103,7 +1123,7 @@ export default function App() {
                             id="mobile-tag-filter"
                             value={activeTag}
                             onChange={(e) => setActiveTag(e.target.value)}
-                            className={`h-9 min-w-0 flex-1 rounded-xl border px-2 text-xs font-medium focus:outline-none sm:flex-none sm:max-w-[160px] sm:px-2.5 ${
+                            className={`h-11 min-w-0 w-full rounded-xl border px-2.5 text-[16px] font-medium focus:outline-none sm:h-9 sm:w-auto sm:max-w-[160px] sm:px-3 md:text-xs ${
                               activeTag
                                 ? 'border-[#1A1816] bg-[#1A1816] text-white'
                                 : 'border-[#DCD6CB] bg-white text-[#1A1816] focus:border-[#1A1816]'
@@ -1126,7 +1146,7 @@ export default function App() {
                         id="mobile-sort-select"
                         value={sortBy}
                         onChange={(e) => setSortBy(e.target.value as SortOption)}
-                        className="h-9 min-w-0 flex-1 rounded-xl border border-[#DCD6CB] bg-white px-2 text-xs font-medium text-[#1A1816] focus:border-[#1A1816] focus:outline-none sm:flex-none sm:px-2.5"
+                        className="h-11 min-w-0 w-full rounded-xl border border-[#DCD6CB] bg-white px-2.5 text-[16px] font-medium text-[#1A1816] focus:border-[#1A1816] focus:outline-none sm:h-9 sm:w-auto sm:px-3 md:text-xs"
                       >
                         <option value="recent">最近收录</option>
                         <option value="rating">评分最高</option>
@@ -1135,22 +1155,24 @@ export default function App() {
                       </select>
                     </div>
 
-                    <span
-                      data-testid="stat-total"
-                      className="font-mono text-xs tabular-nums text-[#7A7268] shrink-0"
-                    >
-                      共 {filteredItems.length} 件
-                    </span>
+                    <div className="flex items-center justify-end">
+                      <span
+                        data-testid="stat-total"
+                        className="font-mono text-[13px] tabular-nums text-[#7A7268] shrink-0 md:text-xs"
+                      >
+                        共 {filteredItems.length} 件
+                      </span>
+                    </div>
                   </div>
 
                   {activeAlbum && (
                     <div
                       data-testid="active-album-banner"
-                      className="mt-2.5 flex items-center justify-between gap-2 rounded-xl border border-[#C9A45C] bg-[#FFFDF9] px-3 py-1.5"
+                      className="mt-2.5 flex items-center justify-between gap-2 rounded-xl border border-[#C9A45C] bg-[#FFFDF9] px-3.5 py-2"
                     >
-                      <div className="flex min-w-0 items-center gap-1.5 text-xs text-[#1A1816]">
+                      <div className="flex min-w-0 items-center gap-1.5 text-[13px] text-[#1A1816] md:text-xs">
                         <BookOpen
-                          className="h-3.5 w-3.5 shrink-0 text-[#A67C37]"
+                          className="h-4 w-4 shrink-0 text-[#A67C37]"
                           aria-hidden="true"
                         />
                         <span className="text-[#7A7268] shrink-0">图鉴筛选</span>
@@ -1162,7 +1184,7 @@ export default function App() {
                         type="button"
                         onClick={() => setActiveAlbumId('')}
                         aria-label="清除图鉴筛选"
-                        className="inline-flex min-h-[36px] shrink-0 items-center gap-1 rounded-lg px-2 text-xs font-medium text-[#625C54] hover:bg-[#F3EFE8] hover:text-[#1A1816] cursor-pointer"
+                        className="inline-flex min-h-[38px] shrink-0 items-center gap-1 rounded-lg px-2.5 text-[13px] font-medium text-[#625C54] hover:bg-[#F3EFE8] hover:text-[#1A1816] cursor-pointer md:text-xs"
                       >
                         <X className="h-3.5 w-3.5" aria-hidden="true" />
                         <span>清除</span>
@@ -1173,11 +1195,11 @@ export default function App() {
                   {activeTag && (
                     <div
                       data-testid="active-tag-banner"
-                      className="mt-2.5 flex items-center justify-between gap-2 rounded-xl border border-[#DCD6CB] bg-white px-3 py-1.5"
+                      className="mt-2.5 flex items-center justify-between gap-2 rounded-xl border border-[#DCD6CB] bg-white px-3.5 py-2"
                     >
-                      <div className="flex min-w-0 items-center gap-1.5 text-xs text-[#1A1816]">
+                      <div className="flex min-w-0 items-center gap-1.5 text-[13px] text-[#1A1816] md:text-xs">
                         <Tag
-                          className="h-3.5 w-3.5 shrink-0 text-[#B43B2B]"
+                          className="h-4 w-4 shrink-0 text-[#B43B2B]"
                           aria-hidden="true"
                         />
                         <span className="text-[#7A7268] shrink-0">标签筛选</span>
@@ -1189,7 +1211,7 @@ export default function App() {
                         type="button"
                         onClick={() => setActiveTag('')}
                         aria-label="清除标签筛选"
-                        className="inline-flex min-h-[36px] shrink-0 items-center gap-1 rounded-lg px-2 text-xs font-medium text-[#625C54] hover:bg-[#F3EFE8] hover:text-[#1A1816] cursor-pointer"
+                        className="inline-flex min-h-[38px] shrink-0 items-center gap-1 rounded-lg px-2.5 text-[13px] font-medium text-[#625C54] hover:bg-[#F3EFE8] hover:text-[#1A1816] cursor-pointer md:text-xs"
                       >
                         <X className="h-3.5 w-3.5" aria-hidden="true" />
                         <span>清除</span>
@@ -1270,10 +1292,10 @@ export default function App() {
         <div
           role="status"
           aria-live="polite"
-          className={`fixed left-1/2 z-50 -translate-x-1/2 rounded-xl bg-[#1A1816] px-4 py-2.5 text-xs font-medium text-white shadow-lg whitespace-nowrap ${
+          className={`fixed left-1/2 z-50 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-xl bg-[#1A1816] px-4 py-2.5 text-center text-[13px] font-medium text-white shadow-lg md:text-xs ${
             pendingLinkSuggestion
-              ? 'top-[62px] md:top-[76px]'
-              : 'bottom-[76px] md:bottom-6'
+              ? 'top-[calc(64px+env(safe-area-inset-top))] md:top-[76px]'
+              : 'bottom-[calc(76px+env(safe-area-inset-bottom))] md:bottom-6'
           }`}
         >
           {notice}

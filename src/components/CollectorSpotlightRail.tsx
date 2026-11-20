@@ -133,13 +133,13 @@ export function CollectorSpotlightRail({
     <section
       aria-label="今日馆藏与专题图鉴"
       data-testid="collector-spotlight-section"
-      className="mx-auto max-w-[1160px] px-4 pt-3 pb-1 md:px-8 md:pt-5"
+      className="mx-auto max-w-[1160px] px-4 pt-3.5 pb-1 min-[420px]:px-5 md:px-8 md:pt-5"
     >
       {/* 1. Daily Archival Spotlight & Check-in Ritual Card */}
       {spotlightItem && spotlightComp && (
         <div
           data-testid="daily-spotlight-card"
-          className="gallery-card-dark overflow-hidden border border-[#342F28] p-4 text-[#F5F1E8]"
+          className="gallery-card-dark overflow-hidden border border-[#342F28] p-4 min-[420px]:p-5 text-[#F5F1E8]"
         >
           {/* Top Ritual Strip: Curator Rank + Daily Check-In Stamp */}
           <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-3">
@@ -153,10 +153,10 @@ export function CollectorSpotlightRail({
                 className="h-4 w-4 shrink-0 text-[#D4AF6A]"
                 aria-hidden="true"
               />
-              <span className="truncate text-xs font-medium text-[#FAF7F0] group-hover:underline">
+              <span className="truncate text-[14px] font-medium text-[#FAF7F0] group-hover:underline md:text-xs">
                 Lv.{rank.level} {rank.title}
               </span>
-              <span className="font-mono text-[11px] tabular-nums text-[#A59D90] shrink-0">
+              <span className="font-mono text-[12px] tabular-nums text-[#A59D90] shrink-0 md:text-[11px]">
                 印记 {unlockedStampCount}/{stamps.length}
               </span>
             </button>
@@ -170,7 +170,7 @@ export function CollectorSpotlightRail({
                   : '今日巡馆打卡'
               }
               data-testid="daily-checkin-btn"
-              className={`inline-flex min-h-[38px] shrink-0 items-center gap-1.5 rounded-xl px-3 text-xs font-medium whitespace-nowrap cursor-pointer transition-colors ${
+              className={`inline-flex min-h-[40px] shrink-0 items-center gap-1.5 rounded-xl px-3.5 text-[13px] font-medium whitespace-nowrap cursor-pointer transition-colors md:min-h-[38px] md:text-xs ${
                 streak.checkedInToday
                   ? 'border border-[#C9A45C]/50 bg-[#C9A45C]/15 text-[#E4C37A]'
                   : 'bg-[#B43B2B] text-white active:scale-[0.97] hover:bg-[#932D20]'
@@ -193,12 +193,12 @@ export function CollectorSpotlightRail({
           </div>
 
           {/* Spotlight Body */}
-          <div className="mt-3.5 flex gap-3.5">
+          <div className="mt-4 flex gap-3.5 min-[420px]:gap-4">
             <button
               type="button"
               onClick={() => onOpenCardModal(spotlightItem)}
               aria-label={`以实体藏卡赏析「${spotlightItem.title}」`}
-              className="gallery-cover-frame w-[76px] shrink-0 border border-white/15 bg-[#12110F] cursor-pointer active:scale-[0.97] transition-transform"
+              className="gallery-cover-frame w-[84px] min-[420px]:w-[92px] shrink-0 border border-white/15 bg-[#12110F] cursor-pointer active:scale-[0.97] transition-transform"
             >
               <ArchivalImage
                 src={spotlightItem.coverUrl}
@@ -211,17 +211,17 @@ export function CollectorSpotlightRail({
             </button>
 
             <div className="flex min-w-0 flex-1 flex-col">
-              <div className="flex items-center justify-between gap-2 text-[11px] text-[#A59D90]">
-                <span className="font-mono tabular-nums">
+              <div className="flex items-center justify-between gap-2 text-[12px] text-[#A59D90] md:text-[11px]">
+                <span className="truncate font-mono tabular-nums">
                   今日藏签 · {spotlightItem.accessionNo} ·{' '}
                   {CATEGORY_LABELS[spotlightItem.category]}
                 </span>
                 <span
-                  className={
+                  className={`shrink-0 whitespace-nowrap ${
                     spotlightComp.tier === 'masterpiece'
                       ? 'font-medium text-[#E4C37A]'
                       : 'text-[#CFC7B9]'
-                  }
+                  }`}
                 >
                   {spotlightComp.tierLabel} {spotlightComp.score}/5
                 </span>
@@ -232,12 +232,12 @@ export function CollectorSpotlightRail({
                 onClick={() => onOpenDetail(spotlightItem)}
                 className="mt-1 text-left cursor-pointer"
               >
-                <h2 className="truncate font-editorial text-lg font-medium leading-snug text-[#FAF7F0]">
+                <h2 className="truncate font-editorial text-[20px] font-medium leading-snug text-[#FAF7F0] md:text-lg">
                   {spotlightItem.title}
                 </h2>
               </button>
 
-              <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-[#C9C1B4]">
+              <p className="mt-1.5 line-clamp-2 text-[14px] leading-relaxed text-[#C9C1B4] md:text-xs">
                 {spotlightItem.quote
                   ? `“${spotlightItem.quote}”`
                   : spotlightItem.notes ||
@@ -245,7 +245,7 @@ export function CollectorSpotlightRail({
               </p>
 
               {/* 5-Tick Completeness Bar */}
-              <div className="mt-auto pt-2.5">
+              <div className="mt-auto pt-3">
                 <div className="grid grid-cols-5 gap-1">
                   {[0, 1, 2, 3, 4].map((idx) => (
                     <span
@@ -265,11 +265,11 @@ export function CollectorSpotlightRail({
           </div>
 
           {/* Action Row */}
-          <div className="mt-3.5 grid grid-cols-3 gap-2 border-t border-white/10 pt-3">
+          <div className="mt-4 grid grid-cols-3 gap-2.5 border-t border-white/10 pt-3.5">
             <button
               type="button"
               onClick={() => onOpenCardModal(spotlightItem)}
-              className="inline-flex min-h-[42px] items-center justify-center gap-1 rounded-xl border border-white/15 bg-white/10 px-2 text-xs font-medium text-[#FAF7F0] whitespace-nowrap cursor-pointer active:scale-[0.98]"
+              className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-white/10 px-2 text-[13px] min-[420px]:text-[14px] font-medium text-[#FAF7F0] whitespace-nowrap cursor-pointer active:scale-[0.98] md:min-h-[42px] md:text-xs"
             >
               <Layers className="h-3.5 w-3.5 shrink-0 text-[#D4AF6A]" aria-hidden="true" />
               <span>实体藏卡</span>
@@ -278,7 +278,7 @@ export function CollectorSpotlightRail({
             <button
               type="button"
               onClick={() => onOpenDetail(spotlightItem)}
-              className="inline-flex min-h-[42px] items-center justify-center gap-1 rounded-xl bg-[#FAF7F0] px-2 text-xs font-medium text-[#1A1816] whitespace-nowrap cursor-pointer active:scale-[0.98]"
+              className="inline-flex min-h-[44px] items-center justify-center gap-1 rounded-xl bg-[#FAF7F0] px-2 text-[13px] min-[420px]:text-[14px] font-medium text-[#1A1816] whitespace-nowrap cursor-pointer active:scale-[0.98] md:min-h-[42px] md:text-xs"
             >
               <span>
                 {spotlightComp.tier === 'masterpiece' ? '查看档案' : '点亮典藏'}
@@ -290,7 +290,7 @@ export function CollectorSpotlightRail({
               onClick={onTriggerRandomEncounter}
               data-testid="random-encounter-btn"
               aria-label="随机邂逅一件馆藏"
-              className="inline-flex min-h-[42px] items-center justify-center gap-1 rounded-xl border border-[#C9A45C]/60 bg-[#C9A45C]/15 px-2 text-xs font-medium text-[#F5DC9B] whitespace-nowrap cursor-pointer active:scale-[0.97] transition-colors hover:bg-[#C9A45C]/25"
+              className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-[#C9A45C]/60 bg-[#C9A45C]/15 px-2 text-[13px] min-[420px]:text-[14px] font-medium text-[#F5DC9B] whitespace-nowrap cursor-pointer active:scale-[0.97] transition-colors hover:bg-[#C9A45C]/25 md:min-h-[42px] md:text-xs"
             >
               <Dices className="h-3.5 w-3.5 shrink-0 text-[#E4C37A]" aria-hidden="true" />
               <span>随机邂逅</span>
@@ -300,14 +300,14 @@ export function CollectorSpotlightRail({
       )}
 
       {/* 2. Themed Collector Albums Shelf (图鉴册：可视化空槽收集感) */}
-      <div className="mt-3.5" data-testid="collector-albums-section">
+      <div className="mt-4" data-testid="collector-albums-section">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
             <BookOpen
-              className="h-3.5 w-3.5 text-[#7A7268]"
+              className="h-4 w-4 text-[#7A7268]"
               aria-hidden="true"
             />
-            <h3 className="text-xs font-medium tracking-[0.06em] text-[#4B453E]">
+            <h3 className="text-[14px] font-medium tracking-[0.04em] text-[#4B453E] md:text-xs">
               专题图鉴册
             </h3>
             {collector.albums.length > 0 && (
@@ -320,7 +320,7 @@ export function CollectorSpotlightRail({
           <button
             type="button"
             onClick={() => setShowCreateAlbum((v) => !v)}
-            className="inline-flex min-h-[36px] items-center gap-1 rounded-xl border border-[#DCD6CB] bg-white px-2.5 text-xs font-medium text-[#1A1816] whitespace-nowrap cursor-pointer active:scale-[0.97]"
+            className="inline-flex min-h-[38px] items-center gap-1 rounded-xl border border-[#DCD6CB] bg-white px-3 text-[13px] font-medium text-[#1A1816] whitespace-nowrap cursor-pointer active:scale-[0.97] md:min-h-[36px] md:text-xs"
           >
             {showCreateAlbum ? (
               <>
@@ -341,12 +341,12 @@ export function CollectorSpotlightRail({
           <form
             onSubmit={handleSubmitAlbum}
             data-testid="create-album-form"
-            className="mt-2.5 space-y-3 rounded-2xl border border-[#DCD6CB] bg-white p-3.5"
+            className="mt-2.5 space-y-3.5 rounded-2xl border border-[#DCD6CB] bg-white p-4"
           >
             <div>
               <label
                 htmlFor="album-name-input"
-                className="block text-xs font-medium text-[#4B453E]"
+                className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
               >
                 图鉴册名称
               </label>
@@ -359,10 +359,10 @@ export function CollectorSpotlightRail({
                   if (albumError) setAlbumError('');
                 }}
                 placeholder="例如：漫威核心角色全图鉴、诺兰全集"
-                className="mt-1.5 h-11 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3 text-sm text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none"
+                className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none md:h-11 md:text-sm"
               />
               {albumError && (
-                <p role="alert" className="mt-1 text-xs text-[#B43B2B]">
+                <p role="alert" className="mt-1 text-[13px] text-[#B43B2B]">
                   {albumError}
                 </p>
               )}
@@ -371,7 +371,7 @@ export function CollectorSpotlightRail({
             <div>
               <label
                 htmlFor="album-tag-input"
-                className="block text-xs font-medium text-[#4B453E]"
+                className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
               >
                 关联标签（自动收纳入册）
               </label>
@@ -381,7 +381,7 @@ export function CollectorSpotlightRail({
                 value={albumTag}
                 onChange={(e) => setAlbumTag(e.target.value)}
                 placeholder="例如：漫威（带该标签的藏品自动填充槽位）"
-                className="mt-1.5 h-11 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3 text-sm text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none"
+                className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none md:h-11 md:text-sm"
               />
               {tagRegistry.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1.5">
@@ -395,7 +395,7 @@ export function CollectorSpotlightRail({
                           setAlbumName(`${t.name}专题图鉴`);
                         }
                       }}
-                      className={`min-h-[34px] rounded-lg border px-2.5 text-xs cursor-pointer transition-colors ${
+                      className={`min-h-[38px] rounded-lg border px-3 text-[13px] cursor-pointer transition-colors md:min-h-[34px] md:text-xs ${
                         albumTag === t.name
                           ? 'border-[#1A1816] bg-[#1A1816] text-white'
                           : 'border-[#DCD6CB] bg-[#FAF9F6] text-[#4B453E]'
@@ -409,7 +409,7 @@ export function CollectorSpotlightRail({
             </div>
 
             <div>
-              <span className="block text-xs font-medium text-[#4B453E]">
+              <span className="block text-[13px] font-medium text-[#4B453E] md:text-xs">
                 集齐目标件数
               </span>
               <div className="mt-1.5 grid grid-cols-5 gap-1.5">
@@ -419,7 +419,7 @@ export function CollectorSpotlightRail({
                     type="button"
                     aria-pressed={albumTarget === num}
                     onClick={() => setAlbumTarget(num)}
-                    className={`min-h-[40px] rounded-xl font-mono text-xs font-medium tabular-nums cursor-pointer transition-colors ${
+                    className={`min-h-[42px] rounded-xl font-mono text-[13px] font-medium tabular-nums cursor-pointer transition-colors md:min-h-[40px] md:text-xs ${
                       albumTarget === num
                         ? 'bg-[#1A1816] text-white'
                         : 'border border-[#DCD6CB] bg-[#FAF9F6] text-[#4B453E]'
@@ -433,7 +433,7 @@ export function CollectorSpotlightRail({
 
             <button
               type="submit"
-              className="h-11 w-full rounded-xl bg-[#B43B2B] text-xs font-medium text-white cursor-pointer active:scale-[0.98]"
+              className="h-12 w-full rounded-xl bg-[#B43B2B] text-[15px] font-medium text-white cursor-pointer active:scale-[0.98] md:h-11 md:text-xs"
             >
               创建图鉴册
             </button>
@@ -442,7 +442,7 @@ export function CollectorSpotlightRail({
 
         {/* Horizontal Album Rail */}
         {collector.albums.length > 0 ? (
-          <div className="no-scrollbar mt-2.5 flex gap-2.5 overflow-x-auto pb-1">
+          <div className="h-scroll-rail no-scrollbar mt-2.5 flex gap-3 pb-1">
             {collector.albums.map((album: CollectorAlbum) => {
               const matched = resolveAlbumItems(album, items);
               const filledCount = matched.length;
@@ -459,7 +459,7 @@ export function CollectorSpotlightRail({
                 <div
                   key={album.id}
                   data-testid={`album-card-${album.id}`}
-                  className={`gallery-card w-[248px] shrink-0 border p-3 ${
+                  className={`gallery-card w-[268px] min-[420px]:w-[280px] shrink-0 border p-3.5 ${
                     isActive
                       ? 'border-[#1A1816] bg-[#FFFDF9]'
                       : isComplete
@@ -473,10 +473,10 @@ export function CollectorSpotlightRail({
                       onClick={() => onSelectAlbum(isActive ? '' : album.id)}
                       className="min-w-0 flex-1 text-left cursor-pointer"
                     >
-                      <p className="truncate font-editorial text-sm font-medium text-[#1A1816]">
+                      <p className="truncate font-editorial text-[16px] font-medium text-[#1A1816] md:text-sm">
                         {album.name}
                       </p>
-                      <p className="mt-0.5 font-mono text-[11px] tabular-nums text-[#7A7268]">
+                      <p className="mt-0.5 font-mono text-[12px] tabular-nums text-[#7A7268] md:text-[11px]">
                         {filledCount} / {album.targetCount} 件
                         {isComplete
                           ? ' · 已集齐'
@@ -487,14 +487,14 @@ export function CollectorSpotlightRail({
                       type="button"
                       onClick={() => void onDeleteAlbum(album.id)}
                       aria-label={`删除图鉴册「${album.name}」`}
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#8C857B] hover:bg-[#F3EFE8] hover:text-[#B43B2B] cursor-pointer"
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[#8C857B] hover:bg-[#F3EFE8] hover:text-[#B43B2B] cursor-pointer"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
 
                   {/* Progress Hairline */}
-                  <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-[#EFECE5]">
+                  <div className="mt-2.5 h-1 w-full overflow-hidden rounded-full bg-[#EFECE5]">
                     <div
                       className={`h-full rounded-full transition-all ${
                         isComplete ? 'bg-[#A67C37]' : 'bg-[#B43B2B]'
@@ -541,12 +541,12 @@ export function CollectorSpotlightRail({
           </div>
         ) : (
           !showCreateAlbum && (
-            <div className="mt-2 flex items-center justify-between gap-2 rounded-2xl border border-dashed border-[#D3CCC0] bg-white/75 px-3.5 py-3">
+            <div className="mt-2.5 flex items-center justify-between gap-2.5 rounded-2xl border border-dashed border-[#D3CCC0] bg-white/75 px-4 py-3.5">
               <div className="min-w-0">
-                <p className="text-xs font-medium text-[#1A1816]">
+                <p className="text-[14px] font-medium text-[#1A1816] md:text-xs">
                   开启你的第一本全图鉴收集册
                 </p>
-                <p className="mt-0.5 text-[11px] text-[#7A7268]">
+                <p className="mt-0.5 text-[12px] text-[#7A7268] md:text-[11px]">
                   设定目标件数，点亮空缺槽位更有集邮成就感
                 </p>
               </div>
@@ -560,7 +560,7 @@ export function CollectorSpotlightRail({
                       targetCount: 5,
                     })
                   }
-                  className="min-h-[38px] shrink-0 rounded-xl bg-[#1A1816] px-3 text-xs font-medium text-white whitespace-nowrap cursor-pointer active:scale-[0.97]"
+                  className="min-h-[40px] shrink-0 rounded-xl bg-[#1A1816] px-3.5 text-[13px] font-medium text-white whitespace-nowrap cursor-pointer active:scale-[0.97] md:min-h-[38px] md:text-xs"
                 >
                   建「{quickSuggestTag.name}」图鉴
                 </button>
@@ -568,7 +568,7 @@ export function CollectorSpotlightRail({
                 <button
                   type="button"
                   onClick={() => setShowCreateAlbum(true)}
-                  className="min-h-[38px] shrink-0 rounded-xl bg-[#1A1816] px-3 text-xs font-medium text-white whitespace-nowrap cursor-pointer"
+                  className="min-h-[40px] shrink-0 rounded-xl bg-[#1A1816] px-3.5 text-[13px] font-medium text-white whitespace-nowrap cursor-pointer md:min-h-[38px] md:text-xs"
                 >
                   去创建
                 </button>

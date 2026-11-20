@@ -36,9 +36,9 @@ export function MobileNavBar({
   return (
     <nav
       aria-label="底部主导航"
-      className="fixed bottom-0 left-0 right-0 z-40 border-t border-[#E4DFD5] bg-white pb-[env(safe-area-inset-bottom)] md:hidden"
+      className="fixed bottom-0 left-0 right-0 z-40 w-full max-w-[100vw] overflow-hidden border-t border-[#E4DFD5] bg-white/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] md:hidden"
     >
-      <div className="grid h-[60px] grid-cols-5 items-center">
+      <div className="grid h-[62px] grid-cols-5 items-center px-1">
         {TABS.map(({ id, label, Icon }) => {
           const active = activeTab === id;
           return (
@@ -47,17 +47,17 @@ export function MobileNavBar({
               type="button"
               aria-current={active ? 'page' : undefined}
               onClick={() => onSelectTab(id)}
-              className={`relative flex h-full min-h-[44px] flex-col items-center justify-center gap-0.5 cursor-pointer transition-colors duration-150 active:scale-[0.96] ${
-                active ? 'text-[#B43B2B]' : 'text-[#7A7268]'
+              className={`relative flex h-full min-h-[44px] min-w-0 flex-col items-center justify-center gap-1 cursor-pointer transition-colors duration-150 active:scale-[0.96] ${
+                active ? 'text-[#B43B2B]' : 'text-[#6E665C]'
               }`}
             >
               <Icon
-                className={`h-[21px] w-[21px] ${
+                className={`h-[22px] w-[22px] shrink-0 ${
                   active ? 'stroke-[2.2]' : 'stroke-[1.65]'
                 }`}
                 aria-hidden="true"
               />
-              <span className="text-[11px] font-medium leading-none tracking-tight whitespace-nowrap">
+              <span className="max-w-full truncate text-[12px] font-medium leading-none tracking-tight whitespace-nowrap">
                 {label}
                 {id === 'library' && totalCount > 0 ? `(${totalCount})` : ''}
               </span>
@@ -93,18 +93,18 @@ export function AppTopBar({
   onQuickCheckIn,
 }: AppTopBarProps) {
   return (
-    <header className="sticky top-0 z-30 border-b border-[#E4DFD5] bg-[#F7F5F0] pt-[env(safe-area-inset-top)]">
-      {/* Mobile Compact App Bar (52px) */}
-      <div className="flex h-[52px] items-center justify-between gap-2 px-4 md:hidden">
+    <header className="sticky top-0 z-30 w-full max-w-full overflow-x-clip border-b border-[#E4DFD5] bg-[#F7F5F0]/95 backdrop-blur-md pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
+      {/* Mobile Compact App Bar (54px, balanced for iPhone 16 Pro Max) */}
+      <div className="flex h-[54px] items-center justify-between gap-2 px-4 min-[420px]:px-5 md:hidden">
         <button
           type="button"
           onClick={() => onSelectTab('library')}
-          className="font-editorial text-lg font-medium tracking-[0.05em] text-[#1A1816] whitespace-nowrap shrink-0 cursor-pointer"
+          className="min-w-0 truncate font-editorial text-[20px] font-medium tracking-[0.04em] text-[#1A1816] whitespace-nowrap cursor-pointer"
         >
           {TAB_TITLES[activeTab]}
         </button>
 
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5 min-[420px]:gap-2">
           <PWAInstallButton variant="topbar" />
           {needsDailyCheckIn && onQuickCheckIn && (
             <button
@@ -113,7 +113,7 @@ export function AppTopBar({
               onClick={onQuickCheckIn}
               aria-label="今日尚未巡馆盖章，点击立即盖章"
               title="今日尚未巡馆盖章，点击立即盖章"
-              className="inline-flex h-[38px] items-center gap-1 rounded-xl border border-[#EACDC6] bg-[#FDF2EF] px-2.5 text-xs font-medium text-[#B43B2B] whitespace-nowrap shrink-0 cursor-pointer active:scale-[0.97] transition-colors hover:bg-[#FBE6E1]"
+              className="inline-flex h-[40px] items-center gap-1 rounded-xl border border-[#EACDC6] bg-[#FDF2EF] px-2.5 text-[13px] font-medium text-[#B43B2B] whitespace-nowrap shrink-0 cursor-pointer active:scale-[0.97] transition-colors hover:bg-[#FBE6E1]"
             >
               <Stamp className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               <span>待盖章</span>
@@ -124,12 +124,12 @@ export function AppTopBar({
             <button
               type="button"
               onClick={() => onSelectTab('search')}
-              className="min-h-[38px] rounded-xl bg-[#B43B2B] px-3.5 py-1.5 text-xs font-medium text-white whitespace-nowrap shrink-0 cursor-pointer active:scale-[0.97] transition-transform"
+              className="inline-flex h-[40px] items-center justify-center rounded-xl bg-[#B43B2B] px-3.5 text-[13px] font-medium text-white whitespace-nowrap shrink-0 cursor-pointer active:scale-[0.97] transition-transform"
             >
               联网搜
             </button>
           ) : (
-            <span className="font-mono text-xs tabular-nums text-[#7A7268]">
+            <span className="font-mono text-[13px] tabular-nums text-[#7A7268] whitespace-nowrap shrink-0">
               已藏 {totalCount} 件
             </span>
           )}

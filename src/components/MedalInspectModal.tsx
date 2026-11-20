@@ -40,16 +40,16 @@ export function MedalInspectModal({
       aria-modal="true"
       aria-labelledby="medal-inspect-title"
       data-testid="medal-inspect-modal"
-      className="fixed inset-0 z-[70] flex items-end justify-center bg-[#12100E]/75 p-0 backdrop-blur-xs sm:items-center sm:p-4"
+      className="fixed inset-0 z-[70] flex items-end justify-center overflow-hidden bg-[#12100E]/75 p-0 backdrop-blur-xs sm:items-center sm:p-4"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="w-full max-w-[390px] overflow-hidden rounded-t-3xl border border-[#3A342C] bg-[#F7F5F0] shadow-2xl sm:rounded-3xl">
+      <div className="flex max-h-[90dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-3xl border border-[#3A342C] bg-[#F7F5F0] shadow-2xl sm:max-w-[400px] sm:rounded-3xl">
         {/* Ceremonial Velvet Stage */}
-        <div className="relative bg-[#1C1A17] px-6 pt-5 pb-6 text-center text-[#F5F1E8]">
+        <div className="relative shrink-0 bg-[#1C1A17] px-6 pt-5 pb-6 text-center text-[#F5F1E8]">
           <div className="flex items-center justify-between">
-            <span className="font-mono text-[11px] tracking-[0.12em] text-[#B8AE9E]">
+            <span className="font-mono text-[12px] tracking-[0.1em] text-[#B8AE9E] md:text-[11px]">
               影藏勋章 · {MEDAL_CATEGORY_LABELS[medal.category]}系列
             </span>
             <button
@@ -73,28 +73,28 @@ export function MedalInspectModal({
               />
             </div>
 
-            <p className="mt-2 font-mono text-[11px] tracking-[0.12em] text-[#E4C37A]">
+            <p className="mt-2 font-mono text-[12px] tracking-[0.1em] text-[#E4C37A] md:text-[11px]">
               {medal.unlocked ? `已点亮 · ${medal.tierLabel}` : '待解锁'}
             </p>
             <h2
               id="medal-inspect-title"
-              className="mt-1 font-editorial text-xl font-medium text-[#FAF7F0]"
+              className="mt-1 font-editorial text-[22px] font-medium text-[#FAF7F0] md:text-xl"
             >
               {medal.title}
             </h2>
-            <p className="mt-1 text-xs text-[#BFB6A7]">{medal.subtitle}</p>
+            <p className="mt-1 text-[13px] text-[#BFB6A7] md:text-xs">{medal.subtitle}</p>
           </div>
         </div>
 
         {/* Archival Lore & Tier Ladder */}
-        <div className="space-y-4 px-5 py-5">
-          <p className="text-xs leading-relaxed text-[#4B453E]">
+        <div className="flex-1 space-y-4 overflow-y-auto overflow-x-hidden overscroll-contain px-5 pt-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:pb-5">
+          <p className="text-[14px] leading-relaxed text-[#4B453E] md:text-xs">
             {medal.description}
           </p>
 
           {/* Progress Bar toward current/next tier */}
           <div>
-            <div className="flex items-center justify-between text-xs tabular-nums">
+            <div className="flex items-center justify-between text-[13px] tabular-nums md:text-xs">
               <span className="text-[#625C54]">
                 {medal.nextTarget !== null
                   ? medal.unlocked
@@ -122,7 +122,7 @@ export function MedalInspectModal({
 
           {/* Tier Progression Ladder */}
           <div className="border-t border-[#E4DFD5] pt-3.5">
-            <p className="text-[11px] font-medium tracking-[0.06em] text-[#7A7268]">
+            <p className="text-[12px] font-medium tracking-[0.06em] text-[#7A7268] md:text-[11px]">
               晋升阶位
             </p>
             <div
@@ -144,7 +144,7 @@ export function MedalInspectModal({
                     }`}
                   >
                     <p
-                      className={`flex items-center justify-center gap-0.5 text-[11px] font-medium whitespace-nowrap ${
+                      className={`flex items-center justify-center gap-0.5 text-[12px] font-medium whitespace-nowrap md:text-[11px] ${
                         reached ? 'text-[#8E6523]' : 'text-[#8C857B]'
                       }`}
                     >
@@ -153,7 +153,7 @@ export function MedalInspectModal({
                       )}
                       <span>{stop.label}</span>
                     </p>
-                    <p className="mt-0.5 font-mono text-[10px] tabular-nums text-[#7A7268]">
+                    <p className="mt-0.5 font-mono text-[11px] tabular-nums text-[#7A7268] md:text-[10px]">
                       ≥{stop.threshold}
                     </p>
                   </div>
@@ -163,7 +163,7 @@ export function MedalInspectModal({
           </div>
 
           {/* Action Row */}
-          <div className="flex items-center gap-2 pt-1">
+          <div className="flex items-center gap-2.5 pt-1">
             {medal.tagName && onFilterByTag && (
               <button
                 type="button"
@@ -172,16 +172,16 @@ export function MedalInspectModal({
                   onClose();
                   onFilterByTag(tag);
                 }}
-                className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#B43B2B] px-4 text-xs font-medium text-white whitespace-nowrap cursor-pointer hover:bg-[#932D20]"
+                className="inline-flex min-h-[46px] flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#B43B2B] px-4 text-[14px] font-medium text-white whitespace-nowrap cursor-pointer hover:bg-[#932D20] md:min-h-[44px] md:text-xs"
               >
-                <Tag className="h-3.5 w-3.5" aria-hidden="true" />
+                <Tag className="h-4 w-4 md:h-3.5 md:w-3.5" aria-hidden="true" />
                 <span>查看「{medal.tagName}」馆藏</span>
               </button>
             )}
             <button
               type="button"
               onClick={onClose}
-              className={`min-h-[44px] rounded-xl border border-[#DCD6CB] bg-white px-4 text-xs font-medium text-[#1A1816] whitespace-nowrap cursor-pointer ${
+              className={`min-h-[46px] rounded-xl border border-[#DCD6CB] bg-white px-4 text-[14px] font-medium text-[#1A1816] whitespace-nowrap cursor-pointer md:min-h-[44px] md:text-xs ${
                 medal.tagName && onFilterByTag ? 'shrink-0' : 'w-full'
               }`}
             >

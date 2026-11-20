@@ -74,7 +74,7 @@ export function FilterToolbar({
           <div
             role="group"
             aria-label="按收藏状态筛选"
-            className="flex items-center gap-1 overflow-x-auto rounded-md bg-[#ECE8DF] p-1"
+            className="h-scroll-rail no-scrollbar flex items-center gap-1 rounded-md bg-[#ECE8DF] p-1"
           >
             {statusOptions.map((opt) => {
               const active = status === opt.id;

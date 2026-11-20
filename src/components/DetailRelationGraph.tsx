@@ -58,19 +58,19 @@ export function DetailRelationGraph({
     <section
       aria-label="深度关联图谱"
       data-testid="detail-relation-graph"
-      className="mt-7 overflow-hidden rounded-2xl border border-[#3B352D] bg-[#1C1A17] text-[#F5F1E8]"
+      className="mt-7 max-w-full overflow-hidden rounded-2xl border border-[#3B352D] bg-[#1C1A17] text-[#F5F1E8]"
     >
       {/* Header */}
       <div className="flex items-start justify-between gap-2 border-b border-white/10 px-4 py-3.5">
         <div className="min-w-0">
-          <h3 className="flex items-center gap-1.5 font-editorial text-base font-medium text-[#FAF7F0]">
+          <h3 className="flex items-center gap-1.5 font-editorial text-[17px] font-medium text-[#FAF7F0] md:text-base">
             <Network
               className="h-4 w-4 shrink-0 text-[#D4AF6A]"
               aria-hidden="true"
             />
             <span>深度关联图谱</span>
           </h3>
-          <p className="mt-0.5 text-[11px] text-[#B8AE9E] tabular-nums">
+          <p className="mt-0.5 text-[12px] text-[#B8AE9E] tabular-nums md:text-[11px]">
             {neighborNodes.length > 0
               ? `直连 ${graph.directCount} 项 · 延伸 ${
                   graph.deepCount + graph.tagLinkCount
@@ -78,7 +78,7 @@ export function DetailRelationGraph({
               : '可视化展示当前档案与馆内其他条目的深层脉络'}
           </p>
         </div>
-        <span className="shrink-0 whitespace-nowrap font-mono text-[11px] tabular-nums text-[#E4C37A]">
+        <span className="shrink-0 whitespace-nowrap font-mono text-[12px] tabular-nums text-[#E4C37A] md:text-[11px]">
           {graph.nodes.length} 节点
         </span>
       </div>
@@ -335,7 +335,7 @@ export function DetailRelationGraph({
         </svg>
 
         {/* Quiet Inline Legend */}
-        <div className="mt-1 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 px-2 pb-1 text-[10px] text-[#A59D90]">
+        <div className="mt-1 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 px-2 pb-1 text-[11px] text-[#A59D90] md:text-[10px]">
           <span className="inline-flex items-center gap-1.5">
             <span className="inline-block h-[2px] w-3.5 bg-[#D85745]" aria-hidden="true" />
             <span>直接关联</span>
@@ -360,20 +360,20 @@ export function DetailRelationGraph({
       {/* Thumb-Friendly Quick Jump Strip for Graphed Neighbors */}
       {neighborNodes.length > 0 ? (
         <div className="border-t border-white/10 px-3.5 py-3">
-          <div className="no-scrollbar flex gap-2 overflow-x-auto pb-0.5">
+          <div className="h-scroll-rail no-scrollbar flex gap-2 pb-0.5">
             {neighborNodes.map((node) => (
               <button
                 key={`jump-${node.item.id}`}
                 type="button"
                 data-testid={`graph-jump-${node.item.id}`}
                 onClick={() => onSelectItem(node.item)}
-                className="inline-flex min-h-[40px] shrink-0 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.05] px-3 py-1.5 text-left transition-colors hover:border-[#C9A45C]/60 hover:bg-white/[0.1] active:scale-[0.98] cursor-pointer"
+                className="inline-flex min-h-[44px] shrink-0 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.05] px-3 py-1.5 text-left transition-colors hover:border-[#C9A45C]/60 hover:bg-white/[0.1] active:scale-[0.98] cursor-pointer md:min-h-[40px]"
               >
                 <div className="min-w-0">
-                  <p className="max-w-[138px] truncate text-xs font-medium text-[#FAF7F0]">
+                  <p className="max-w-[146px] truncate text-[13px] font-medium text-[#FAF7F0] md:text-xs">
                     {node.item.title}
                   </p>
-                  <p className="text-[10px] text-[#A59D90] whitespace-nowrap">
+                  <p className="text-[11px] text-[#A59D90] whitespace-nowrap md:text-[10px]">
                     <span
                       style={{
                         color: CATEGORY_RING_COLOR[node.item.category],
@@ -394,7 +394,7 @@ export function DetailRelationGraph({
           </div>
         </div>
       ) : (
-        <div className="border-t border-white/10 px-4 py-3 text-center text-xs text-[#A59D90]">
+        <div className="border-t border-white/10 px-4 py-3 text-center text-[13px] text-[#A59D90] md:text-xs">
           暂无馆内关联节点，在上方关联其他条目或添加共同主题标签后，将自动连线成网。
         </div>
       )}

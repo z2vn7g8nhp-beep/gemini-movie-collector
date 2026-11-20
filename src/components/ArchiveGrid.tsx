@@ -120,9 +120,9 @@ export function ArchiveGrid({
     <section
       aria-label="藏品陈列网格"
       data-testid="archive-grid"
-      className="mx-auto max-w-[1160px] px-4 pt-2 pb-24 md:px-8 md:pb-16"
+      className="mx-auto max-w-[1160px] px-4 pt-2.5 pb-[calc(6.5rem+env(safe-area-inset-bottom))] min-[420px]:px-5 md:px-8 md:pb-16"
     >
-      <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 sm:gap-5 lg:grid-cols-4 lg:gap-6">
+      <div className="grid grid-cols-2 gap-3.5 min-[420px]:gap-4 sm:grid-cols-3 sm:gap-5 lg:grid-cols-4 lg:gap-6">
         {items.map((item) => {
           const relatedItems = getRelatedItems(item, allItems);
           const relatedSummary = formatRelatedSummary(relatedItems);
@@ -138,7 +138,7 @@ export function ArchiveGrid({
             .join(' · ');
 
           return (
-            <article key={item.id} className="group flex flex-col">
+            <article key={item.id} className="group flex min-w-0 flex-col">
               <button
                 type="button"
                 onClick={() => onSelectItem(item)}
@@ -163,7 +163,7 @@ export function ArchiveGrid({
                     {isMasterpiece && (
                       <span
                         aria-label="典藏级档案"
-                        className="pointer-events-none absolute right-2 top-2 rounded-lg border border-[#E6C57A]/75 bg-[#1B1814]/85 px-2 py-0.5 font-editorial text-[10px] tracking-[0.14em] text-[#F2D68A] backdrop-blur-[2px]"
+                        className="pointer-events-none absolute right-2 top-2 rounded-lg border border-[#E6C57A]/75 bg-[#1B1814]/85 px-2 py-0.5 font-editorial text-[11px] tracking-[0.14em] text-[#F2D68A] backdrop-blur-[2px]"
                       >
                         典藏
                       </span>
@@ -171,21 +171,21 @@ export function ArchiveGrid({
                   </div>
                 </div>
 
-                {/* Compact Mobile-Optimized Metadata */}
-                <div className="flex flex-1 flex-col px-3 pt-2.5 pb-3">
-                  <p className="truncate font-mono text-[10px] text-[#7A7268] tabular-nums">
+                {/* Readable iPhone 16 Pro Max Optimized Card Metadata */}
+                <div className="flex flex-1 flex-col px-3 pt-2.5 pb-3.5 min-[420px]:px-3.5">
+                  <p className="truncate font-mono text-[11px] min-[420px]:text-[12px] text-[#7A7268] tabular-nums md:text-[10px]">
                     {metaLine}
                   </p>
-                  <h2 className="mt-1 line-clamp-1 font-editorial text-[15px] font-medium leading-snug text-[#1A1816]">
+                  <h2 className="mt-1 line-clamp-1 font-editorial text-[16px] min-[420px]:text-[17px] font-medium leading-snug text-[#1A1816] md:text-[15px]">
                     {item.title}
                   </h2>
                   {item.subtitle && (
-                    <p className="mt-0.5 line-clamp-1 text-xs text-[#625C54]">
+                    <p className="mt-0.5 line-clamp-1 text-[13px] text-[#625C54] md:text-xs">
                       {item.subtitle}
                     </p>
                   )}
 
-                  <div className="mt-auto flex items-center justify-between gap-1.5 pt-2.5 text-[11px] text-[#7A7268]">
+                  <div className="mt-auto flex items-center justify-between gap-1.5 pt-2.5 text-[12px] min-[420px]:text-[13px] text-[#7A7268] md:text-[11px]">
                     <span
                       className="inline-flex shrink-0 items-center gap-1 tabular-nums"
                       aria-label={
@@ -195,7 +195,7 @@ export function ArchiveGrid({
                       {item.rating > 0 ? (
                         <>
                           <Star
-                            className="h-3 w-3 fill-[#B43B2B] text-[#B43B2B]"
+                            className="h-3.5 w-3.5 fill-[#B43B2B] text-[#B43B2B] md:h-3 md:w-3"
                             aria-hidden="true"
                           />
                           <span className="font-mono font-medium text-[#1A1816]">
@@ -214,7 +214,7 @@ export function ArchiveGrid({
                         {relatedSummary}
                       </span>
                     ) : (
-                      <span className="font-mono text-[10px] tabular-nums text-[#8C857B]">
+                      <span className="font-mono text-[11px] min-[420px]:text-[12px] tabular-nums text-[#8C857B] md:text-[10px]">
                         {completeness.tierLabel} {completeness.score}/5
                       </span>
                     )}
@@ -228,7 +228,7 @@ export function ArchiveGrid({
                     {[0, 1, 2, 3, 4].map((idx) => (
                       <span
                         key={idx}
-                        className={`h-[2.5px] rounded-full ${
+                        className={`h-[3px] rounded-full ${
                           idx < completeness.score
                             ? isMasterpiece
                               ? 'bg-[#A67C37]'

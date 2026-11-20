@@ -178,27 +178,27 @@ export function ProfileBackupView({
   };
 
   return (
-    <section className="mx-auto max-w-[760px] space-y-4 px-4 pt-4 pb-28 md:px-8 md:pt-8 md:pb-16">
+    <section className="mx-auto max-w-[760px] space-y-4 px-4 pt-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] min-[420px]:px-5 md:px-8 md:pt-8 md:pb-16">
       {/* 1. Curator Rank & Passport Card */}
       <div
         data-testid="curator-rank-card"
         className="gallery-card-dark border border-[#342F28] p-5 text-[#F5F1E8]"
       >
         <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="font-mono text-[11px] tracking-[0.12em] text-[#A59D90] tabular-nums">
+          <div className="min-w-0">
+            <p className="font-mono text-[12px] tracking-[0.12em] text-[#A59D90] tabular-nums md:text-[11px]">
               馆主铭牌 · LV.{rank.level}
             </p>
-            <h2 className="mt-1 flex items-center gap-2 font-editorial text-2xl font-medium text-[#FAF7F0]">
-              <Award className="h-5 w-5 text-[#D4AF6A]" aria-hidden="true" />
-              <span>{rank.title}</span>
+            <h2 className="mt-1 flex items-center gap-2 font-editorial text-[24px] font-medium text-[#FAF7F0] min-[420px]:text-[25px] md:text-2xl">
+              <Award className="h-5 w-5 shrink-0 text-[#D4AF6A]" aria-hidden="true" />
+              <span className="truncate">{rank.title}</span>
             </h2>
           </div>
 
           <button
             type="button"
             onClick={() => void onCheckInToday()}
-            className={`inline-flex min-h-[40px] shrink-0 items-center gap-1.5 rounded-xl px-3.5 text-xs font-medium whitespace-nowrap cursor-pointer transition-colors ${
+            className={`inline-flex min-h-[42px] shrink-0 items-center gap-1.5 rounded-xl px-3.5 text-[13px] font-medium whitespace-nowrap cursor-pointer transition-colors md:min-h-[40px] md:text-xs ${
               streak.checkedInToday
                 ? 'border border-[#C9A45C]/60 bg-[#C9A45C]/15 text-[#E4C37A]'
                 : 'bg-[#B43B2B] text-white active:scale-[0.97]'
@@ -220,7 +220,7 @@ export function ProfileBackupView({
 
         {/* Rank Progress */}
         <div className="mt-4">
-          <div className="flex items-center justify-between text-xs text-[#C9C1B4] tabular-nums">
+          <div className="flex items-center justify-between text-[13px] text-[#C9C1B4] tabular-nums md:text-xs">
             <span>馆藏值 {rank.points}</span>
             <span>
               {rank.nextLevelPoints
@@ -241,29 +241,29 @@ export function ProfileBackupView({
           <div>
             <p
               data-testid="profile-stat-total"
-              className="font-mono text-lg font-medium tabular-nums text-[#FAF7F0]"
+              className="font-mono text-[20px] font-medium tabular-nums text-[#FAF7F0] md:text-lg"
             >
               {stats.total}
             </p>
-            <p className="mt-0.5 text-[11px] text-[#A59D90]">总馆藏</p>
+            <p className="mt-0.5 text-[12px] text-[#A59D90] md:text-[11px]">总馆藏</p>
           </div>
           <div>
-            <p className="font-mono text-lg font-medium tabular-nums text-[#E4C37A]">
+            <p className="font-mono text-[20px] font-medium tabular-nums text-[#E4C37A] md:text-lg">
               {rank.masterpieceCount}
             </p>
-            <p className="mt-0.5 text-[11px] text-[#A59D90]">典藏级</p>
+            <p className="mt-0.5 text-[12px] text-[#A59D90] md:text-[11px]">典藏级</p>
           </div>
           <div>
-            <p className="font-mono text-lg font-medium tabular-nums text-[#FAF7F0]">
+            <p className="font-mono text-[20px] font-medium tabular-nums text-[#FAF7F0] md:text-lg">
               {rank.linkPairCount}
             </p>
-            <p className="mt-0.5 text-[11px] text-[#A59D90]">羁绊组</p>
+            <p className="mt-0.5 text-[12px] text-[#A59D90] md:text-[11px]">羁绊组</p>
           </div>
           <div>
-            <p className="font-mono text-lg font-medium tabular-nums text-[#E4C37A]">
+            <p className="font-mono text-[20px] font-medium tabular-nums text-[#E4C37A] md:text-lg">
               {unlockedMedals.length}/{medals.length}
             </p>
-            <p className="mt-0.5 text-[11px] text-[#A59D90]">影藏勋章</p>
+            <p className="mt-0.5 text-[12px] text-[#A59D90] md:text-[11px]">影藏勋章</p>
           </div>
         </div>
       </div>
@@ -271,18 +271,18 @@ export function ProfileBackupView({
       {/* 1.5 Dynamic Cinema Medals Cabinet */}
       <div
         data-testid="cinema-medals-section"
-        className="gallery-card border border-[#E6E0D4] p-4 sm:p-5"
+        className="gallery-card border border-[#E6E0D4] p-4 min-[420px]:p-5"
       >
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <h2 className="font-editorial text-base font-medium text-[#1A1816]">
+            <h2 className="font-editorial text-[18px] font-medium text-[#1A1816] md:text-base">
               影藏勋章殿
             </h2>
-            <p className="mt-0.5 text-xs text-[#7A7268]">
+            <p className="mt-0.5 text-[13px] text-[#7A7268] md:text-xs">
               依收藏类型、专题标签与关联图谱动态铸造并逐阶晋升
             </p>
           </div>
-          <span className="shrink-0 whitespace-nowrap font-mono text-xs font-medium tabular-nums text-[#8E6523]">
+          <span className="shrink-0 whitespace-nowrap font-mono text-[13px] font-medium tabular-nums text-[#8E6523] md:text-xs">
             {unlockedMedals.length} / {medals.length}
           </span>
         </div>
@@ -290,29 +290,29 @@ export function ProfileBackupView({
         {/* Velvet Featured Crest Strip (Top Unlocked Prestige Medals) */}
         {unlockedMedals.length > 0 && (
           <div className="mt-3.5 rounded-xl border border-[#C9A45C]/40 bg-[#1C1A17] p-3 text-[#F5F1E8]">
-            <p className="font-mono text-[10px] tracking-[0.12em] text-[#B8AE9E]">
+            <p className="font-mono text-[11px] tracking-[0.1em] text-[#B8AE9E] md:text-[10px]">
               荣耀陈列 · 点击勋章查看铭文与晋阶
             </p>
-            <div className="no-scrollbar mt-2.5 flex gap-2.5 overflow-x-auto pb-0.5">
+            <div className="h-scroll-rail no-scrollbar mt-2.5 flex gap-2.5 pb-0.5">
               {unlockedMedals.slice(0, 6).map((medal) => (
                 <button
                   key={`featured-${medal.id}`}
                   type="button"
                   onClick={() => setInspectingMedal(medal)}
                   aria-label={`赏析荣耀勋章「${medal.title}」`}
-                  className="flex w-[76px] shrink-0 flex-col items-center rounded-xl border border-white/10 bg-white/[0.04] px-1.5 py-2 text-center transition-colors hover:border-[#C9A45C]/60 cursor-pointer"
+                  className="flex w-[84px] shrink-0 flex-col items-center rounded-xl border border-white/10 bg-white/[0.04] px-2 py-2 text-center transition-colors hover:border-[#C9A45C]/60 cursor-pointer min-[420px]:w-[88px] md:w-[76px]"
                 >
                   <CinemaMedalSvg
                     category={medal.category}
                     motif={medal.motif}
                     tier={medal.tier}
                     monogram={medal.monogram}
-                    size={46}
+                    size={48}
                   />
-                  <span className="mt-1 w-full truncate text-[11px] font-medium text-[#FAF7F0]">
+                  <span className="mt-1 w-full truncate text-[12px] font-medium text-[#FAF7F0] md:text-[11px]">
                     {medal.shortTitle}
                   </span>
-                  <span className="text-[10px] text-[#E4C37A] whitespace-nowrap">
+                  <span className="text-[11px] text-[#E4C37A] whitespace-nowrap md:text-[10px]">
                     {medal.tierLabel}
                   </span>
                 </button>
@@ -355,14 +355,14 @@ export function ProfileBackupView({
                 role="tab"
                 aria-selected={active}
                 onClick={() => setMedalFilter(tab.id)}
-                className={`min-h-[38px] rounded-lg px-1.5 text-xs font-medium whitespace-nowrap cursor-pointer transition-colors ${
+                className={`min-h-[42px] rounded-lg px-1.5 text-[13px] font-medium whitespace-nowrap cursor-pointer transition-colors md:min-h-[38px] md:text-xs ${
                   active
                     ? 'bg-white text-[#1A1816] shadow-xs'
                     : 'text-[#625C54]'
                 }`}
               >
                 {tab.label}
-                <span className="ml-0.5 font-mono text-[10px] tabular-nums opacity-75">
+                <span className="ml-0.5 font-mono text-[11px] tabular-nums opacity-75 md:text-[10px]">
                   {tab.count}
                 </span>
               </button>
@@ -400,17 +400,17 @@ export function ProfileBackupView({
                   size={62}
                 />
                 <p
-                  className={`mt-1.5 w-full truncate text-xs font-medium leading-tight ${
+                  className={`mt-1.5 w-full truncate text-[13px] font-medium leading-tight md:text-xs ${
                     medal.unlocked ? 'text-[#1A1816]' : 'text-[#7A7268]'
                   }`}
                 >
                   {medal.shortTitle}
                 </p>
-                <p className="mt-0.5 line-clamp-1 w-full text-[10px] text-[#7A7268]">
+                <p className="mt-0.5 line-clamp-1 w-full text-[11px] text-[#7A7268] md:text-[10px]">
                   {medal.unlocked ? medal.tierLabel : '待解锁'}
                 </p>
                 <span
-                  className={`mt-1 font-mono text-[10px] tabular-nums ${
+                  className={`mt-1 font-mono text-[11px] tabular-nums md:text-[10px] ${
                     medal.unlocked
                       ? medal.tier === 'crimson'
                         ? 'font-medium text-[#B43B2B]'
@@ -431,24 +431,24 @@ export function ProfileBackupView({
       </div>
 
       {/* 2. 14-Day Check-In Filmstrip Calendar */}
-      <div className="rounded-2xl border border-[#E4DFD5] bg-white p-4 sm:p-5">
+      <div className="rounded-2xl border border-[#E4DFD5] bg-white p-4 min-[420px]:p-5">
         <div className="flex items-center justify-between gap-2">
           <div>
-            <h2 className="font-editorial text-base font-medium text-[#1A1816]">
+            <h2 className="font-editorial text-[18px] font-medium text-[#1A1816] md:text-base">
               近 14 日巡馆足迹
             </h2>
-            <p className="mt-0.5 text-xs text-[#7A7268] tabular-nums">
+            <p className="mt-0.5 text-[13px] text-[#7A7268] tabular-nums md:text-xs">
               连续 {streak.currentStreak} 天 · 最长 {streak.longestStreak} 天 · 累计 {streak.totalDays} 天
             </p>
           </div>
         </div>
 
-        <div className="mt-3.5 grid grid-cols-7 gap-1.5 sm:grid-cols-14">
+        <div className="mt-3.5 grid grid-cols-7 gap-2 sm:grid-cols-14 sm:gap-1.5">
           {calendarDays.map((cell) => (
             <div
               key={cell.dateKey}
               aria-label={`${cell.dateKey} ${cell.checked ? '已巡馆' : '未巡馆'}`}
-              className={`flex aspect-square flex-col items-center justify-center rounded-xl border font-mono text-xs tabular-nums ${
+              className={`flex aspect-square flex-col items-center justify-center rounded-xl border font-mono text-[13px] tabular-nums md:text-xs ${
                 cell.checked
                   ? 'border-[#B43B2B] bg-[#B43B2B] font-medium text-white'
                   : cell.isToday
@@ -465,18 +465,18 @@ export function ProfileBackupView({
       {/* 3. Collectible Archival Stamp Book (12 Stamps) */}
       <div
         data-testid="collector-stamps-section"
-        className="gallery-card border border-[#E6E0D4] p-4 sm:p-5"
+        className="gallery-card border border-[#E6E0D4] p-4 min-[420px]:p-5"
       >
         <div className="flex items-center justify-between gap-2">
-          <div>
-            <h2 className="font-editorial text-base font-medium text-[#1A1816]">
+          <div className="min-w-0">
+            <h2 className="font-editorial text-[18px] font-medium text-[#1A1816] md:text-base">
               馆藏印记册
             </h2>
-            <p className="mt-0.5 text-xs text-[#7A7268]">
+            <p className="mt-0.5 text-[13px] text-[#7A7268] md:text-xs">
               收集、关联与打磨档案即可点亮专属纸质胶片朱印与烫金印
             </p>
           </div>
-          <span className="shrink-0 whitespace-nowrap font-mono text-xs font-medium tabular-nums text-[#B43B2B]">
+          <span className="shrink-0 whitespace-nowrap font-mono text-[13px] font-medium tabular-nums text-[#B43B2B] md:text-xs">
             {unlockedCount} / {stamps.length}
           </span>
         </div>
@@ -509,17 +509,17 @@ export function ProfileBackupView({
                 />
 
                 <p
-                  className={`mt-2 text-xs font-medium leading-tight ${
+                  className={`mt-2 text-[13px] font-medium leading-tight md:text-xs ${
                     stamp.unlocked ? 'text-[#1A1816]' : 'text-[#7A7268]'
                   }`}
                 >
                   {stamp.title}
                 </p>
-                <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-[#7A7268]">
+                <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-[#7A7268] md:text-[10px]">
                   {stamp.desc}
                 </p>
                 <span
-                  className={`mt-1.5 font-mono text-[10px] tabular-nums ${
+                  className={`mt-1.5 font-mono text-[11px] tabular-nums md:text-[10px] ${
                     stamp.unlocked
                       ? isGold
                         ? 'font-medium text-[#8E6523]'
@@ -540,22 +540,22 @@ export function ProfileBackupView({
       {/* 4. Category Breakdown Compact Strip */}
       <div className="grid grid-cols-3 gap-2.5">
         <div className="rounded-2xl border border-[#E4DFD5] bg-white p-3.5 text-center">
-          <p className="font-mono text-xl font-medium tabular-nums text-[#1A1816]">
+          <p className="font-mono text-[22px] font-medium tabular-nums text-[#1A1816] md:text-xl">
             {stats.film}
           </p>
-          <p className="mt-0.5 text-xs text-[#625C54]">影视作品</p>
+          <p className="mt-0.5 text-[13px] text-[#625C54] md:text-xs">影视作品</p>
         </div>
         <div className="rounded-2xl border border-[#E4DFD5] bg-white p-3.5 text-center">
-          <p className="font-mono text-xl font-medium tabular-nums text-[#1A1816]">
+          <p className="font-mono text-[22px] font-medium tabular-nums text-[#1A1816] md:text-xl">
             {stats.person}
           </p>
-          <p className="mt-0.5 text-xs text-[#625C54]">影人档案</p>
+          <p className="mt-0.5 text-[13px] text-[#625C54] md:text-xs">影人档案</p>
         </div>
         <div className="rounded-2xl border border-[#E4DFD5] bg-white p-3.5 text-center">
-          <p className="font-mono text-xl font-medium tabular-nums text-[#1A1816]">
+          <p className="font-mono text-[22px] font-medium tabular-nums text-[#1A1816] md:text-xl">
             {stats.character}
           </p>
-          <p className="mt-0.5 text-xs text-[#625C54]">角色图鉴</p>
+          <p className="mt-0.5 text-[13px] text-[#625C54] md:text-xs">角色图鉴</p>
         </div>
       </div>
 
@@ -565,16 +565,16 @@ export function ProfileBackupView({
         className="rounded-2xl border border-[#E4DFD5] bg-white p-5"
       >
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-editorial text-lg font-medium text-[#1A1816]">
+          <h2 className="font-editorial text-[19px] font-medium text-[#1A1816] md:text-lg">
             独立 Web App 与离线安装
           </h2>
-          <span className="font-mono text-[11px] text-[#7A7268]">
+          <span className="font-mono text-[12px] text-[#7A7268] md:text-[11px]">
             {runtimeMode === 'static'
               ? 'GitHub Pages 纯静态本地模式'
               : '服务端直连 + 本地离线双模'}
           </span>
         </div>
-        <p className="mt-1.5 text-xs leading-relaxed text-[#625C54]">
+        <p className="mt-1.5 text-[14px] leading-relaxed text-[#625C54] md:text-xs">
           支持将光影志添加到手机主屏幕或安装为桌面独立窗口，断网时仍可翻阅全部本地藏馆、手记与印记册；部署至 GitHub Pages 时无需后端服务器即可完整运行。
         </p>
         <div className="mt-4">
@@ -590,11 +590,11 @@ export function ProfileBackupView({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Link2 className="h-4 w-4 text-[#B43B2B]" aria-hidden="true" />
-            <h2 className="font-editorial text-lg font-medium text-[#1A1816]">
+            <h2 className="font-editorial text-[19px] font-medium text-[#1A1816] md:text-lg">
               豆瓣影视直连通道
             </h2>
           </div>
-          <span className="font-mono text-[11px] text-[#2A6B46]">
+          <span className="font-mono text-[12px] text-[#2A6B46] md:text-[11px]">
             {runtimeMode === 'server'
               ? '服务端已内置直连'
               : relayInput
@@ -603,7 +603,7 @@ export function ProfileBackupView({
           </span>
         </div>
 
-        <p className="mt-1.5 text-xs leading-relaxed text-[#625C54]">
+        <p className="mt-1.5 text-[14px] leading-relaxed text-[#625C54] md:text-xs">
           {runtimeMode === 'server'
             ? '当前已默认直连 IMDb（评分、奖项、高清海报与主创）并原生融合豆瓣中文片名、评分、简介与剧照，开箱即用。'
             : '当前纯静态/手机端已免配置直连 IMDb（全球稳定无防盗链）并自动启用豆瓣中文信息辅助。如需在静态环境下进一步增强豆瓣中文评分与原站剧照，可按需展开绑定个人中转地址。'}
@@ -613,7 +613,7 @@ export function ProfileBackupView({
           type="button"
           onClick={() => setRelayExpanded((prev) => !prev)}
           aria-expanded={relayExpanded}
-          className="mt-3 text-xs font-medium text-[#1A1816] underline underline-offset-4 hover:text-[#B43B2B] cursor-pointer"
+          className="mt-3 inline-flex min-h-[40px] items-center text-[13px] font-medium text-[#1A1816] underline underline-offset-4 hover:text-[#B43B2B] cursor-pointer md:min-h-0 md:text-xs"
         >
           {relayExpanded ? '收起高级中转配置' : '高级选项：绑定自建中转（可选）'}
         </button>
@@ -623,7 +623,7 @@ export function ProfileBackupView({
             <div>
               <label
                 htmlFor="douban-relay-url-input"
-                className="block text-xs font-medium text-[#4B453E]"
+                className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
               >
                 豆瓣桥接地址（Cloudflare Worker 或本应用后端 URL）
               </label>
@@ -637,7 +637,7 @@ export function ProfileBackupView({
                     if (relayStatus) setRelayStatus('');
                   }}
                   placeholder="https://your-douban-relay.workers.dev"
-                  className="h-10 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3 font-mono text-xs text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none sm:flex-1"
+                  className="h-12 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 font-mono text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none sm:flex-1 md:h-10 md:px-3 md:text-xs"
                 />
                 <button
                   type="button"
@@ -650,21 +650,21 @@ export function ProfileBackupView({
                         : '已清空自定义豆瓣桥接地址。'
                     );
                   }}
-                  className="h-10 rounded-xl bg-[#1A1816] px-4 text-xs font-medium text-white whitespace-nowrap cursor-pointer hover:bg-[#B43B2B]"
+                  className="h-12 rounded-xl bg-[#1A1816] px-4 text-[14px] font-medium text-white whitespace-nowrap cursor-pointer hover:bg-[#B43B2B] md:h-10 md:text-xs"
                 >
                   保存地址
                 </button>
               </div>
               {relayStatus && (
-                <p role="status" className="mt-1.5 text-xs text-[#2A6B46]">
+                <p role="status" className="mt-1.5 break-all text-[13px] text-[#2A6B46] md:text-xs">
                   {relayStatus}
                 </p>
               )}
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#ECE7DD] bg-[#FAF9F6] px-3.5 py-2.5">
-              <span className="text-xs text-[#625C54]">
-                零服务器成本：30 行 Cloudflare Worker 脚本（仓库路径 <code className="font-mono text-[#1A1816]">cloudflare-worker/douban-proxy.js</code>）
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#ECE7DD] bg-[#FAF9F6] px-3.5 py-3">
+              <span className="min-w-0 text-[13px] leading-relaxed text-[#625C54] md:text-xs">
+                零服务器成本：30 行 Cloudflare Worker 脚本（仓库路径 <code className="break-all font-mono text-[#1A1816]">cloudflare-worker/douban-proxy.js</code>）
               </span>
               <button
                 type="button"
@@ -679,7 +679,7 @@ export function ProfileBackupView({
                     setRelayStatus('请直接查看项目中的 cloudflare-worker/douban-proxy.js 文件。');
                   }
                 }}
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#DCD6CB] bg-white px-3 text-xs font-medium text-[#1A1816] cursor-pointer hover:border-[#1A1816]"
+                className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-[#DCD6CB] bg-white px-3 text-[13px] font-medium text-[#1A1816] cursor-pointer hover:border-[#1A1816] md:h-8 md:text-xs"
               >
                 {workerCopied ? (
                   <>
@@ -700,10 +700,10 @@ export function ProfileBackupView({
 
       {/* Export Backup Card */}
       <div className="rounded-2xl border border-[#E4DFD5] bg-white p-5">
-        <h2 className="font-editorial text-lg font-medium text-[#1A1816]">
+        <h2 className="font-editorial text-[19px] font-medium text-[#1A1816] md:text-lg">
           备份与导出
         </h2>
-        <p className="mt-1 text-xs leading-relaxed text-[#625C54]">
+        <p className="mt-1.5 text-[14px] leading-relaxed text-[#625C54] md:text-xs">
           {runtimeMode === 'static'
             ? '当前数据安全保存于浏览器本地存储（无需登录账号）。跨设备同步或长期归档建议定期导出 JSON 备份文件。'
             : '数据已实时保存至服务端与当前浏览器，无需登录第三方账号。你可以随时导出 JSON 备份文件。'}
@@ -711,7 +711,7 @@ export function ProfileBackupView({
         <button
           type="button"
           onClick={handleDownloadJson}
-          className="mt-4 inline-flex h-12 w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-[#1A1816] px-5 text-sm font-medium text-white cursor-pointer active:scale-[0.98] transition-transform hover:bg-[#B43B2B]"
+          className="mt-4 inline-flex h-12 w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-[#1A1816] px-5 text-[15px] font-medium text-white cursor-pointer active:scale-[0.98] transition-transform hover:bg-[#B43B2B] md:text-sm"
         >
           <Download className="h-4 w-4" aria-hidden="true" />
           导出全部馆藏（JSON）
@@ -720,17 +720,17 @@ export function ProfileBackupView({
 
       {/* Import Card */}
       <div className="rounded-2xl border border-[#E4DFD5] bg-white p-5">
-        <h2 className="font-editorial text-lg font-medium text-[#1A1816]">
+        <h2 className="font-editorial text-[19px] font-medium text-[#1A1816] md:text-lg">
           导入恢复
         </h2>
-        <p className="mt-1 text-xs leading-relaxed text-[#625C54]">
+        <p className="mt-1.5 text-[14px] leading-relaxed text-[#625C54] md:text-xs">
           导入备份时会自动按分类与名称去重，不会覆盖已有笔记。
         </p>
 
         <div className="mt-4">
           <label
             htmlFor="mobile-backup-file"
-            className="inline-flex h-12 w-full sm:w-auto items-center justify-center gap-2 rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-5 text-sm font-medium text-[#1A1816] cursor-pointer active:scale-[0.98]"
+            className="inline-flex h-12 w-full sm:w-auto items-center justify-center gap-2 rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-5 text-[15px] font-medium text-[#1A1816] cursor-pointer active:scale-[0.98] md:text-sm"
           >
             <Upload className="h-4 w-4" aria-hidden="true" />
             从手机文件选择 JSON 导入
@@ -747,7 +747,7 @@ export function ProfileBackupView({
         <div className="mt-4">
           <label
             htmlFor="mobile-backup-paste"
-            className="block text-xs text-[#625C54]"
+            className="block text-[13px] text-[#625C54] md:text-xs"
           >
             或粘贴 JSON 备份文本
           </label>
@@ -757,13 +757,13 @@ export function ProfileBackupView({
             value={jsonInput}
             onChange={(e) => setJsonInput(e.target.value)}
             placeholder='{"items": [...]}'
-            className="mt-1.5 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 py-2.5 font-mono text-xs text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none"
+            className="mt-1.5 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 py-2.5 font-mono text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none md:text-xs"
           />
           <button
             type="button"
             disabled={importing}
             onClick={() => void runImport(jsonInput)}
-            className="mt-3 h-11 w-full sm:w-auto rounded-xl bg-[#B43B2B] px-5 text-sm font-medium text-white cursor-pointer active:scale-[0.98] disabled:opacity-50"
+            className="mt-3 h-12 w-full sm:w-auto rounded-xl bg-[#B43B2B] px-5 text-[15px] font-medium text-white cursor-pointer active:scale-[0.98] disabled:opacity-50 md:h-11 md:text-sm"
           >
             {importing ? '导入中…' : '解析并合并导入'}
           </button>
@@ -775,10 +775,10 @@ export function ProfileBackupView({
         <div className="rounded-2xl border border-[#E4DFD5] bg-white p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-sm font-medium text-[#1A1816]">
+              <h2 className="text-[15px] font-medium text-[#1A1816] md:text-sm">
                 清空全部馆藏
               </h2>
-              <p className="mt-0.5 text-xs text-[#625C54]">
+              <p className="mt-0.5 text-[13px] text-[#625C54] md:text-xs">
                 清除所有已收录条目，建议先导出备份。
               </p>
             </div>
@@ -786,9 +786,9 @@ export function ProfileBackupView({
               <button
                 type="button"
                 onClick={() => setConfirmClearAll(true)}
-                className="inline-flex h-11 items-center justify-center gap-1.5 rounded-xl border border-[#E5BFB9] bg-[#FDF4F2] px-4 text-xs font-medium text-[#932D20] cursor-pointer"
+                className="inline-flex h-12 items-center justify-center gap-1.5 rounded-xl border border-[#E5BFB9] bg-[#FDF4F2] px-4 text-[14px] font-medium text-[#932D20] cursor-pointer md:h-11 md:text-xs"
               >
-                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                <Trash2 className="h-4 w-4 md:h-3.5 md:w-3.5" aria-hidden="true" />
                 清空全部
               </button>
             ) : (
@@ -803,14 +803,14 @@ export function ProfileBackupView({
                       message: '已清空全部馆藏。',
                     });
                   }}
-                  className="h-11 flex-1 sm:flex-initial rounded-xl bg-[#B43B2B] px-4 text-xs font-medium text-white cursor-pointer"
+                  className="h-12 flex-1 sm:flex-initial rounded-xl bg-[#B43B2B] px-4 text-[14px] font-medium text-white cursor-pointer md:h-11 md:text-xs"
                 >
                   确认清空
                 </button>
                 <button
                   type="button"
                   onClick={() => setConfirmClearAll(false)}
-                  className="h-11 flex-1 sm:flex-initial rounded-xl border border-[#DCD6CB] bg-white px-4 text-xs text-[#4B453E] cursor-pointer"
+                  className="h-12 flex-1 sm:flex-initial rounded-xl border border-[#DCD6CB] bg-white px-4 text-[14px] text-[#4B453E] cursor-pointer md:h-11 md:text-xs"
                 >
                   取消
                 </button>
@@ -823,7 +823,7 @@ export function ProfileBackupView({
       {feedback && (
         <p
           role={feedback.type === 'error' ? 'alert' : 'status'}
-          className={`rounded-2xl border px-4 py-3 text-xs ${
+          className={`rounded-2xl border px-4 py-3 text-[13px] md:text-xs ${
             feedback.type === 'error'
               ? 'border-[#E5BFB9] bg-[#FDF4F2] text-[#932D20]'
               : 'border-[#C8DFD0] bg-[#F2F7F4] text-[#2A6B46]'

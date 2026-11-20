@@ -23,14 +23,34 @@
     background-color: var(--color-canvas);
     color: var(--color-ink);
     scroll-behavior: smooth;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: clip;
+    overscroll-behavior-x: none;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
   }
 
   body {
+    width: 100%;
+    max-width: 100%;
+    min-height: 100dvh;
+    overflow-x: clip;
+    overscroll-behavior-x: none;
+    touch-action: pan-y;
     background-color: var(--color-canvas);
     background-image:
       radial-gradient(rgba(120, 102, 76, 0.045) 0.65px, transparent 0.65px),
       radial-gradient(ellipse at top, rgba(255, 252, 245, 0.85), rgba(242, 237, 227, 0.45));
     background-size: 16px 16px, 100% 100%;
+  }
+
+  #root {
+    width: 100%;
+    max-width: 100%;
+    min-height: 100dvh;
+    overflow-x: clip;
   }
 
   h1, h2, h3, .font-editorial {
@@ -41,6 +61,25 @@
   .tabular-nums {
     font-variant-numeric: tabular-nums;
   }
+
+  /* Prevent iOS Safari auto-zoom on focus (which causes post-focus horizontal wobble) */
+  @media (max-width: 767px) {
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+    textarea,
+    select {
+      font-size: 16px;
+    }
+  }
+}
+
+/* Touch-contained horizontal rail so swiping carousels never wobbles the outer page */
+.h-scroll-rail {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x pan-y;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Art Gallery Archival Card & Cover Visual Asset System */

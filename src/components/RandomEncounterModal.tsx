@@ -78,7 +78,7 @@ export function RandomEncounterModal({
       aria-labelledby="random-encounter-title"
       data-testid="random-encounter-modal"
       data-item-id={item.id}
-      className="encounter-backdrop-in fixed inset-0 z-[65] flex items-center justify-center bg-[#12100E]/75 p-4 backdrop-blur-xs"
+      className="encounter-backdrop-in fixed inset-0 z-[65] flex items-center justify-center overflow-hidden bg-[#12100E]/75 px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur-xs"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -87,13 +87,13 @@ export function RandomEncounterModal({
         key={`${item.id}-${drawCount}`}
         className={`${
           drawCount > 1 ? 'encounter-card-swap' : 'encounter-card-reveal'
-        } relative flex max-h-[88vh] w-full max-w-[368px] flex-col overflow-hidden rounded-3xl border ${
+        } relative flex max-h-[88dvh] w-full max-w-[392px] flex-col overflow-hidden rounded-3xl border md:max-w-[376px] ${
           isMasterpiece ? 'border-[#C9A45C]' : 'border-[#3B352D]'
         } bg-[#F7F5F0] shadow-2xl`}
       >
         {/* Top Ceremonial Bar */}
         <div className="flex items-center justify-between bg-[#1C1A17] px-4 py-2.5 text-[#F5F1E8]">
-          <div className="flex min-w-0 items-center gap-2 font-mono text-[11px] tracking-[0.08em] text-[#D4AF6A] tabular-nums">
+          <div className="flex min-w-0 items-center gap-2 font-mono text-[12px] tracking-[0.06em] text-[#D4AF6A] tabular-nums md:text-[11px]">
             <Dices className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             <span className="truncate">
               随机邂逅 · {item.accessionNo}
@@ -110,7 +110,7 @@ export function RandomEncounterModal({
         </div>
 
         {/* Scrollable Card Body */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain">
           {/* Framed Poster Hero with Contrast Scrim */}
           <div className="relative bg-[#151310] px-4 pt-3 pb-4">
             <div className="gallery-cover-frame relative mx-auto aspect-[4/3] w-full rounded-2xl border border-white/10 bg-[#1C1A17]">
@@ -126,7 +126,7 @@ export function RandomEncounterModal({
                 className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-[#12100E]/95 via-[#12100E]/60 to-transparent"
               />
               <div className="absolute inset-x-0 bottom-0 p-3.5 text-[#FAF7F0]">
-                <p className="flex items-center gap-1.5 font-mono text-[11px] text-[#E4C37A] tabular-nums">
+                <p className="flex items-center gap-1.5 font-mono text-[12px] text-[#E4C37A] tabular-nums md:text-[11px]">
                   <span>{CATEGORY_LABELS[item.category]}</span>
                   {item.year && (
                     <>
@@ -149,12 +149,12 @@ export function RandomEncounterModal({
                 </p>
                 <h2
                   id="random-encounter-title"
-                  className="mt-0.5 line-clamp-2 font-editorial text-xl font-medium leading-snug text-white"
+                  className="mt-0.5 line-clamp-2 font-editorial text-[22px] font-medium leading-snug text-white md:text-xl"
                 >
                   {item.title}
                 </h2>
                 {(item.originalTitle || item.subtitle) && (
-                  <p className="mt-0.5 truncate text-xs text-[#CFC7B9]">
+                  <p className="mt-0.5 truncate text-[13px] text-[#CFC7B9] md:text-xs">
                     {item.originalTitle || item.subtitle}
                   </p>
                 )}
@@ -165,13 +165,13 @@ export function RandomEncounterModal({
           {/* Editorial Details Section */}
           <div className="space-y-3.5 px-5 py-4">
             {/* Unboxed Metadata Line */}
-            <p className="text-xs text-[#625C54] tabular-nums">
+            <p className="text-[13px] text-[#625C54] tabular-nums md:text-xs">
               {metadataParts.join(' · ')}
             </p>
 
             {/* Quote or Story Excerpt */}
             <p
-              className={`line-clamp-3 text-sm leading-relaxed ${
+              className={`line-clamp-3 text-[15px] leading-relaxed md:text-sm ${
                 item.quote
                   ? 'font-editorial italic text-[#1A1816]'
                   : 'text-[#2E2A26]'
@@ -183,14 +183,14 @@ export function RandomEncounterModal({
             {/* Earned Medals Mini Crest Row */}
             {medalShowcase && medalShowcase.earnedMedals.length > 0 && (
               <div className="flex items-center justify-between gap-2 border-t border-[#E4DFD5] pt-3">
-                <span className="text-[11px] font-medium text-[#7A7268] shrink-0">
+                <span className="shrink-0 text-[12px] font-medium text-[#7A7268] md:text-[11px]">
                   已授勋章
                 </span>
                 <div className="flex items-center gap-2 overflow-hidden">
                   {medalShowcase.earnedMedals.slice(0, 3).map((medal) => (
                     <div
                       key={medal.id}
-                      className="flex items-center gap-1 min-w-0"
+                      className="flex min-w-0 items-center gap-1"
                     >
                       <CinemaMedalSvg
                         category={medal.category}
@@ -200,7 +200,7 @@ export function RandomEncounterModal({
                         size={26}
                         className="shrink-0"
                       />
-                      <span className="truncate text-[11px] font-medium text-[#3D3832]">
+                      <span className="truncate text-[12px] font-medium text-[#3D3832] md:text-[11px]">
                         {medal.shortTitle}
                       </span>
                     </div>
@@ -211,7 +211,7 @@ export function RandomEncounterModal({
 
             {/* Clean Unboxed Relations & Tags Footer */}
             {(relatedItems.length > 0 || item.tags.length > 0) && (
-              <div className="space-y-1 border-t border-[#E4DFD5] pt-3 text-xs text-[#625C54]">
+              <div className="space-y-1 border-t border-[#E4DFD5] pt-3 text-[13px] text-[#625C54] md:text-xs">
                 {relatedItems.length > 0 && (
                   <p className="truncate">
                     <span className="text-[#8C857B]">关联：</span>
@@ -233,13 +233,13 @@ export function RandomEncounterModal({
         </div>
 
         {/* Sticky Ergonomic Action Bar */}
-        <div className="flex items-center gap-2 border-t border-[#E4DFD5] bg-[#FAF9F6] px-4 py-3">
+        <div className="flex items-center gap-2.5 border-t border-[#E4DFD5] bg-[#FAF9F6] px-4 py-3">
           {allItems.length > 1 && (
             <button
               type="button"
               onClick={onDrawAnother}
               data-testid="encounter-draw-another-btn"
-              className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-xl border border-[#DCD6CB] bg-white px-3 text-xs font-medium text-[#1A1816] whitespace-nowrap cursor-pointer active:scale-[0.97] transition-transform hover:border-[#1A1816]"
+              className="inline-flex min-h-[46px] flex-1 items-center justify-center gap-1.5 rounded-xl border border-[#DCD6CB] bg-white px-3 text-[14px] font-medium text-[#1A1816] whitespace-nowrap cursor-pointer active:scale-[0.97] transition-transform hover:border-[#1A1816] md:min-h-[44px] md:text-xs"
             >
               <Dices className="h-4 w-4 text-[#A67C37]" aria-hidden="true" />
               <span>再邂逅一次</span>
@@ -249,7 +249,7 @@ export function RandomEncounterModal({
             type="button"
             onClick={() => onOpenFullDetail(item)}
             data-testid="encounter-open-detail-btn"
-            className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#B43B2B] px-3 text-xs font-medium text-white whitespace-nowrap cursor-pointer active:scale-[0.97] transition-transform hover:bg-[#932D20]"
+            className="inline-flex min-h-[46px] flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#B43B2B] px-3 text-[14px] font-medium text-white whitespace-nowrap cursor-pointer active:scale-[0.97] transition-transform hover:bg-[#932D20] md:min-h-[44px] md:text-xs"
           >
             <span>展开完整档案</span>
             <ArrowUpRight className="h-4 w-4" aria-hidden="true" />

@@ -171,14 +171,14 @@ export function ManualCreateView({
   };
 
   return (
-    <section className="mx-auto max-w-[760px] px-4 pt-4 pb-28 md:px-8 md:pt-8 md:pb-16">
+    <section className="mx-auto max-w-[760px] px-4 pt-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] min-[420px]:px-5 md:px-8 md:pt-8 md:pb-16">
       <form
         onSubmit={handleSubmit}
         noValidate
-        className="space-y-5 rounded-2xl border border-[#E4DFD5] bg-white p-4 sm:p-6"
+        className="space-y-5 rounded-2xl border border-[#E4DFD5] bg-white p-4 min-[420px]:p-5 sm:p-6"
       >
         <div>
-          <span className="block text-xs font-medium text-[#625C54]">
+          <span className="block text-[13px] font-medium text-[#625C54] md:text-xs">
             建档分类
           </span>
           <div
@@ -192,7 +192,7 @@ export function ManualCreateView({
                 type="button"
                 aria-pressed={category === cat}
                 onClick={() => setCategory(cat)}
-                className={`min-h-[42px] rounded-lg text-sm font-medium cursor-pointer transition-colors ${
+                className={`min-h-[44px] rounded-lg text-[15px] font-medium cursor-pointer transition-colors md:min-h-[42px] md:text-sm ${
                   category === cat
                     ? 'bg-white text-[#1A1816] shadow-xs'
                     : 'text-[#625C54]'
@@ -208,7 +208,7 @@ export function ManualCreateView({
         <div>
           <label
             htmlFor="create-title"
-            className="block text-xs font-medium text-[#4B453E]"
+            className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
           >
             名称 / 片名 <span className="text-[#B43B2B]">*</span>
           </label>
@@ -228,14 +228,14 @@ export function ManualCreateView({
                   ? '例如：梁朝伟'
                   : '例如：周慕云'
             }
-            className={`mt-1.5 h-12 w-full rounded-xl border bg-[#FAF9F6] px-3.5 text-[15px] text-[#1A1816] focus:bg-white focus:outline-none ${
+            className={`mt-1.5 h-12 w-full rounded-xl border bg-[#FAF9F6] px-3.5 text-[16px] text-[#1A1816] focus:bg-white focus:outline-none md:text-[15px] ${
               errors.title
                 ? 'border-[#B43B2B]'
                 : 'border-[#DCD6CB] focus:border-[#1A1816]'
             }`}
           />
           {errors.title && (
-            <p role="alert" className="mt-1.5 text-xs text-[#B43B2B]">
+            <p role="alert" className="mt-1.5 text-[13px] text-[#B43B2B] md:text-xs">
               {errors.title}
             </p>
           )}
@@ -245,7 +245,7 @@ export function ManualCreateView({
           <div>
             <label
               htmlFor="create-original-title"
-              className="block text-xs font-medium text-[#4B453E]"
+              className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
             >
               原名 / 外文名（选填）
             </label>
@@ -255,14 +255,14 @@ export function ManualCreateView({
               value={originalTitle}
               onChange={(e) => setOriginalTitle(e.target.value)}
               placeholder="选填"
-              className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-sm text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none"
+              className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none md:text-sm"
             />
           </div>
 
           <div>
             <label
               htmlFor="create-subtitle"
-              className="block text-xs font-medium text-[#4B453E]"
+              className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
             >
               {category === 'film'
                 ? '导演 / 类型'
@@ -276,7 +276,7 @@ export function ManualCreateView({
               value={subtitle}
               onChange={(e) => setSubtitle(e.target.value)}
               placeholder="选填"
-              className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-sm text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none"
+              className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none md:text-sm"
             />
           </div>
         </div>
@@ -285,7 +285,7 @@ export function ManualCreateView({
           <div>
             <label
               htmlFor="create-year"
-              className="block text-xs font-medium text-[#4B453E]"
+              className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
             >
               年份（4位）
             </label>
@@ -299,14 +299,14 @@ export function ManualCreateView({
                 if (errors.year) setErrors((p) => ({ ...p, year: undefined }));
               }}
               placeholder="如 2000"
-              className={`mt-1.5 h-12 w-full rounded-xl border bg-[#FAF9F6] px-3.5 font-mono text-sm text-[#1A1816] focus:bg-white focus:outline-none ${
+              className={`mt-1.5 h-12 w-full rounded-xl border bg-[#FAF9F6] px-3.5 font-mono text-[16px] text-[#1A1816] focus:bg-white focus:outline-none md:text-sm ${
                 errors.year
                   ? 'border-[#B43B2B]'
                   : 'border-[#DCD6CB] focus:border-[#1A1816]'
               }`}
             />
             {errors.year && (
-              <p role="alert" className="mt-1 text-xs text-[#B43B2B]">
+              <p role="alert" className="mt-1 text-[13px] text-[#B43B2B] md:text-xs">
                 {errors.year}
               </p>
             )}
@@ -315,7 +315,7 @@ export function ManualCreateView({
           <div>
             <label
               htmlFor="create-region"
-              className="block text-xs font-medium text-[#4B453E]"
+              className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
             >
               地区
             </label>
@@ -325,7 +325,7 @@ export function ManualCreateView({
               value={region}
               onChange={(e) => setRegion(e.target.value)}
               placeholder="如 中国 / 日本"
-              className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-sm text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none"
+              className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none md:text-sm"
             />
           </div>
         </div>
@@ -335,7 +335,7 @@ export function ManualCreateView({
           <div>
             <label
               htmlFor="create-work"
-              className="block text-xs font-medium text-[#4B453E]"
+              className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
             >
               {category === 'character'
                 ? '出处影视作品'
@@ -349,7 +349,7 @@ export function ManualCreateView({
               value={relatedWorkTitle}
               onChange={(e) => setRelatedWorkTitle(e.target.value)}
               placeholder="选填"
-              className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-sm text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none"
+              className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none md:text-sm"
             />
           </div>
 
@@ -357,7 +357,7 @@ export function ManualCreateView({
             <div>
               <label
                 htmlFor="create-actor"
-                className="block text-xs font-medium text-[#4B453E]"
+                className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
               >
                 饰演演员 / 声优
               </label>
@@ -367,7 +367,7 @@ export function ManualCreateView({
                 value={portrayedBy}
                 onChange={(e) => setPortrayedBy(e.target.value)}
                 placeholder="选填"
-                className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-sm text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none"
+                className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none md:text-sm"
               />
             </div>
           )}
@@ -375,7 +375,7 @@ export function ManualCreateView({
 
         {/* Status */}
         <div>
-          <span className="block text-xs font-medium text-[#4B453E]">
+          <span className="block text-[13px] font-medium text-[#4B453E] md:text-xs">
             收藏状态
           </span>
           <div className="mt-2 grid grid-cols-4 gap-2">
@@ -387,7 +387,7 @@ export function ManualCreateView({
                   type="button"
                   aria-pressed={active}
                   onClick={() => setStatus(st)}
-                  className={`min-h-[42px] rounded-xl text-xs font-medium cursor-pointer transition-colors ${
+                  className={`min-h-[44px] rounded-xl text-[13px] font-medium whitespace-nowrap cursor-pointer transition-colors md:min-h-[42px] md:text-xs ${
                     active
                       ? 'bg-[#1A1816] text-white'
                       : 'border border-[#DCD6CB] bg-[#FAF9F6] text-[#4B453E]'
@@ -402,7 +402,7 @@ export function ManualCreateView({
 
         {/* Rating Stars (44px touch targets) */}
         <div>
-          <span className="block text-xs font-medium text-[#4B453E]">
+          <span className="block text-[13px] font-medium text-[#4B453E] md:text-xs">
             个人评分
           </span>
           <div className="mt-2 flex items-center gap-1">
@@ -424,7 +424,7 @@ export function ManualCreateView({
                 />
               </button>
             ))}
-            <span className="ml-2 font-mono text-xs tabular-nums text-[#625C54]">
+            <span className="ml-2 font-mono text-[13px] tabular-nums text-[#625C54] md:text-xs">
               {rating > 0 ? `${rating}.0` : '未评'}
             </span>
           </div>
@@ -434,7 +434,7 @@ export function ManualCreateView({
         <div>
           <label
             htmlFor="create-cover"
-            className="block text-xs font-medium text-[#4B453E]"
+            className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
           >
             封面 / 剧照链接（选填，自动服务端直连代理）
           </label>
@@ -449,14 +449,14 @@ export function ManualCreateView({
               }
             }}
             placeholder="https://..."
-            className={`mt-1.5 h-12 w-full rounded-xl border bg-[#FAF9F6] px-3.5 font-mono text-xs text-[#1A1816] focus:bg-white focus:outline-none ${
+            className={`mt-1.5 h-12 w-full rounded-xl border bg-[#FAF9F6] px-3.5 font-mono text-[16px] text-[#1A1816] focus:bg-white focus:outline-none md:text-xs ${
               errors.coverUrl
                 ? 'border-[#B43B2B]'
                 : 'border-[#DCD6CB] focus:border-[#1A1816]'
             }`}
           />
           {errors.coverUrl && (
-            <p role="alert" className="mt-1 text-xs text-[#B43B2B]">
+            <p role="alert" className="mt-1 text-[13px] text-[#B43B2B] md:text-xs">
               {errors.coverUrl}
             </p>
           )}
@@ -466,7 +466,7 @@ export function ManualCreateView({
         <div>
           <label
             htmlFor="create-quote"
-            className="block text-xs font-medium text-[#4B453E]"
+            className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
           >
             经典台词 / 语录（选填）
           </label>
@@ -476,14 +476,14 @@ export function ManualCreateView({
             value={quote}
             onChange={(e) => setQuote(e.target.value)}
             placeholder="摘录一句最打动你的台词…"
-            className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-sm text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none"
+            className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none md:text-sm"
           />
         </div>
 
         <div>
           <label
             htmlFor="create-notes"
-            className="block text-xs font-medium text-[#4B453E]"
+            className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
           >
             观影手记 / 简介（选填）
           </label>
@@ -493,14 +493,14 @@ export function ManualCreateView({
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="记录你的想法、剧情备忘或喜欢这个角色的原因…"
-            className="mt-1.5 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 py-3 text-sm leading-relaxed text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none"
+            className="mt-1.5 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 py-3 text-[16px] leading-relaxed text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none md:text-sm"
           />
         </div>
 
         <div>
           <label
             htmlFor="create-tags"
-            className="block text-xs font-medium text-[#4B453E]"
+            className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
           >
             标签（顿号或逗号分隔）
           </label>
@@ -510,7 +510,7 @@ export function ManualCreateView({
             value={tagsText}
             onChange={(e) => setTagsText(e.target.value)}
             placeholder="例如：年度挚爱、反复重刷"
-            className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-sm text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none"
+            className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none md:text-sm"
           />
         </div>
 
@@ -519,9 +519,9 @@ export function ManualCreateView({
             {liveRecommendations.length > 0 && (
               <div
                 data-testid="create-live-recommendations"
-                className="rounded-xl border border-[#E5D5BE] bg-[#FFFDF8] p-3"
+                className="rounded-xl border border-[#E5D5BE] bg-[#FFFDF8] p-3.5"
               >
-                <p className="flex items-center gap-1.5 text-xs font-medium text-[#8E6523]">
+                <p className="flex items-center gap-1.5 text-[13px] font-medium text-[#8E6523] md:text-xs">
                   <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                   <span>
                     根据作品 / 演员名称为你推荐 {liveRecommendations.length} 项未关联藏品
@@ -533,7 +533,7 @@ export function ManualCreateView({
                       key={`draft-rec-${rec.id}`}
                       type="button"
                       onClick={() => toggleRelated(rec.id)}
-                      className="inline-flex min-h-[38px] items-center gap-1.5 rounded-lg border border-[#EACDC6] bg-[#FDF2EF] px-2.5 py-1.5 text-left text-xs font-medium text-[#B43B2B] cursor-pointer transition-colors hover:bg-[#FBE6E1]"
+                      className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg border border-[#EACDC6] bg-[#FDF2EF] px-2.5 py-1.5 text-left text-[13px] font-medium text-[#B43B2B] cursor-pointer transition-colors hover:bg-[#FBE6E1] md:min-h-[38px] md:text-xs"
                     >
                       <Link2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                       <span>
@@ -549,10 +549,10 @@ export function ManualCreateView({
             )}
 
             <div>
-              <span className="block text-xs font-medium text-[#4B453E]">
+              <span className="block text-[13px] font-medium text-[#4B453E] md:text-xs">
                 关联馆内已有藏品（选填）
               </span>
-              <div className="mt-2 flex max-h-36 flex-wrap gap-2 overflow-y-auto rounded-xl border border-[#E4DFD5] bg-[#FAF9F6] p-3">
+              <div className="mt-2 flex max-h-40 flex-wrap gap-2 overflow-y-auto rounded-xl border border-[#E4DFD5] bg-[#FAF9F6] p-3">
                 {existingItems.map((ex) => {
                   const checked = selectedRelatedIds.includes(ex.id);
                   return (
@@ -561,7 +561,7 @@ export function ManualCreateView({
                       type="button"
                       aria-pressed={checked}
                       onClick={() => toggleRelated(ex.id)}
-                      className={`min-h-[38px] rounded-lg px-3 py-1.5 text-xs font-medium cursor-pointer transition-colors ${
+                      className={`min-h-[40px] rounded-lg px-3 py-1.5 text-[13px] font-medium cursor-pointer transition-colors md:min-h-[38px] md:text-xs ${
                         checked
                           ? 'bg-[#B43B2B] text-white'
                           : 'border border-[#DCD6CB] bg-white text-[#2E2A26]'
@@ -579,7 +579,7 @@ export function ManualCreateView({
         <button
           type="submit"
           disabled={submitting}
-          className="h-12 w-full rounded-xl bg-[#B43B2B] text-sm font-medium text-white cursor-pointer active:scale-[0.98] transition-transform hover:bg-[#932D20] disabled:opacity-60"
+          className="h-12 w-full rounded-xl bg-[#B43B2B] text-[16px] font-medium text-white cursor-pointer active:scale-[0.98] transition-transform hover:bg-[#932D20] disabled:opacity-60 md:text-sm"
         >
           {submitting ? '建档中…' : '确认收录到藏馆'}
         </button>
