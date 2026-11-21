@@ -57,3 +57,38 @@ test('unindexed title accepts only cast statements for the requested IMDb ID', a
     globalThis.fetch = fetch;
   }
 });
+
+test('Sunrise on the Reaping has same-origin cast data even with no external requests', async () => {
+  const data = await loadFilmCredits('https://www.imdb.com/title/tt32558705/', '饥饿游戏：收获日出');
+  assert.ok(data?.castArticleRevision);
+  for (const [role, actor] of [['Haymitch Abernathy', 'Joseph Zada'], ['Effie Trinket', 'Elle Fanning']]) {
+    const person = data.people.find(p => [p.title, p.originalTitle].includes(actor));
+    assert.ok(person);
+    assert.ok(data.characters.some(c => [c.title, c.originalTitle].includes(role) && c.portrayedBy?.includes(person.title)));
+  }
+});
+
+test('an unindexed film without Wikidata cast statements resolves its exact article and ignores other sections', async () => {
+  const fetch = globalThis.fetch;
+  const id = 'tt999999998';
+  globalThis.fetch = async input => {
+    const url = new URL(String(input));
+    if (url.hostname === 'en.wikipedia.org') {
+      assert.equal(url.searchParams.get('titles'), 'Example (film)');
+      const revision = { revid: 123, slots: { main: { content: '== Cast ==\n* [[One Actor]] as [[The Lead]]\n== Production ==\n* Wrong Name as Wrong Role' } } };
+      return Response.json({ query: { pages: [{ title: 'Example (film)', revisions: [revision] }] } });
+    }
+    const query = url.searchParams.get('query')!;
+    assert.ok(query.includes(id));
+    return Response.json({ results: { bindings: query.includes('?page schema:about')
+      ? [{ page: { value: 'https://en.wikipedia.org/wiki/Example_(film)' } }] : [] } });
+  };
+  try {
+    const data = await withFilmCredits({ title: 'Example', sourceUrl: 'https://www.imdb.com/title/' + id + '/' },
+      Promise.resolve({ sources: [], films: [], people: [], characters: [] }));
+    assert.deepEqual(data.characters.map(c => [c.title, c.portrayedBy]), [['The Lead', 'One Actor']]);
+    assert.equal(data.castArticleRevision, 123);
+  } finally {
+    globalThis.fetch = fetch;
+  }
+});

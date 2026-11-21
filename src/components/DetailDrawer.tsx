@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { SummarySource } from './SummarySource';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Check,
   ChevronDown,
@@ -29,13 +30,14 @@ import {
   fetchCharacterDossier,
   fetchOnlineRelations,
   getRuntimeModeSync,
+  searchOnline,
 } from '../services/archiveApi';
 import {
   CATEGORY_LABELS,
   findExistingItemByTitle,
   getStatusLabel,
 } from '../utils/archive';
-import { extractImdbIdFromUrl } from '../utils/imdbParsers';
+import { extractImdbIdFromUrl, hasCjkCharacters } from '../utils/imdbParsers';
 import { formatCoverUrlForMode } from '../utils/runtimeEnv';
 import {
   mergeCharacterProfile,
@@ -108,7 +110,7 @@ const STATUS_CHOICES: CollectionStatus[] = [
 ];
 
 export function DetailDrawer({
-  item,
+  item: savedItem,
   allItems,
   onClose,
   onSelectRelated,
@@ -122,6 +124,28 @@ export function DetailDrawer({
   onUnlinkItems,
   onQuickCreateRelated,
 }: DetailDrawerProps) {
+  const [resolvedFilm, setResolvedFilm] = useState<OnlineSearchResult | null>(null);
+  const imdbId = savedItem?.category === 'film' && savedItem.sourceName?.includes('IMDb')
+    ? extractImdbIdFromUrl(savedItem.sourceUrl) : null;
+  const needsProfile = Boolean(imdbId && savedItem && !hasCjkCharacters(savedItem.summary || ''));
+  useEffect(() => {
+    if (!imdbId || !needsProfile) return;
+    let active = true;
+    searchOnline(imdbId, 'film').then(({ results }) => {
+      const match = results.find(row => row.externalId === 'imdb-' + imdbId && row.summaryRevision);
+      if (active && match) setResolvedFilm(match);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [imdbId, needsProfile]);
+
+  const item = useMemo(() => {
+    if (!savedItem || !imdbId || !needsProfile || resolvedFilm?.externalId !== 'imdb-' + imdbId) return savedItem;
+    const rename = !hasCjkCharacters(savedItem.title) && hasCjkCharacters(resolvedFilm.title)
+      && (!resolvedFilm.originalTitle || resolvedFilm.originalTitle.toLowerCase() === savedItem.title.toLowerCase());
+    return { ...savedItem, title: rename ? resolvedFilm.title : savedItem.title,
+      originalTitle: savedItem.originalTitle || (rename ? savedItem.title : undefined),
+      summary: resolvedFilm.summary, summaryRevision: resolvedFilm.summaryRevision };
+  }, [savedItem, imdbId, needsProfile, resolvedFilm]);
   const [rating, setRating] = useState(0);
   const [status, setStatus] = useState<CollectionStatus>('watched');
   const [quote, setQuote] = useState('');
@@ -795,6 +819,7 @@ export function DetailDrawer({
             item.summary && (
               <p className="mt-5 text-[15px] leading-[1.75] text-[#2E2A26] md:text-sm md:leading-relaxed">
                 {item.summary}
+                <SummarySource revision={item.summaryRevision} />
               </p>
             )
           )}

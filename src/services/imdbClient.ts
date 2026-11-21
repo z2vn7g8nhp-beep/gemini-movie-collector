@@ -558,20 +558,23 @@ async function fetchBaikePerson(query: string, options: ImdbClientOptions): Prom
 
 async function resolveWikidataByImdbIds(
   imdbIds: string[],
-  options: ImdbClientOptions
-): Promise<{ zhTitleMap: Map<string, string>; crossIdMap: Map<string, string> }> {
+  options: ImdbClientOptions,
+  includeFilmPages = false,
+): Promise<{ zhTitleMap: Map<string, string>; crossIdMap: Map<string, string>; pages: Map<string, string> }> {
   const zhTitleMap = new Map<string, string>();
   const crossIdMap = new Map<string, string>();
+  const pages = new Map<string, string>();
   const ids = [...new Set(imdbIds.filter(id => /^(tt|nm)\d{5,10}$/.test(id)))].slice(0, 12);
-  if (!ids.length || options.signal?.aborted) return { zhTitleMap, crossIdMap };
+  if (!ids.length || options.signal?.aborted) return { zhTitleMap, crossIdMap, pages };
   const languages = ['zh-cn', 'zh-hans', 'zh', 'zh-sg', 'zh-hk', 'zh-tw'];
-  const query = `SELECT ?id ?label ?douban WHERE {
+  const query = `SELECT ?id ?label ?douban ${includeFilmPages ? '?page' : ''} WHERE {
     VALUES ?id { ${ids.map(id => JSON.stringify(id)).join(' ')} }
     ?work wdt:P345 ?id.
     OPTIONAL { ?work rdfs:label ?label FILTER(LANGMATCHES(LANG(?label), "zh")) }
     OPTIONAL { ?work wdt:P4529 ?douban }
+    ${includeFilmPages ? 'OPTIONAL { ?page schema:about ?work; schema:isPartOf <https://zh.wikipedia.org/>. }' : ''}
   }`;
-  type Row = { id: { value: string }; label?: { value: string; 'xml:lang': string }; douban?: { value: string } };
+  type Row = { id: { value: string }; label?: { value: string; 'xml:lang': string }; douban?: { value: string }; page?: { value: string } };
   const data = await fetchJsonCached<{ results: { bindings: Row[] } }>(
     'https://query.wikidata.org/sparql?' + new URLSearchParams({ query, format: 'json' }),
     { ...options, timeoutMs: 2300 }
@@ -580,6 +583,11 @@ async function resolveWikidataByImdbIds(
   for (const row of data?.results?.bindings || []) {
     const id = row.id.value;
     if (!ids.includes(id)) continue;
+    if (row.page?.value.startsWith('https://zh.wikipedia.org/wiki/')) {
+      const name = decodeURIComponent(row.page.value.slice('https://zh.wikipedia.org/wiki/'.length)).replace(/_/g, ' ');
+      // Reject multiple article identities for a single provider ID.
+      pages.set(id, !pages.has(id) || pages.get(id) === name ? name : '');
+    }
     if (row.douban?.value) crossIdMap.set(id, row.douban.value);
     const rank = languages.indexOf(row.label?.['xml:lang'] || '');
     if (row.label && hasCjkCharacters(row.label.value) && rank >= 0 && rank < (priority.get(id) ?? Infinity)) {
@@ -587,7 +595,28 @@ async function resolveWikidataByImdbIds(
       zhTitleMap.set(id, row.label.value);
     }
   }
-  return { zhTitleMap, crossIdMap };
+  return { zhTitleMap, crossIdMap, pages };
+}
+
+async function fetchLinkedFilmProfiles(pages: Map<string, string>, options: ImdbClientOptions) {
+  const output = new Map<string, { title?: string; summary: string; summaryRevision: number }>();
+  const titles = [...new Set(pages.values())].filter(Boolean);
+  if (!titles.length) return output;
+  const params = new URLSearchParams({ action: 'query', format: 'json', formatversion: '2', origin: '*',
+    variant: 'zh-cn', prop: 'extracts|info', exintro: '1', explaintext: '1', exlimit: 'max', titles: titles.join('|') });
+  type WikiPage = { title: string; extract?: string; lastrevid?: number };
+  const data = await fetchJsonCached<{ query?: { pages?: WikiPage[] } }>(
+    'https://zh.wikipedia.org/w/api.php?' + params, { ...options, timeoutMs: 2500 });
+  for (const page of data?.query?.pages || []) {
+    const summary = page.extract?.trim().split('\n')[0];
+    if (!page.lastrevid || !summary || !hasCjkCharacters(summary)) continue;
+    const ids = [...pages].filter(([, name]) => name === page.title);
+    if (ids.length !== 1) continue;
+    const title = /^《([^《》]+)》/.exec(summary)?.[1];
+    output.set(ids[0][0], { title, summary: summary.length > 320 ? summary.slice(0, 320) + '…' : summary,
+      summaryRevision: page.lastrevid });
+  }
+  return output;
 }
 
 async function runDoubanAssistSafe(
@@ -690,13 +719,20 @@ async function searchFilmTitles(query: string, options: ImdbClientOptions): Prom
     const meta = await fetchCinemetaTitleMeta(id, byId.get(id)?.mediaType || 'auto', options);
     if (meta?.imdbId === id) details.set(id, meta.result);
   }));
-  const unknown = ranked.filter(item => !hasCjkCharacters(item.title) || dbHits.length > 0).map(item => item.externalId.slice(5));
+  const unknown = ranked.filter(item => !hasCjkCharacters(item.summary) || !hasCjkCharacters(item.title) || dbHits.length > 0).map(item => item.externalId.slice(5));
   if (direct && !ranked.length) unknown.push(direct.id);
   const [labels] = await Promise.all([
-    waitWithGrace(resolveWikidataByImdbIds(unknown, options), 2400, undefined),
+    waitWithGrace(resolveWikidataByImdbIds(unknown, options, true), 2400, undefined),
     waitWithGrace(hydrate, 2400, undefined),
   ]);
   if (direct && !ranked.length && details.has(direct.id)) ranked.push(details.get(direct.id)!);
+  const profiles = labels?.pages.size ? await fetchLinkedFilmProfiles(labels.pages, options) : undefined;
+  if (direct && !ranked.length) {
+    const profile = profiles?.get(direct.id);
+    const title = profile?.title || labels?.zhTitleMap.get(direct.id);
+    if (title) ranked.push({ category: 'film', externalId: 'imdb-' + direct.id, title, tags: [], summary: '',
+      sourceName: 'IMDb · 中文资料', sourceUrl: 'https://www.imdb.com/title/' + direct.id + '/' });
+  }
   let usedDouban = false;
   const results = ranked.map(candidate => {
     const id = candidate.externalId.slice(5);
@@ -706,7 +742,10 @@ async function searchFilmTitles(query: string, options: ImdbClientOptions): Prom
     const crossIdMap = db && dbId ? new Map([[id, dbId]]) : undefined;
     if (db) usedDouban = true;
     const enriched = db ? mergeImdbWithDoubanAssist([item], [db], { crossIdMap })[0] : item;
-    return localLabel(enriched, labels?.zhTitleMap.get(id) || bridge?.zhTitleMap.get(id));
+    const profile = profiles?.get(id);
+    const localized = localLabel(enriched, profile?.title || labels?.zhTitleMap.get(id) || bridge?.zhTitleMap.get(id));
+    return profile && !hasCjkCharacters(localized.summary)
+      ? { ...localized, summary: profile.summary, summaryRevision: profile.summaryRevision } : localized;
   });
   if (!direct && !results.length && dbHits.length) {
     results.push(...dbHits.slice(0, 12));
