@@ -33,7 +33,7 @@ npm run preview
 
 ### 中文片名搜索
 
-常见影视的中文名、英文名、年份和 IMDb 编号随应用发布，静态版和服务端共用同一份索引。打开应用后，即使外部资料源超时，索引内的影片也可以搜索、收藏。索引外的条目、实时评分、海报、简介和影人资料依赖在线来源。
+常见影视的中文名、英文名、年份和 IMDb 编号随应用发布，静态版和服务端共用同一份索引。打开应用后，即使外部资料源超时，索引内的影片也可以搜索、收藏。实时评分、海报和未随站点收录的资料依赖在线来源。
 
 维护者可运行 `python3 scripts/update-film-index.py` 更新完整索引。候选来自 IMDb 投票数最多的 6,000 个编号及 Cinemeta 当前热门电影、剧集。中文名取自同一 IMDb 编号关联的 Wikidata 实体。GitHub Pages 每次部署及每周一更新热门片名；更新源不可用时，构建使用仓库内的索引。
 
@@ -50,3 +50,9 @@ npm run preview
 - `python3 scripts/update-role-pairs.py`
 
 Wikidata 提供 CC0 结构化资料。英文维基百科的补充记录仅提取演职员段落明确列出的姓名与角色，通过 Wikidata 的 IMDb 编号和站点链接核对作品，保存来源修订号。详情页链接至对应修订版，可查看原文和作者历史。这些记录不能证明片尾名单齐全。[Wikidata 许可](https://www.wikidata.org/wiki/Wikidata:Licensing) · [维基百科使用条款](https://foundation.wikimedia.org/wiki/Policy:Terms_of_Use) · [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+### 新片与已有藏品的中文资料
+
+`python3 scripts/update-release-catalog.py` 按上映日期从 Wikidata 查找去年、今年和明年的影视作品，以 IMDb 编号和中文维基百科站点链接核对身份。影片可以在获得投票、进入热门榜之前收录。可以用 `--years 2024 2025` 指定年份，历次收录的资料会保留。运行同一脚本并传入 `--cast-only` 可按已核对的英文条目刷新角色表。每周发布流程单独刷新这批数据，热门榜更新失败时仍可发布新片资料。
+
+中文简介节选自中文维基百科对应修订版的简体中文导语，提供原文与 CC BY-SA 4.0 许可链接。有明确英文演员与角色记录的作品随站点提供角色表。搜索结果和旧 IMDb 藏品共用片名和简介资料，原收藏的评分、笔记及关联保存在原记录中。缺少同站角色资料时，应用可按精确 IMDb 编号联网查询 Wikidata 和对应英文维基百科条目。静态站点的本地覆盖取决于已发布的数据以及上游作品条目的内容。

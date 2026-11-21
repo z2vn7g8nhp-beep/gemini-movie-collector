@@ -38,11 +38,32 @@ jobs:
         with:
           path: |
             src/data/film-labels.json
+            src/data/release-profiles.json
             src/data/credits
             src/data/role-pairs
-          key: film-catalog-${{ hashFiles('scripts/update-*.py', 'src/data/film-credits-query.json', 'src/data/film-labels.json', 'src/data/credits/*.json', 'src/data/role-pairs/*.json') }}-${{ github.run_id }}
+          key: film-catalog-${{ hashFiles('scripts/*.py', 'src/data/release-profiles.json', 'src/data/film-credits-query.json', 'src/data/film-labels.json', 'src/data/credits/*.json', 'src/data/role-pairs/*.json') }}-${{ github.run_id }}
           restore-keys: |
-            film-catalog-${{ hashFiles('scripts/update-*.py', 'src/data/film-credits-query.json', 'src/data/film-labels.json', 'src/data/credits/*.json', 'src/data/role-pairs/*.json') }}-
+            film-catalog-${{ hashFiles('scripts/*.py', 'src/data/release-profiles.json', 'src/data/film-credits-query.json', 'src/data/film-labels.json', 'src/data/credits/*.json', 'src/data/role-pairs/*.json') }}-
+
+      - name: Refresh recent and upcoming releases independently of the popularity catalog
+        id: releases
+        if: github.event_name != 'push'
+        continue-on-error: true
+        timeout-minutes: 15
+        run: python3 scripts/update-release-catalog.py
+
+      - name: Refresh cast for releases with verified article links
+        id: release_cast
+        if: github.event_name != 'push'
+        continue-on-error: true
+        timeout-minutes: 20
+        run: |
+          staging=$(mktemp -d)
+          mkdir -p "$staging/src/data"
+          cp -r scripts "$staging/"
+          cp -r src/data/{release-profiles.json,role-pairs} "$staging/src/data/"
+          python3 "$staging/scripts/update-release-catalog.py" --cast-only
+          cp -r "$staging/src/data/role-pairs" src/data/
 
       - name: Refresh the film catalog and cast together
         id: refresh
@@ -53,7 +74,7 @@ jobs:
           staging=$(mktemp -d)
           mkdir -p "$staging/src/data"
           cp -r scripts "$staging/"
-          cp -r src/data/{film-labels.json,film-credits-query.json,credits,role-pairs} "$staging/src/data/"
+          cp -r src/data/{film-labels.json,release-profiles.json,film-credits-query.json,credits,role-pairs} "$staging/src/data/"
           python3 "$staging/scripts/update-film-index.py"
           python3 "$staging/scripts/update-film-credits.py"
           python3 "$staging/scripts/update-role-pairs.py"
@@ -75,11 +96,12 @@ jobs:
         run: npm run build:gh-pages
 
       - name: Preserve the validated data refresh
-        if: steps.refresh.outcome == 'success'
+        if: steps.refresh.outcome == 'success' || steps.releases.outcome == 'success' || steps.release_cast.outcome == 'success'
         uses: actions/cache/save@v4
         with:
           path: |
             src/data/film-labels.json
+            src/data/release-profiles.json
             src/data/credits
             src/data/role-pairs
           key: ${{ steps.catalog.outputs.cache-primary-key }}

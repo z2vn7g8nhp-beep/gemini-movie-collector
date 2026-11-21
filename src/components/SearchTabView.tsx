@@ -1,3 +1,5 @@
+import { localizeFilm } from '../utils/filmIndex';
+import { SummarySource } from './SummarySource';
 import { useEffect, useRef, useState } from 'react';
 import { Check, Loader2, Plus, Search, X } from 'lucide-react';
 import type {
@@ -41,7 +43,8 @@ function loadSearchSession(): CachedSearchSession | null {
           ? parsed.category
           : 'film',
       query: parsed.query,
-      results: Array.isArray(parsed.results) ? parsed.results : [],
+      results: Array.isArray(parsed.results)
+        ? parsed.results.filter(row => row && typeof row.externalId === 'string' && typeof row.title === 'string') : [],
       activeSources: Array.isArray(parsed.activeSources)
         ? parsed.activeSources
         : [],
@@ -82,7 +85,7 @@ export function SearchTabView({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [results, setResults] = useState<OnlineSearchResult[]>(
-    () => (initialQuery.trim() ? [] : cachedSession?.results ?? [])
+    () => (initialQuery.trim() ? [] : cachedSession?.results.map(localizeFilm) ?? [])
   );
   const [activeSources, setActiveSources] = useState<string[]>(
     () => (initialQuery.trim() ? [] : cachedSession?.activeSources ?? [])
@@ -368,6 +371,7 @@ export function SearchTabView({
                       <p className="mt-1.5 line-clamp-2 text-[14px] leading-relaxed text-[#4B453E] md:text-xs">
                         {item.summary}
                       </p>
+                      <SummarySource revision={item.summaryRevision} />
                     </div>
                   </div>
 

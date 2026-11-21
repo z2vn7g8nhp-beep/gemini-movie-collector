@@ -31,6 +31,7 @@ export interface ArchiveItem {
   region?: string;
   coverUrl?: string;
   summary: string;
+  summaryRevision?: number;
   quote?: string;
   notes: string;
   rating: number;
@@ -56,6 +57,7 @@ export interface OnlineSearchResult {
   region?: string;
   coverUrl?: string;
   summary: string;
+  summaryRevision?: number;
   relatedWorkTitle?: string;
   portrayedBy?: string;
   sourceName: string;

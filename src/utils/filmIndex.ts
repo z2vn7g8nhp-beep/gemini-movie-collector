@@ -1,6 +1,7 @@
 import labels from '../data/film-labels.json';
-import type { OnlineSearchResult } from '../types/archive';
-import { parseImdbUrlOrId, rankImdbResults } from './imdbParsers';
+import profilesJson from '../data/release-profiles.json';
+import type { ArchiveItem, OnlineSearchResult } from '../types/archive';
+import { extractImdbIdFromUrl, hasCjkCharacters, parseImdbUrlOrId, rankImdbResults } from './imdbParsers';
 import { normalizeEntityKey } from './wikiCast';
 
 // Mainland theatrical titles for entries whose Wikidata label uses the Taiwan release name.
@@ -11,23 +12,55 @@ const mainlandTitles: Record<string, string> = {
   tt10545296: '饥饿游戏：鸣鸟与蛇之歌',
 };
 
-const records = labels.map(([id, label, originalTitle, year, kind]) => {
-  const title = mainlandTitles[id] || label;
+interface ReleaseProfile {
+  title: string; alias: string; original: string; year: string; kind: string; summary: string; revision: number;
+}
+const profiles: Record<string, ReleaseProfile> = profilesJson;
+const titles = new Map(labels.map(row => [row[0], row]));
+for (const [id, p] of Object.entries(profiles)) {
+  if (!titles.has(id)) titles.set(id, [id, p.title, p.original, p.year, p.kind]);
+}
+const records = [...titles.values()].map(([id, label, original, year, kind]) => {
+  const profile = profiles[id];
+  const title = mainlandTitles[id] || profile?.title || label;
+  const originalTitle = original || profile?.original || '';
   return {
-    id, title, originalTitle, year, kind,
-    keys: [label, title, originalTitle].map(normalizeEntityKey),
+    id, title, originalTitle, year: year || profile?.year, kind: kind || profile?.kind,
+    keys: [label, title, originalTitle, profile?.alias || '', profile?.original || ''].filter(Boolean).map(normalizeEntityKey),
   };
 });
 const byId = new Map(records.map(record => [record.id, record]));
+
+function localizedSummary(id: string, summary: string) {
+  const profile = profiles[id];
+  return profile?.summary && !hasCjkCharacters(summary)
+    ? { summary: profile.summary, summaryRevision: profile.revision } : {};
+}
 
 export function localizeFilm(item: OnlineSearchResult): OnlineSearchResult {
   const record = byId.get(item.externalId.replace(/^imdb-/, ''));
   if (!record || item.category !== 'film') return item;
   return {
     ...item,
+    ...localizedSummary(record.id, item.summary),
     title: record.title,
     originalTitle: item.originalTitle || record.originalTitle || (item.title !== record.title ? item.title : undefined),
     year: item.year || record.year || undefined,
+  };
+}
+
+// Derive a library view from the exact source ID. Keep the user's stored snapshot intact.
+export function localizeArchivedFilm(item: ArchiveItem): ArchiveItem {
+  if (item.category !== 'film' || !item.sourceName?.includes('IMDb')) return item;
+  const id = extractImdbIdFromUrl(item.sourceUrl);
+  const record = id && byId.get(id);
+  if (!record) return item;
+  const rename = !hasCjkCharacters(item.title) && [record.originalTitle, item.originalTitle]
+    .some(original => original && normalizeEntityKey(original) === normalizeEntityKey(item.title));
+  return {
+    ...item, ...localizedSummary(record.id, item.summary || ''),
+    title: rename ? record.title : item.title,
+    originalTitle: rename ? item.originalTitle || item.title : item.originalTitle,
   };
 }
 
@@ -59,6 +92,7 @@ export function searchFilmIndex(query: string): OnlineSearchResult[] {
     sourceName: 'IMDb · 中文片名索引',
     sourceUrl: 'https://www.imdb.com/title/' + record.id + '/',
     summary: '',
+    ...localizedSummary(record.id, ''),
     tags: [],
   })), query).slice(0, 12);
 }

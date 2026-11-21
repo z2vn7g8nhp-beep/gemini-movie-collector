@@ -129,6 +129,51 @@ async function lookupFilmCredits(id: string, title: string, signal?: AbortSignal
   }
 }
 
+// A Wikidata cast statement need not list a character. For a cache miss, resolve
+// the article by IMDb ID just as the build job does and read its credited pairs.
+async function lookupArticleCast(id: string, title: string, signal?: AbortSignal): Promise<OnlineRelationsResponse | null> {
+  if (!/^tt\d{5,10}$/.test(id) || signal?.aborted) return null;
+  const controller = new AbortController();
+  const cancel = () => controller.abort();
+  const timer = setTimeout(cancel, 6000);
+  signal?.addEventListener('abort', cancel, { once: true });
+  try {
+    const query = `SELECT DISTINCT ?page WHERE { ?work wdt:P345 "${id}". ?page schema:about ?work; schema:isPartOf <https://en.wikipedia.org/>. }`;
+    const link = await fetch('https://query.wikidata.org/sparql?' + new URLSearchParams({ query, format: 'json' }), { signal: controller.signal });
+    if (!link.ok) return null;
+    const bindings = (await link.json()).results.bindings;
+    if (bindings.length !== 1 || !bindings[0].page?.value) return null;
+    const pageUrl = new URL(bindings[0].page.value);
+    if (pageUrl.origin !== 'https://en.wikipedia.org' || !pageUrl.pathname.startsWith('/wiki/')) return null;
+    const pageTitle = decodeURIComponent(pageUrl.pathname.slice(6)).replace(/_/g, ' ');
+    const params = new URLSearchParams({ origin: '*', action: 'query', format: 'json', formatversion: '2',
+      prop: 'revisions', rvprop: 'ids|content', rvslots: 'main', titles: pageTitle });
+    const res = await fetch('https://en.wikipedia.org/w/api.php?' + params, { signal: controller.signal });
+    if (!res.ok) return null;
+    const page = (await res.json()).query.pages.find((p: { title: string }) => p.title === pageTitle);
+    const revision = page?.revisions?.[0];
+    if (!Number.isSafeInteger(revision?.revid)) return null;
+    const section = /^==\s*(?:Voice cast|Cast(?: and characters)?|Starring)\s*==[ \t]*$([\s\S]*?)(?=^==[^=]|(?![\s\S]))/im.exec(revision.slots.main.content);
+    if (!section) return null;
+    const name = (raw: string) => raw.replace(/\[\[(?:[^\[\]|]+\|)?([^\[\]]+)\]\]/g, '$1').trim().replace(/^'+|'+$/g, '');
+    const valid = (s: string) => s.length <= 65 && s.split(/\s+/).length <= 7 && /^\p{Lu}[\p{L}\p{N} .’'-]*$/u.test(s);
+    const pairs: Array<[string, string]> = [];
+    for (const line of section[1].split('\n')) {
+      const match = /^\*\s*([^*].*?)\s+as\s+(.+)$/i.exec(line.split(/<ref\b|<!--/i)[0]);
+      if (!match) continue;
+      const actor = name(match[1]);
+      const role = name(match[2].split(/[:,]|\s+[–—]\s+/)[0]);
+      if (valid(actor) && valid(role)) pairs.push([actor, role]);
+    }
+    return pairs.length ? articleCredits([revision.revid, pairs], id, title) : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener('abort', cancel);
+  }
+}
+
 // Keep distinct Wikidata entities, even when they have the same display name.
 // Borrow portraits and links only from uniquely matching live entries.
 function combine(base: OnlineSearchResult[], live: OnlineSearchResult[]): OnlineSearchResult[] {
@@ -188,7 +233,9 @@ export async function withFilmCredits(
     if (data && !signal?.aborted) onPreview?.(data);
     const id = extractImdbIdFromUrl(params.sourceUrl);
     if (!allowLookup || !id || data?.characters.length || signal?.aborted) return data;
-    const remote = await lookupFilmCredits(id, params.title, signal);
+    const statements = await lookupFilmCredits(id, params.title, signal);
+    const article = statements?.characters.length ? null : await lookupArticleCast(id, params.title, signal);
+    const remote = statements && article ? mergeFilmCredits(statements, article) : statements || article;
     if (!remote) return data;
     const combined = data ? mergeFilmCredits(data, remote) : remote;
     if (!signal?.aborted) onPreview?.(combined);

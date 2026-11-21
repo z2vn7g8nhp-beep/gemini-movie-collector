@@ -576,6 +576,9 @@ export function parseImportPayload(jsonText: string): {
                     : undefined,
               }
             : undefined,
+        summaryRevision:
+          typeof entry.summaryRevision === 'number' && Number.isSafeInteger(entry.summaryRevision)
+          && entry.summaryRevision > 0 ? entry.summaryRevision : undefined,
         sourceName:
           typeof entry.sourceName === 'string' ? entry.sourceName : '导入备份',
         sourceUrl:

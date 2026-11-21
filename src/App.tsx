@@ -58,6 +58,7 @@ import {
   detectNewOrUpgradedMedals,
   type MedalTier,
 } from './utils/medals';
+import { localizeArchivedFilm } from './utils/filmIndex';
 import { collectTagRegistry } from './utils/tags';
 import {
   loadPersistedUiState,
@@ -524,8 +525,10 @@ export default function App() {
     [collector.albums, activeAlbumId]
   );
 
+  const displayItems = useMemo(() => items.map(localizeArchivedFilm), [items]);
+
   const filteredItems = useMemo(() => {
-    const baseItems = activeAlbum ? resolveAlbumItems(activeAlbum, items) : items;
+    const baseItems = activeAlbum ? resolveAlbumItems(activeAlbum, displayItems) : displayItems;
     return filterAndSortItems(baseItems, {
       category: activeCategory,
       status: statusFilter,
@@ -533,21 +536,21 @@ export default function App() {
       query: libraryQuery,
       sortBy,
     });
-  }, [items, activeAlbum, activeCategory, statusFilter, activeTag, libraryQuery, sortBy]);
+  }, [displayItems, activeAlbum, activeCategory, statusFilter, activeTag, libraryQuery, sortBy]);
 
   const selectedItem = useMemo(
-    () => items.find((i) => i.id === selectedItemId) ?? null,
-    [items, selectedItemId]
+    () => displayItems.find((i) => i.id === selectedItemId) ?? null,
+    [displayItems, selectedItemId]
   );
 
   const cardModalItem = useMemo(
-    () => items.find((i) => i.id === cardModalItemId) ?? null,
-    [items, cardModalItemId]
+    () => displayItems.find((i) => i.id === cardModalItemId) ?? null,
+    [displayItems, cardModalItemId]
   );
 
   const encounterItem = useMemo(
-    () => items.find((i) => i.id === encounterItemId) ?? null,
-    [items, encounterItemId]
+    () => displayItems.find((i) => i.id === encounterItemId) ?? null,
+    [displayItems, encounterItemId]
   );
 
   const handleTriggerRandomEncounter = () => {
@@ -705,6 +708,7 @@ export default function App() {
       region: result.region,
       coverUrl: formatCoverUrlForMode(result.coverUrl, runtimeModeRef.current),
       summary: result.summary,
+      summaryRevision: result.summaryRevision,
       notes: '',
       rating: 0,
       status: result.category === 'film' ? 'watchlist' : 'watched',
@@ -871,6 +875,7 @@ export default function App() {
         runtimeModeRef.current
       ),
       summary: candidate.summary,
+      summaryRevision: candidate.summaryRevision,
       notes: '',
       rating: 0,
       status: candidate.category === 'film' ? 'watchlist' : 'watched',

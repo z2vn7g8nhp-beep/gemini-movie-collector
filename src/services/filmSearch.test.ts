@@ -56,3 +56,66 @@ test('title spelling outranks enrichment and same-name works retain distinct IMD
     globalThis.fetch = originalFetch;
   }
 });
+
+test('a new release can be searched, collected and reopened with its Chinese profile without external data', async () => {
+  const { localizeArchivedFilm } = await import('../utils/filmIndex');
+  const fetch = globalThis.fetch;
+  globalThis.fetch = async () => { throw new TypeError('external host blocked'); };
+  const id = 'tt32558705';
+  const title = '饥饿游戏：收获日出';
+  const english = 'The Hunger Games: Sunrise on the Reaping';
+  try {
+    for (const query of [english, title, id]) {
+      const { results } = await searchImdbMedia(query, 'film', { mode: 'browser' });
+      assert.equal(results[0]?.externalId, 'imdb-' + id);
+      assert.equal(results[0].title, title);
+      assert.equal(results[0].originalTitle, english);
+      assert.match(results[0].summary, /饥饿游戏/);
+      assert.ok(results[0].summaryRevision);
+    }
+    const old = {
+      id: 'archive-film', accessionNo: 'CA-002', category: 'film' as const, title: english,
+      sourceUrl: 'https://www.imdb.com/title/' + id + '/', sourceName: 'IMDb', summary: 'Explores Panem…',
+      rating: 3, status: 'watched' as const, relatedIds: ['saved-role'], tags: ['动作'], notes: '个人笔记',
+      createdAt: '', updatedAt: '',
+    };
+    const current = localizeArchivedFilm(old);
+    assert.equal(current.title, title);
+    assert.equal(current.originalTitle, english);
+    assert.equal(current.notes, old.notes);
+    assert.equal(current.rating, 3);
+    assert.deepEqual(current.relatedIds, old.relatedIds);
+    assert.ok(current.summaryRevision);
+    assert.equal(old.title, english);
+    const manual = { ...old, sourceName: '手动建档', title: 'My title', summary: 'My own text' };
+    assert.deepEqual(localizeArchivedFilm(manual), manual);
+  } finally {
+    globalThis.fetch = fetch;
+  }
+});
+
+test('a direct IMDb ID outside the snapshot resolves Chinese metadata through its own sitelink', async () => {
+  const fetch = globalThis.fetch;
+  const id = 'tt99999111';
+  globalThis.fetch = async input => {
+    const url = new URL(String(input));
+    if (url.hostname === 'query.wikidata.org') return Response.json({ results: { bindings: [
+      { id: { value: id }, page: { value: 'https://zh.wikipedia.org/wiki/测试电影' } },
+      { id: { value: 'tt99999992' }, page: { value: 'https://zh.wikipedia.org/wiki/同名图书' } },
+    ] } });
+    if (url.hostname === 'zh.wikipedia.org' && url.searchParams.has('titles')) {
+      assert.equal(url.searchParams.get('titles'), '测试电影');
+      return Response.json({ query: { pages: [
+        { title: '测试电影', extract: '《测试影片》讲述一家人的故事。', lastrevid: 1234 },
+        { title: '同名图书', extract: '《另一本书》', lastrevid: 5678 },
+      ] } });
+    }
+    return new Response(null, { status: 503 });
+  };
+  try {
+    const { results } = await searchImdbMedia(id, 'film', { mode: 'server' });
+    assert.deepEqual(results.map(r => [r.title, r.externalId, r.summaryRevision]), [['测试影片', 'imdb-' + id, 1234]]);
+  } finally {
+    globalThis.fetch = fetch;
+  }
+});

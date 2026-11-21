@@ -1,4 +1,5 @@
 """Bundle Wikidata (CC0) cast and role statements for films in the title index."""
+import argparse
 import json
 from concurrent.futures import ThreadPoolExecutor
 import re
@@ -45,6 +46,12 @@ def encode(row):
 
 def main():
     ids = [row[0] for row in json.loads((ROOT / "src/data/film-labels.json").read_text())]
+    profiles = ROOT / "src/data/release-profiles.json"
+    release_ids = json.loads(profiles.read_text()) if profiles.exists() else {}
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--releases-only", action="store_true")
+    args = parser.parse_args()
+    ids = list(release_ids) if args.releases_only else list(dict.fromkeys([*ids, *release_ids]))
     groups = defaultdict(list)
     for imdb in ids:
         groups[imdb[-2:]].append(imdb)
@@ -62,8 +69,11 @@ def main():
         for rows in films.values():
             rows.sort()
         path = output / f"film-credits-{shard}.json"
+        # Keep last-known rows if an upstream statement temporarily disappears.
+        previous = json.loads(path.read_text()) if path.exists() else {}
+        previous.update(films)
         temp = path.with_suffix(".tmp")
-        temp.write_text(json.dumps(films, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n")
+        temp.write_text(json.dumps(previous, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n")
         temp.replace(path)
         print(f"{shard}: {len(films)} titles", flush=True)
         return len(films)
