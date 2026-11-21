@@ -1,3 +1,4 @@
+import { withFilmCredits } from './filmCredits';
 import type {
   ArchiveCategory,
   CharacterProfile,
@@ -2577,7 +2578,7 @@ async function enrichRelationsWithBaikeServer(
   return mergeUniqueByTitle(cloned, aliasMap);
 }
 
-export async function fetchOnlineRelations(params: {
+interface RelationsRequest {
   category?: string;
   title: string;
   originalTitle?: string;
@@ -2585,7 +2586,16 @@ export async function fetchOnlineRelations(params: {
   year?: string;
   mode: MediaEngineMode;
   signal?: AbortSignal;
-}): Promise<OnlineRelationsResponse> {
+}
+
+export function fetchOnlineRelations(params: RelationsRequest): Promise<OnlineRelationsResponse> {
+  const live = fetchLiveRelations(params);
+  return normalizeCategory(params.category) === 'film'
+    ? withFilmCredits(params, live, params.signal)
+    : live;
+}
+
+async function fetchLiveRelations(params: RelationsRequest): Promise<OnlineRelationsResponse> {
   const category = normalizeCategory(params.category);
   const title = params.title.trim();
   const originalTitle = params.originalTitle?.trim() || undefined;
@@ -2699,8 +2709,8 @@ export async function fetchOnlineRelations(params: {
 
     return {
       films: [],
-      people: enrichedPeople.slice(0, 60),
-      characters: mergeUniqueByTitle(enrichedChars).slice(0, 60),
+      people: enrichedPeople,
+      characters: mergeUniqueByTitle(enrichedChars),
       sources: Array.from(new Set(sources)),
     };
   }

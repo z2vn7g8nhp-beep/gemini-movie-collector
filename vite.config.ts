@@ -59,6 +59,7 @@ export default defineConfig(() => {
         workbox: {
           cleanupOutdatedCaches: true,
           globPatterns: ['**/*.{js,css,html,ico,png,jpg,svg,woff,woff2}'],
+          globIgnores: ['**/film-credits-*.js'],
           navigateFallback: 'index.html',
           navigateFallbackDenylist: [/^\/api\//, /^\/douban/, /^\/img/],
           runtimeCaching: [

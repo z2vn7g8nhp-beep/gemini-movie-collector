@@ -38,3 +38,9 @@ npm run preview
 维护者可运行 `python3 scripts/update-film-index.py` 更新完整索引。候选来自 IMDb 投票数最多的 6,000 个编号及 Cinemeta 当前热门电影、剧集。中文名取自同一 IMDb 编号关联的 Wikidata 实体。GitHub Pages 每次部署及每周一更新热门片名；更新源不可用时，构建使用仓库内的索引。
 
 [IMDb 数据集](https://developer.imdb.com/non-commercial-datasets/) · [Wikidata 数据许可](https://www.wikidata.org/wiki/Wikidata:Licensing)
+
+### 演职员与角色
+
+对带有 IMDb 影片链接的藏品，详情页按影片编号从本站载入导演、编剧、演员和有明确记录的角色，再补充可用的联网资料。各片的署名及角色覆盖取决于数据源；详情页另有 IMDb 完整演职员表入口。打开单部作品时只加载一个资料分片。
+
+运行 `python3 scripts/update-film-credits.py` 可按现有片名索引更新演职员快照。快照使用 Wikidata 的 CC0 结构化数据，支持角色实体及纯文本角色名。[Wikidata 数据许可](https://www.wikidata.org/wiki/Wikidata:Licensing)

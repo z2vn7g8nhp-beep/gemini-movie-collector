@@ -6,9 +6,10 @@ import type {
 import type { OnlineRelationsResponse } from '../services/archiveApi';
 import type { AppTab } from '../components/MobileNavBar';
 import type { RuntimeMode } from './runtimeEnv';
+import { extractImdbIdFromUrl } from './imdbParsers';
 import { normalizeEntityKey } from './wikiCast';
 
-const RELATIONS_CACHE_KEY = 'cinearchive.relationsCache.v4';
+const RELATIONS_CACHE_KEY = 'cinearchive.relationsCache.v5';
 const RELATIONS_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const RELATIONS_CACHE_MAX_ENTRIES = 45;
 
@@ -28,8 +29,11 @@ export function buildRelationsCacheKey(params: {
   category: 'film' | 'person';
   title: string;
   originalTitle?: string;
+  sourceUrl?: string;
   year?: string;
 }): string {
+  const imdb = extractImdbIdFromUrl(params.sourceUrl);
+  if (imdb) return `${params.category}::${imdb}`;
   const mainKey = normalizeEntityKey(params.title || params.originalTitle || '');
   const yearPart = (params.year || '').trim().slice(0, 4);
   return `${params.category}::${mainKey}::${yearPart}`;
@@ -72,6 +76,7 @@ export function readCachedRelations(params: {
   category: 'film' | 'person';
   title: string;
   originalTitle?: string;
+  sourceUrl?: string;
   year?: string;
 }): OnlineRelationsResponse | null {
   const key = buildRelationsCacheKey(params);
@@ -95,6 +100,7 @@ export function writeCachedRelations(
     category: 'film' | 'person';
     title: string;
     originalTitle?: string;
+    sourceUrl?: string;
     year?: string;
   },
   data: OnlineRelationsResponse
