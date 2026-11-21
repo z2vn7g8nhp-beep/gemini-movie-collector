@@ -1,12 +1,20 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import fs from 'fs';
+import { createHash } from 'node:crypto';
 import path from 'path';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(() => {
+  const revision = createHash('sha256');
+  for (const dir of ['src/data/credits', 'src/data/role-pairs']) {
+    for (const name of fs.readdirSync(dir).filter(n => n.endsWith('.json')).sort()) {
+      revision.update(name).update(fs.readFileSync(path.join(dir, name)));
+    }
+  }
   return {
+    define: { 'import.meta.env.VITE_CREDITS_REVISION': JSON.stringify(revision.digest('hex')) },
     // Relative base ensures assets, manifest, and service worker work seamlessly
     // both at root (`/`) and under GitHub Pages project subpaths (`/<repo>/`).
     base: process.env.VITE_BASE_PATH || './',
@@ -59,6 +67,7 @@ export default defineConfig(() => {
         workbox: {
           cleanupOutdatedCaches: true,
           globPatterns: ['**/*.{js,css,html,ico,png,jpg,svg,woff,woff2}'],
+          globIgnores: ['**/film-credits-*.js', '**/role-pairs-*.js'],
           navigateFallback: 'index.html',
           navigateFallbackDenylist: [/^\/api\//, /^\/douban/, /^\/img/],
           runtimeCaching: [

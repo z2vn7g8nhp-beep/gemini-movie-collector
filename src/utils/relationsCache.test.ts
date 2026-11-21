@@ -67,6 +67,24 @@ test('relationsCache persists and retrieves online relations without refetching'
   assert.equal(hit.people[0].title, '小罗伯特·唐尼');
 });
 
+test('a film with missing roles is eligible for refresh while the prior cast stays available offline', () => {
+  installMockWindow();
+  const params = { category: 'film' as const, title: '部分名单' };
+  const clock = Date.now;
+  const start = clock();
+  try {
+    Date.now = () => start;
+    writeCachedRelations(params, { films: [], characters: [], sources: ['IMDb'], people: [
+      { externalId: 'nm1234567', title: '演员', category: 'person', tags: [], summary: '', sourceName: 'IMDb' },
+    ] });
+    Date.now = () => start + 31 * 60 * 1000;
+    assert.equal(readCachedRelations(params), null);
+    assert.equal(readCachedRelations(params, true)?.people.length, 1);
+  } finally {
+    Date.now = clock;
+  }
+});
+
 test('relationsCache persists and restores UI session state and origin-scoped runtime mode', () => {
   installMockWindow();
   savePersistedUiState({

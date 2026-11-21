@@ -6,9 +6,10 @@ import type {
 import type { OnlineRelationsResponse } from '../services/archiveApi';
 import type { AppTab } from '../components/MobileNavBar';
 import type { RuntimeMode } from './runtimeEnv';
+import { extractImdbIdFromUrl } from './imdbParsers';
 import { normalizeEntityKey } from './wikiCast';
 
-const RELATIONS_CACHE_KEY = 'cinearchive.relationsCache.v4';
+const RELATIONS_CACHE_KEY = 'cinearchive.relationsCache.v5';
 const RELATIONS_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const RELATIONS_CACHE_MAX_ENTRIES = 45;
 
@@ -19,6 +20,8 @@ const RUNTIME_MODE_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
 interface CachedRelationsEntry {
   key: string;
   updatedAt: number;
+  revision?: string;
+  retrySoon?: boolean;
   data: OnlineRelationsResponse;
 }
 
@@ -28,8 +31,11 @@ export function buildRelationsCacheKey(params: {
   category: 'film' | 'person';
   title: string;
   originalTitle?: string;
+  sourceUrl?: string;
   year?: string;
 }): string {
+  const imdb = extractImdbIdFromUrl(params.sourceUrl);
+  if (imdb) return `${params.category}::${imdb}`;
   const mainKey = normalizeEntityKey(params.title || params.originalTitle || '');
   const yearPart = (params.year || '').trim().slice(0, 4);
   return `${params.category}::${mainKey}::${yearPart}`;
@@ -42,13 +48,11 @@ function loadAllStoredRelations(): CachedRelationsEntry[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    const now = Date.now();
     return parsed.filter(
       (entry): entry is CachedRelationsEntry =>
         Boolean(entry) &&
         typeof entry.key === 'string' &&
         typeof entry.updatedAt === 'number' &&
-        now - entry.updatedAt < RELATIONS_CACHE_TTL_MS &&
         Boolean(entry.data)
     );
   } catch {
@@ -68,26 +72,20 @@ function persistStoredRelations(entries: CachedRelationsEntry[]): void {
   }
 }
 
-export function readCachedRelations(params: {
-  category: 'film' | 'person';
-  title: string;
-  originalTitle?: string;
-  year?: string;
-}): OnlineRelationsResponse | null {
+export function readCachedRelations(
+  params: Parameters<typeof buildRelationsCacheKey>[0],
+  allowStale = false,
+): OnlineRelationsResponse | null {
   const key = buildRelationsCacheKey(params);
-  const now = Date.now();
-
-  const memHit = memoryRelationsCache.get(key);
-  if (memHit && now - memHit.updatedAt < RELATIONS_CACHE_TTL_MS) {
-    return memHit.data;
-  }
-
-  const stored = loadAllStoredRelations();
-  const hit = stored.find((e) => e.key === key);
-  if (!hit) return null;
-
-  memoryRelationsCache.set(key, hit);
-  return hit.data;
+  const entry = memoryRelationsCache.get(key) || loadAllStoredRelations().find(row => row.key === key);
+  if (!entry) return null;
+  const film = params.category === 'film';
+  const ttl = film && (entry.retrySoon || !entry.data.characters.length || !entry.data.people.length)
+    ? 30 * 60 * 1000 : RELATIONS_CACHE_TTL_MS;
+  const outdated = film && entry.revision !== (import.meta.env?.VITE_CREDITS_REVISION || 'dev');
+  if (!allowStale && (outdated || Date.now() - entry.updatedAt >= ttl)) return null;
+  memoryRelationsCache.set(key, entry);
+  return entry.data;
 }
 
 export function writeCachedRelations(
@@ -95,9 +93,11 @@ export function writeCachedRelations(
     category: 'film' | 'person';
     title: string;
     originalTitle?: string;
+    sourceUrl?: string;
     year?: string;
   },
-  data: OnlineRelationsResponse
+  data: OnlineRelationsResponse,
+  retrySoon = false,
 ): void {
   const totalCount =
     data.films.length + data.people.length + data.characters.length;
@@ -107,6 +107,8 @@ export function writeCachedRelations(
   const entry: CachedRelationsEntry = {
     key,
     updatedAt: Date.now(),
+    retrySoon,
+    revision: import.meta.env?.VITE_CREDITS_REVISION || 'dev',
     data,
   };
   memoryRelationsCache.set(key, entry);

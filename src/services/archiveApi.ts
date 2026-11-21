@@ -1,3 +1,4 @@
+import { withFilmCredits } from './filmCredits';
 import type {
   ArchiveCategory,
   CharacterProfile,
@@ -87,6 +88,7 @@ export interface OnlineSearchResponse {
 }
 
 export interface OnlineRelationsResponse {
+  castArticleRevision?: number;
   films: OnlineSearchResult[];
   people: OnlineSearchResult[];
   characters: OnlineSearchResult[];
@@ -1611,16 +1613,27 @@ export async function searchCovers(
 
 // ---------- Cross-Entity Relations Discovery ----------
 
+interface RelationRequest {
+  category: 'film' | 'person';
+  title: string;
+  originalTitle?: string;
+  sourceUrl?: string;
+  year?: string;
+  tags?: string[];
+  subtitle?: string;
+}
+
 export async function fetchOnlineRelations(
-  params: {
-    category: 'film' | 'person';
-    title: string;
-    originalTitle?: string;
-    sourceUrl?: string;
-    year?: string;
-    tags?: string[];
-    subtitle?: string;
-  },
+  params: RelationRequest,
+  signal?: AbortSignal,
+  onPreview?: (result: OnlineRelationsResponse) => void
+): Promise<OnlineRelationsResponse> {
+  const live = fetchLiveRelations(params, signal);
+  return params.category === 'film' ? withFilmCredits(params, live, signal, onPreview, getRuntimeModeSync() === 'static') : live;
+}
+
+async function fetchLiveRelations(
+  params: RelationRequest,
   signal?: AbortSignal
 ): Promise<OnlineRelationsResponse> {
   const mode = await detectRuntimeMode();
@@ -1636,6 +1649,7 @@ export async function fetchOnlineRelations(
     if (res.ok) {
       const data = (await res.json()) as Partial<OnlineRelationsResponse>;
       return {
+        castArticleRevision: Number.isSafeInteger(data.castArticleRevision) ? data.castArticleRevision : undefined,
         films: Array.isArray(data.films) ? data.films : [],
         people: Array.isArray(data.people) ? data.people : [],
         characters: Array.isArray(data.characters) ? data.characters : [],
@@ -2101,8 +2115,8 @@ export async function fetchOnlineRelations(
 
     return {
       films: [],
-      people: enrichedPeople.slice(0, 60),
-      characters: mergedCharacters.slice(0, 60),
+      people: enrichedPeople,
+      characters: mergedCharacters,
       sources: Array.from(new Set(sources)),
     };
   } else {
