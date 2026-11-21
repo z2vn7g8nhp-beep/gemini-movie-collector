@@ -32,7 +32,35 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps --no-audit --no-fund
 
-      - name: Refresh Chinese labels for current releases
+      - name: Restore the last published data refresh
+        id: catalog
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            src/data/film-labels.json
+            src/data/credits
+            src/data/role-pairs
+          key: film-catalog-${{ hashFiles('scripts/update-*.py', 'src/data/film-credits-query.json', 'src/data/film-labels.json', 'src/data/credits/*.json', 'src/data/role-pairs/*.json') }}-${{ github.run_id }}
+          restore-keys: |
+            film-catalog-${{ hashFiles('scripts/update-*.py', 'src/data/film-credits-query.json', 'src/data/film-labels.json', 'src/data/credits/*.json', 'src/data/role-pairs/*.json') }}-
+
+      - name: Refresh the film catalog and cast together
+        id: refresh
+        if: github.event_name != 'push'
+        continue-on-error: true
+        timeout-minutes: 45
+        run: |
+          staging=$(mktemp -d)
+          mkdir -p "$staging/src/data"
+          cp -r scripts "$staging/"
+          cp -r src/data/{film-labels.json,film-credits-query.json,credits,role-pairs} "$staging/src/data/"
+          python3 "$staging/scripts/update-film-index.py"
+          python3 "$staging/scripts/update-film-credits.py"
+          python3 "$staging/scripts/update-role-pairs.py"
+          cp -r "$staging/src/data/." src/data/
+
+      - name: Refresh trending labels between catalog rebuilds
+        if: github.event_name == 'push'
         continue-on-error: true
         timeout-minutes: 4
         run: python3 scripts/update-film-index.py --trending-only
@@ -45,6 +73,16 @@ jobs:
 
       - name: Build static GitHub Pages Web App
         run: npm run build:gh-pages
+
+      - name: Preserve the validated data refresh
+        if: steps.refresh.outcome == 'success'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            src/data/film-labels.json
+            src/data/credits
+            src/data/role-pairs
+          key: ${{ steps.catalog.outputs.cache-primary-key }}
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5

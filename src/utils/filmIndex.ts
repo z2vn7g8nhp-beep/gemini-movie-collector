@@ -31,6 +31,17 @@ export function localizeFilm(item: OnlineSearchResult): OnlineSearchResult {
   };
 }
 
+// Imported archives may have no provider link. Only resolve a unique exact name/year pair.
+export function findIndexedFilmId(title: string, originalTitle?: string, year?: string): string | undefined {
+  if (!year || !/^\d{4}$/.test(year)) return undefined;
+  const names = [title, originalTitle].filter((s): s is string => Boolean(s?.trim()))
+    .map(s => s.normalize('NFKC').trim().toLowerCase());
+  const matches = records.filter(row => row.year === year && names.every(name =>
+    [row.title, row.originalTitle].some(s => s?.normalize('NFKC').trim().toLowerCase() === name)
+  ));
+  return names.length && matches.length === 1 ? matches[0].id : undefined;
+}
+
 export function searchFilmIndex(query: string): OnlineSearchResult[] {
   const direct = parseImdbUrlOrId(query);
   const key = normalizeEntityKey(query);

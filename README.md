@@ -41,6 +41,12 @@ npm run preview
 
 ### 演职员与角色
 
-对带有 IMDb 影片链接的藏品，详情页按影片编号从本站载入导演、编剧、演员和有明确记录的角色，再补充可用的联网资料。各片的署名及角色覆盖取决于数据源；详情页另有 IMDb 完整演职员表入口。打开单部作品时只加载一个资料分片。
+影片详情优先读本站按 IMDb 编号保存的演职员与角色资料。缺少链接的旧藏品也可按片名与年份唯一匹配。标签上的「已收录」是实际查到的数量；缺资料显示「待补充」。本站未覆盖的 IMDb 编号会尝试联网查询。换用新版资料或重新打开缺项缓存后，原藏品可以直接补充。
 
-运行 `python3 scripts/update-film-credits.py` 可按现有片名索引更新演职员快照。快照使用 Wikidata 的 CC0 结构化数据，支持角色实体及纯文本角色名。[Wikidata 数据许可](https://www.wikidata.org/wiki/Wikidata:Licensing)
+每周一及手动触发 Pages 工作流时，在临时目录依次刷新片名、Wikidata 演职员、英文维基百科演员与角色对应记录。全部数据准备完成才进入构建；上游报错时沿用上次成功的缓存，缓存不可用时使用仓库快照。推送代码时继续更新热门片名。可分别运行以下脚本复现更新：
+
+- `python3 scripts/update-film-index.py`
+- `python3 scripts/update-film-credits.py`
+- `python3 scripts/update-role-pairs.py`
+
+Wikidata 提供 CC0 结构化资料。英文维基百科的补充记录仅提取演职员段落明确列出的姓名与角色，通过 Wikidata 的 IMDb 编号和站点链接核对作品，保存来源修订号。详情页链接至对应修订版，可查看原文和作者历史。这些记录不能证明片尾名单齐全。[Wikidata 许可](https://www.wikidata.org/wiki/Wikidata:Licensing) · [维基百科使用条款](https://foundation.wikimedia.org/wiki/Policy:Terms_of_Use) · [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)

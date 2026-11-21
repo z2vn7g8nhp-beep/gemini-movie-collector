@@ -88,6 +88,7 @@ export interface OnlineSearchResponse {
 }
 
 export interface OnlineRelationsResponse {
+  castArticleRevision?: number;
   films: OnlineSearchResult[];
   people: OnlineSearchResult[];
   characters: OnlineSearchResult[];
@@ -1628,7 +1629,7 @@ export async function fetchOnlineRelations(
   onPreview?: (result: OnlineRelationsResponse) => void
 ): Promise<OnlineRelationsResponse> {
   const live = fetchLiveRelations(params, signal);
-  return params.category === 'film' ? withFilmCredits(params, live, signal, onPreview) : live;
+  return params.category === 'film' ? withFilmCredits(params, live, signal, onPreview, getRuntimeModeSync() === 'static') : live;
 }
 
 async function fetchLiveRelations(
@@ -1648,6 +1649,7 @@ async function fetchLiveRelations(
     if (res.ok) {
       const data = (await res.json()) as Partial<OnlineRelationsResponse>;
       return {
+        castArticleRevision: Number.isSafeInteger(data.castArticleRevision) ? data.castArticleRevision : undefined,
         films: Array.isArray(data.films) ? data.films : [],
         people: Array.isArray(data.people) ? data.people : [],
         characters: Array.isArray(data.characters) ? data.characters : [],

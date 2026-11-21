@@ -84,6 +84,7 @@ export interface CoverSearchResponse {
 }
 
 export interface OnlineRelationsResponse {
+  castArticleRevision?: number;
   films: OnlineSearchResult[];
   people: OnlineSearchResult[];
   characters: OnlineSearchResult[];

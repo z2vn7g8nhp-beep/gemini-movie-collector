@@ -25,6 +25,7 @@ import type {
   OnlineSearchResult,
 } from '../types/archive';
 import {
+  type OnlineRelationsResponse,
   fetchCharacterDossier,
   fetchOnlineRelations,
   getRuntimeModeSync,
@@ -56,6 +57,20 @@ import { DetailMedalShowcase } from './DetailMedalShowcase';
 import { DetailRelationGraph } from './DetailRelationGraph';
 import { DetailTagManager } from './DetailTagManager';
 
+function retainKnownLists(next: OnlineRelationsResponse, previous: OnlineRelationsResponse | null) {
+  if (!previous) return next;
+  const missingPeople = !next.people.length && previous.people.length > 0;
+  const missingRoles = !next.characters.length && previous.characters.length > 0;
+  if (!missingPeople && !missingRoles) return next;
+  return {
+    ...next,
+    people: missingPeople ? previous.people : next.people,
+    characters: missingRoles ? previous.characters : next.characters,
+    sources: [...new Set([...next.sources, ...previous.sources])],
+    castArticleRevision: next.castArticleRevision || previous.castArticleRevision,
+  };
+}
+
 interface DetailDrawerProps {
   item: ArchiveItem | null;
   allItems: ArchiveItem[];
@@ -78,14 +93,7 @@ interface DetailDrawerProps {
   ) => void;
 }
 
-interface OnlineRelationsPayload {
-  films: OnlineSearchResult[];
-  people: OnlineSearchResult[];
-  characters: OnlineSearchResult[];
-  sources: string[];
-}
-
-const EMPTY_RELATIONS: OnlineRelationsPayload = {
+const EMPTY_RELATIONS: OnlineRelationsResponse = {
   films: [],
   people: [],
   characters: [],
@@ -145,7 +153,7 @@ export function DetailDrawer({
 
   // Live online relation discovery state (for films & people only)
   const [onlineRelations, setOnlineRelations] =
-    useState<OnlineRelationsPayload>(EMPTY_RELATIONS);
+    useState<OnlineRelationsResponse>(EMPTY_RELATIONS);
   const [relationsLoading, setRelationsLoading] = useState(false);
   const [relationsError, setRelationsError] = useState('');
   const [relationsTab, setRelationsTab] = useState<'primary' | 'secondary'>(
@@ -311,6 +319,7 @@ export function DetailDrawer({
       return;
     }
 
+    const previous = item.category === 'film' ? readCachedRelations(reqParams, true) : null;
     if (!isManualRefresh) setRelationsTab('primary');
     const controller = new AbortController();
     let cancelled = false;
@@ -319,20 +328,21 @@ export function DetailDrawer({
       setRelationsLoading(true);
       setRelationsError('');
       if (!isManualRefresh) {
-        setOnlineRelations(EMPTY_RELATIONS);
+        setOnlineRelations(previous || EMPTY_RELATIONS);
       }
 
       try {
         const next = await fetchOnlineRelations(reqParams, controller.signal, preview => {
-          if (!cancelled) setOnlineRelations(preview);
+          if (!cancelled) setOnlineRelations(retainKnownLists(preview, previous));
         });
         if (cancelled) return;
-        setOnlineRelations(next);
-        writeCachedRelations(reqParams, next);
+        const displayed = retainKnownLists(next, previous);
+        setOnlineRelations(displayed);
+        writeCachedRelations(reqParams, displayed, displayed !== next);
 
         const primaryCount =
-          item!.category === 'film' ? next.people.length : next.films.length;
-        const secondaryCount = next.characters.length;
+          item!.category === 'film' ? displayed.people.length : displayed.films.length;
+        const secondaryCount = displayed.characters.length;
         if (primaryCount === 0 && secondaryCount > 0) {
           setRelationsTab('secondary');
         }
@@ -395,6 +405,7 @@ export function DetailDrawer({
 
   const visibleOnlineList =
     relationsTab === 'primary' ? primaryList : secondaryList;
+  const filmCoverage = (count: number) => count ? `已收录 ${count}` : relationsLoading ? '查询中' : '待补充';
   const totalOnlineCount = primaryList.length + secondaryList.length;
 
   const filterNorm = relationsFilter.trim().toLowerCase();
@@ -999,6 +1010,13 @@ export function DetailDrawer({
                     IMDb 完整演职员表 <ExternalLink className="h-3 w-3" aria-hidden="true" />
                   </a>
                 )}
+                {onlineRelations.castArticleRevision && (
+                  <p className="mt-1 text-xs text-[#625C54]">
+                    角色署名参考
+                    <a className="ml-1 underline" href={`https://en.wikipedia.org/w/index.php?oldid=${onlineRelations.castArticleRevision}`}
+                      target="_blank" rel="noopener noreferrer">维基百科原文</a>
+                  </p>
+                )}
                 {onlineRelations.sources.length > 0 && (
                   <p className="mt-0.5 text-[12px] text-[#7A7268] md:text-[11px]">
                     资料来源：{onlineRelations.sources.join(' · ')}
@@ -1041,7 +1059,7 @@ export function DetailDrawer({
               >
                 {primaryTabLabel}
                 <span className="ml-1 font-mono text-[12px] tabular-nums opacity-75 md:text-[11px]">
-                  {primaryList.length}
+                  {item.category === 'film' ? filmCoverage(primaryList.length) : primaryList.length}
                 </span>
               </button>
               <button
@@ -1061,7 +1079,7 @@ export function DetailDrawer({
               >
                 {secondaryTabLabel}
                 <span className="ml-1 font-mono text-[12px] tabular-nums opacity-75 md:text-[11px]">
-                  {secondaryList.length}
+                  {item.category === 'film' ? filmCoverage(secondaryList.length) : secondaryList.length}
                 </span>
               </button>
             </div>
@@ -1104,7 +1122,7 @@ export function DetailDrawer({
                   <Loader2 className="h-4 w-4 animate-spin text-[#B43B2B]" />
                   <span>正在查找演职员与角色…</span>
                 </div>
-              ) : relationsError ? (
+              ) : relationsError && !visibleOnlineList.length ? (
                 <div className="py-4 text-center">
                   <p className="text-xs text-[#B43B2B]">{relationsError}</p>
                   <button

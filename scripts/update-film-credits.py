@@ -9,23 +9,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
-QUERY = """
-SELECT DISTINCT ?id ?job ?person ?personLabel ?personEn ?role ?roleLabel ?roleEn ?name WHERE {
-  VALUES ?id { %s }
-  ?film wdt:P345 ?id.
-  { ?film p:P161 ?credit. ?credit ps:P161 ?person.
-    OPTIONAL { ?credit pq:P453 ?role }
-    OPTIONAL { ?credit pq:P4633 ?name }
-    BIND("cast" AS ?job)
-  } UNION { ?film wdt:P57 ?person BIND("director" AS ?job) }
-    UNION { ?film wdt:P58 ?person BIND("writer" AS ?job) }
-  BIND(COALESCE(?role, ?person) AS ?roleLabelTarget)
-  SERVICE wikibase:label { bd:serviceParam wikibase:language "zh-cn,zh-hans,zh,en,mul".
-    ?person rdfs:label ?personLabel. ?roleLabelTarget rdfs:label ?roleLabel. }
-  SERVICE wikibase:label { bd:serviceParam wikibase:language "en,mul".
-    ?person rdfs:label ?personEn. ?roleLabelTarget rdfs:label ?roleEn. }
-}
-"""
+QUERY = "\n".join(json.loads((ROOT / "src/data/film-credits-query.json").read_text()))
 
 def load_rows(ids):
     query = QUERY % " ".join(json.dumps(i) for i in ids)
