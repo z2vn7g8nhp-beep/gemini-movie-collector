@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { SEED_COLLECTION } from '../data/seedCollection';
 import {
   buildCollectorRank,
+  computeAlbumProgress,
   computeCheckInStreak,
   computeCollectorStamps,
   computeItemCompleteness,
@@ -108,6 +109,88 @@ test('resolveAlbumItems matches items by linked tag and explicit itemIds', () =>
   const matched = resolveAlbumItems(album, SEED_COLLECTION);
   assert.ok(matched.some((i) => i.id === SEED_COLLECTION[0].id));
   assert.ok(matched.some((i) => i.tags.includes('吉卜力')));
+});
+
+test('computeAlbumProgress computes accurate percentage, remaining count, and completion state', () => {
+  // 0% progress when no items match
+  const emptyProgress = computeAlbumProgress(
+    {
+      id: 'alb-empty',
+      name: '空图鉴',
+      tag: '不存在的标签',
+      targetCount: 5,
+      createdAt: '2026-11-18T00:00:00.000Z',
+    },
+    SEED_COLLECTION
+  );
+  assert.equal(emptyProgress.filledCount, 0);
+  assert.equal(emptyProgress.targetCount, 5);
+  assert.equal(emptyProgress.remainingCount, 5);
+  assert.equal(emptyProgress.percent, 0);
+  assert.equal(emptyProgress.isComplete, false);
+
+  // Partial progress (2 / 5 = 40%)
+  const partialProgress = computeAlbumProgress(
+    {
+      id: 'alb-partial',
+      name: '局部收藏',
+      itemIds: [SEED_COLLECTION[0].id, SEED_COLLECTION[1].id],
+      targetCount: 5,
+      createdAt: '2026-11-18T00:00:00.000Z',
+    },
+    SEED_COLLECTION
+  );
+  assert.equal(partialProgress.filledCount, 2);
+  assert.equal(partialProgress.remainingCount, 3);
+  assert.equal(partialProgress.percent, 40);
+  assert.equal(partialProgress.isComplete, false);
+
+  // Rounded percentage (1 / 3 = 33%)
+  const thirdProgress = computeAlbumProgress(
+    {
+      id: 'alb-third',
+      name: '三分之一',
+      itemIds: [SEED_COLLECTION[0].id],
+      targetCount: 3,
+      createdAt: '2026-11-18T00:00:00.000Z',
+    },
+    SEED_COLLECTION
+  );
+  assert.equal(thirdProgress.percent, 33);
+  assert.equal(thirdProgress.remainingCount, 2);
+  assert.equal(thirdProgress.isComplete, false);
+
+  // Over-target count clamps percentage at 100% and remainingCount at 0
+  const overflowProgress = computeAlbumProgress(
+    {
+      id: 'alb-overflow',
+      name: '已超额集齐',
+      itemIds: SEED_COLLECTION.slice(0, 4).map((i) => i.id),
+      targetCount: 3,
+      createdAt: '2026-11-18T00:00:00.000Z',
+    },
+    SEED_COLLECTION
+  );
+  assert.equal(overflowProgress.filledCount, 4);
+  assert.equal(overflowProgress.targetCount, 3);
+  assert.equal(overflowProgress.remainingCount, 0);
+  assert.equal(overflowProgress.percent, 100);
+  assert.equal(overflowProgress.isComplete, true);
+
+  // Non-positive targetCount safely normalizes to 1
+  const safeTargetProgress = computeAlbumProgress(
+    {
+      id: 'alb-zero-target',
+      name: '异常目标值',
+      itemIds: [SEED_COLLECTION[0].id],
+      targetCount: 0,
+      createdAt: '2026-11-18T00:00:00.000Z',
+    },
+    SEED_COLLECTION
+  );
+  assert.equal(safeTargetProgress.targetCount, 1);
+  assert.equal(safeTargetProgress.percent, 100);
+  assert.equal(safeTargetProgress.isComplete, true);
 });
 
 test('buildCollectorRank and computeCollectorStamps derive real rank and unlock states from collection', () => {

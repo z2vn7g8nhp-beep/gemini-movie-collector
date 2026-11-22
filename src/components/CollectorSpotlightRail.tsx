@@ -18,12 +18,12 @@ import type {
 import { CATEGORY_LABELS } from '../utils/archive';
 import {
   buildCollectorRank,
+  computeAlbumProgress,
   computeCheckInStreak,
   computeCollectorStamps,
   computeItemCompleteness,
   formatLocalDateKey,
   pickDailySpotlightItem,
-  resolveAlbumItems,
 } from '../utils/collector';
 import { collectTagRegistry } from '../utils/tags';
 import { ArchivalImage } from './ArchivalImage';
@@ -457,15 +457,16 @@ export function CollectorSpotlightRail({
             {collector.albums.length > 0 ? (
               <div className="h-scroll-rail no-scrollbar mt-3 flex gap-3 pb-1">
                 {collector.albums.map((album: CollectorAlbum) => {
-                  const matched = resolveAlbumItems(album, items);
-                  const filledCount = matched.length;
-                  const isComplete = filledCount >= album.targetCount;
-                  const pct = Math.min(
-                    100,
-                    Math.round((filledCount / Math.max(1, album.targetCount)) * 100)
-                  );
+                  const {
+                    matchedItems: matched,
+                    filledCount,
+                    targetCount,
+                    remainingCount,
+                    percent,
+                    isComplete,
+                  } = computeAlbumProgress(album, items);
                   const isActive = activeAlbumId === album.id;
-                  const slotTotal = Math.min(5, Math.max(album.targetCount, 3));
+                  const slotTotal = Math.min(5, Math.max(targetCount, 3));
                   const emptySlots = Math.max(0, slotTotal - matched.length);
 
                   return (
@@ -492,10 +493,10 @@ export function CollectorSpotlightRail({
                             {album.name}
                           </p>
                           <p className="mt-0.5 font-mono text-[11px] tabular-nums text-[#7A7268]">
-                            {filledCount} / {album.targetCount} 件
+                            {filledCount} / {targetCount} 件
                             {isComplete
                               ? ' · 已集齐'
-                              : ` · 还差 ${album.targetCount - filledCount} 件`}
+                              : ` · 还差 ${remainingCount} 件`}
                           </p>
                         </button>
                         <button
@@ -508,14 +509,39 @@ export function CollectorSpotlightRail({
                         </button>
                       </div>
 
-                      {/* Progress Hairline */}
-                      <div className="mt-2.5 h-1 w-full overflow-hidden rounded-full bg-[#E8E2D7]">
+                      {/* Collection Progress Bar & Percentage */}
+                      <div
+                        data-testid={`album-progress-${album.id}`}
+                        className="mt-2.5 flex items-center gap-2.5"
+                      >
                         <div
-                          className={`h-full rounded-full transition-all ${
-                            isComplete ? 'bg-[#A67C37]' : 'bg-[#B43B2B]'
+                          role="progressbar"
+                          aria-label={`${album.name}收集进度`}
+                          aria-valuenow={percent}
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                          aria-valuetext={`${percent}%，已收集 ${filledCount} / ${targetCount} 件`}
+                          className="h-2 flex-1 overflow-hidden rounded-full bg-[#E8E2D7]"
+                        >
+                          <div
+                            className={`h-full rounded-full transition-all duration-300 ${
+                              percent > 0 ? 'min-w-[6px]' : ''
+                            } ${
+                              isComplete
+                                ? 'bg-gradient-to-r from-[#A67C37] to-[#C9A45C]'
+                                : 'bg-gradient-to-r from-[#B43B2B] to-[#CE4D3B]'
+                            }`}
+                            style={{ width: `${percent}%` }}
+                          />
+                        </div>
+                        <span
+                          data-testid={`album-progress-percent-${album.id}`}
+                          className={`shrink-0 font-mono text-[12px] font-medium tabular-nums whitespace-nowrap ${
+                            isComplete ? 'text-[#7D571B]' : 'text-[#4B453E]'
                           }`}
-                          style={{ width: `${pct}%` }}
-                        />
+                        >
+                          {percent}%
+                        </span>
                       </div>
 
                       {/* Visual Collector Slots */}

@@ -258,6 +258,39 @@ export function resolveAlbumItems(
   });
 }
 
+export interface AlbumProgress {
+  matchedItems: ArchiveItem[];
+  filledCount: number;
+  targetCount: number;
+  remainingCount: number;
+  percent: number;
+  isComplete: boolean;
+}
+
+export function computeAlbumProgress(
+  album: CollectorAlbum,
+  items: ArchiveItem[]
+): AlbumProgress {
+  const matchedItems = resolveAlbumItems(album, items);
+  const filledCount = matchedItems.length;
+  const targetCount = Math.max(1, Math.round(Number(album.targetCount) || 0));
+  const percent = Math.min(
+    100,
+    Math.max(0, Math.round((filledCount / targetCount) * 100))
+  );
+  const isComplete = filledCount >= targetCount;
+  const remainingCount = Math.max(0, targetCount - filledCount);
+
+  return {
+    matchedItems,
+    filledCount,
+    targetCount,
+    remainingCount,
+    percent,
+    isComplete,
+  };
+}
+
 function countUniqueLinkPairs(items: ArchiveItem[]): number {
   const pairs = new Set<string>();
   const existingIds = new Set(items.map((i) => i.id));
