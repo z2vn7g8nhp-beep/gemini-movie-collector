@@ -1,12 +1,24 @@
 import { useMemo, useState } from 'react';
-import { ArrowDownUp, CalendarDays, Clock, Star } from 'lucide-react';
-import type { ArchiveCategory, ArchiveItem } from '../types/archive';
+import {
+  ArrowDownUp,
+  CalendarDays,
+  Clock,
+  Film,
+  History,
+  Repeat,
+  Star,
+} from 'lucide-react';
+import type { ArchiveCategory, ArchiveItem, WatchMedium } from '../types/archive';
 import { CATEGORY_LABELS, getRelatedItems } from '../utils/archive';
 import { computeItemCompleteness } from '../utils/collector';
+import { WATCH_MEDIUM_LABELS } from '../utils/curation';
 import {
+  buildEraTimeline,
   buildTimelineGroups,
+  buildWatchedTimeline,
   extractTimelineDateParts,
   type TimelineOrder,
+  type TimelineViewMode,
 } from '../utils/timeline';
 import { ArchivalImage } from './ArchivalImage';
 
@@ -24,12 +36,19 @@ const CAT_FILTERS: Array<{ id: 'all' | ArchiveCategory; label: string }> = [
   { id: 'character', label: '角色' },
 ];
 
+const VIEW_MODES: Array<{ id: TimelineViewMode; label: string }> = [
+  { id: 'collected', label: '按收录' },
+  { id: 'watched', label: '按观影' },
+  { id: 'era', label: '按年代' },
+];
+
 export function TimelineMemoriesView({
   items,
   onSelectItem,
   onJumpToSearch,
   onJumpToCreate,
 }: TimelineMemoriesViewProps) {
+  const [viewMode, setViewMode] = useState<TimelineViewMode>('collected');
   const [order, setOrder] = useState<TimelineOrder>('desc');
   const [selectedMonth, setSelectedMonth] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<
@@ -44,6 +63,24 @@ export function TimelineMemoriesView({
         category: selectedCategory,
       }),
     [items, order, selectedMonth, selectedCategory]
+  );
+
+  const watchedTimeline = useMemo(
+    () =>
+      buildWatchedTimeline(items, {
+        order,
+        category: selectedCategory,
+      }),
+    [items, order, selectedCategory]
+  );
+
+  const eraTimeline = useMemo(
+    () =>
+      buildEraTimeline(items, {
+        order,
+        category: selectedCategory,
+      }),
+    [items, order, selectedCategory]
   );
 
   const activeMonthMeta = useMemo(
@@ -68,7 +105,7 @@ export function TimelineMemoriesView({
             尚未开启你的光影编年
           </h2>
           <p className="mt-2 text-[15px] leading-relaxed text-[#625C54] md:text-sm">
-            每收录一部影视、一位影人或一个角色，都会在这里按收录时间留下一枚光影记忆刻度。
+            每收录一部影视、一位影人或一个角色，都会在这里按收录、观影与年代留下一枚光影记忆刻度。
           </p>
           <div className="mt-6 flex flex-col gap-2.5 sm:flex-row sm:justify-center">
             <button
@@ -91,6 +128,28 @@ export function TimelineMemoriesView({
     );
   }
 
+  const headerTitle =
+    viewMode === 'collected'
+      ? activeMonthMeta
+        ? `${activeMonthMeta.label}回顾`
+        : `共珍藏 ${timeline.summary.totalItems} 段光影记忆`
+      : viewMode === 'watched'
+        ? `共记录 ${watchedTimeline.totalEvents} 次银幕相逢`
+        : eraTimeline.earliestYear && eraTimeline.latestYear
+          ? `${eraTimeline.earliestYear} — ${eraTimeline.latestYear} 影史纵览`
+          : '按上映年代回溯光影';
+
+  const headerSubtitle =
+    viewMode === 'collected'
+      ? activeMonthMeta
+        ? `本月收录 ${activeMonthMeta.totalCount} 件 · 影视 ${activeMonthMeta.filmCount} · 影人 ${activeMonthMeta.personCount} · 角色 ${activeMonthMeta.characterCount}`
+        : timeline.summary.firstCollectedDate
+          ? `始于 ${timeline.summary.firstCollectedDate} · 跨越 ${timeline.summary.totalMonths} 个月份`
+          : '按收录顺序重温每一次心动'
+      : viewMode === 'watched'
+        ? `手动打卡 ${watchedTimeline.explicitLogCount} 次 · 重温二刷 ${watchedTimeline.rewatchCount} 次`
+        : `共跨越 ${eraTimeline.decades.length} 个年代 · ${eraTimeline.totalDatedItems} 件含年份档案`;
+
   return (
     <section
       aria-label="时间轴回忆"
@@ -102,19 +161,18 @@ export function TimelineMemoriesView({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="font-mono text-[12px] tracking-[0.12em] text-[#B8AE9E] md:text-[11px]">
-              光影编年 · 时间轴回忆
+              光影编年 ·{' '}
+              {viewMode === 'collected'
+                ? '收录时间轴'
+                : viewMode === 'watched'
+                  ? '观影与重温轴'
+                  : '作品年代史'}
             </p>
-            <h2 className="mt-1 font-editorial text-[24px] font-medium leading-tight text-[#FAF7F0] min-[420px]:text-[25px] md:text-2xl">
-              {activeMonthMeta
-                ? `${activeMonthMeta.label}回顾`
-                : `共珍藏 ${timeline.summary.totalItems} 段光影记忆`}
+            <h2 className="mt-1 font-editorial text-[23px] font-medium leading-tight text-[#FAF7F0] min-[420px]:text-[25px] md:text-2xl">
+              {headerTitle}
             </h2>
             <p className="mt-1.5 text-[13px] text-[#BFB6A7] tabular-nums md:text-xs">
-              {activeMonthMeta
-                ? `本月收录 ${activeMonthMeta.totalCount} 件 · 影视 ${activeMonthMeta.filmCount} · 影人 ${activeMonthMeta.personCount} · 角色 ${activeMonthMeta.characterCount}`
-                : timeline.summary.firstCollectedDate
-                  ? `始于 ${timeline.summary.firstCollectedDate} · 跨越 ${timeline.summary.totalMonths} 个月份`
-                  : '按收录顺序重温每一次心动'}
+              {headerSubtitle}
             </p>
           </div>
 
@@ -123,88 +181,175 @@ export function TimelineMemoriesView({
             data-testid="timeline-order-toggle"
             onClick={() => setOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'))}
             aria-label={
-              order === 'desc' ? '切换为最初起步正序' : '切换为最新收录倒序'
+              order === 'desc' ? '切换为正序排列' : '切换为倒序排列'
             }
             className="inline-flex min-h-[42px] shrink-0 items-center gap-1.5 rounded-xl border border-white/15 bg-white/10 px-3 text-[13px] font-medium text-[#FAF7F0] whitespace-nowrap cursor-pointer active:scale-[0.97] hover:bg-white/15 md:min-h-[40px] md:text-xs"
           >
             <ArrowDownUp className="h-3.5 w-3.5 text-[#D4AF6A]" aria-hidden="true" />
-            <span>{order === 'desc' ? '最新在前' : '最初起步'}</span>
-          </button>
-        </div>
-
-        {/* 3-Metric Journey Figures */}
-        <div className="mt-4 grid grid-cols-3 gap-2 border-t border-white/10 pt-3.5 text-center">
-          <div>
-            <p className="font-mono text-[20px] font-medium tabular-nums text-[#FAF7F0] md:text-lg">
-              {timeline.summary.totalItems}
-            </p>
-            <p className="mt-0.5 text-[12px] text-[#A59D90] md:text-[11px]">累计收录</p>
-          </div>
-          <div>
-            <p className="font-mono text-[20px] font-medium tabular-nums text-[#E4C37A] md:text-lg">
-              {timeline.summary.totalMonths}
-            </p>
-            <p className="mt-0.5 text-[12px] text-[#A59D90] md:text-[11px]">记录月份</p>
-          </div>
-          <div>
-            <p className="font-mono text-[20px] font-medium tabular-nums text-[#FAF7F0] md:text-lg">
-              {timeline.summary.journeySpanDays} 天
-            </p>
-            <p className="mt-0.5 text-[12px] text-[#A59D90] md:text-[11px]">收集历程</p>
-          </div>
-        </div>
-      </div>
-
-      {/* 2. Monthly Review Selector & Category Filter */}
-      <div className="space-y-3">
-        <div
-          role="tablist"
-          aria-label="按月份回顾"
-          data-testid="timeline-month-selector"
-          className="h-scroll-rail no-scrollbar flex items-center gap-2 pb-0.5"
-        >
-          <button
-            type="button"
-            role="tab"
-            aria-selected={selectedMonth === ''}
-            onClick={() => setSelectedMonth('')}
-            className={`inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-xl border px-3.5 text-[13px] font-medium whitespace-nowrap cursor-pointer transition-colors md:min-h-[42px] md:text-xs ${
-              selectedMonth === ''
-                ? 'border-[#1A1816] bg-[#1A1816] text-white'
-                : 'border-[#DCD6CB] bg-white text-[#4B453E] hover:border-[#1A1816]'
-            }`}
-          >
-            <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />
-            <span>全部月份</span>
-            <span className="font-mono text-[12px] tabular-nums opacity-80 md:text-[11px]">
-              {timeline.summary.totalItems}
+            <span>
+              {viewMode === 'era'
+                ? order === 'desc'
+                  ? '当代优先'
+                  : '经典优先'
+                : order === 'desc'
+                  ? '最新在前'
+                  : '最初起步'}
             </span>
           </button>
+        </div>
 
-          {timeline.allMonths.map((month) => {
-            const active = selectedMonth === month.monthKey;
+        {/* 3-Perspective Segmented Switcher inside Dark Header */}
+        <div
+          role="tablist"
+          aria-label="时间轴视角切换"
+          data-testid="timeline-mode-switcher"
+          className="mt-4 grid grid-cols-3 gap-1 rounded-xl bg-white/10 p-1"
+        >
+          {VIEW_MODES.map((m) => {
+            const active = viewMode === m.id;
             return (
               <button
-                key={month.monthKey}
+                key={m.id}
                 type="button"
                 role="tab"
-                data-testid={`timeline-month-btn-${month.monthKey}`}
+                data-testid={`timeline-mode-${m.id}`}
                 aria-selected={active}
-                onClick={() => setSelectedMonth(active ? '' : month.monthKey)}
-                className={`inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-xl border px-3.5 text-[13px] font-medium whitespace-nowrap cursor-pointer transition-colors md:min-h-[42px] md:text-xs ${
+                onClick={() => setViewMode(m.id)}
+                className={`min-h-[42px] rounded-lg px-2 text-[14px] font-medium whitespace-nowrap cursor-pointer transition-colors md:min-h-[38px] md:text-xs ${
                   active
-                    ? 'border-[#B43B2B] bg-[#B43B2B] text-white'
-                    : 'border-[#DCD6CB] bg-white text-[#1A1816] hover:border-[#1A1816]'
+                    ? 'bg-[#FAF7F0] text-[#1A1816] shadow-xs'
+                    : 'text-[#C8BFA8] hover:text-white'
                 }`}
               >
-                <span>{month.label}</span>
-                <span className="font-mono text-[12px] tabular-nums opacity-80 md:text-[11px]">
-                  {month.totalCount}件
-                </span>
+                {m.label}
               </button>
             );
           })}
         </div>
+
+        {/* 3-Metric Journey Figures */}
+        {viewMode === 'collected' && (
+          <div className="mt-4 grid grid-cols-3 gap-2 border-t border-white/10 pt-3.5 text-center">
+            <div>
+              <p className="font-mono text-[20px] font-medium tabular-nums text-[#FAF7F0] md:text-lg">
+                {timeline.summary.totalItems}
+              </p>
+              <p className="mt-0.5 text-[12px] text-[#A59D90] md:text-[11px]">累计收录</p>
+            </div>
+            <div>
+              <p className="font-mono text-[20px] font-medium tabular-nums text-[#E4C37A] md:text-lg">
+                {timeline.summary.totalMonths}
+              </p>
+              <p className="mt-0.5 text-[12px] text-[#A59D90] md:text-[11px]">记录月份</p>
+            </div>
+            <div>
+              <p className="font-mono text-[20px] font-medium tabular-nums text-[#FAF7F0] md:text-lg">
+                {timeline.summary.journeySpanDays} 天
+              </p>
+              <p className="mt-0.5 text-[12px] text-[#A59D90] md:text-[11px]">收集历程</p>
+            </div>
+          </div>
+        )}
+
+        {viewMode === 'watched' && (
+          <div className="mt-4 grid grid-cols-3 gap-2 border-t border-white/10 pt-3.5 text-center">
+            <div>
+              <p className="font-mono text-[20px] font-medium tabular-nums text-[#FAF7F0] md:text-lg">
+                {watchedTimeline.totalEvents}
+              </p>
+              <p className="mt-0.5 text-[12px] text-[#A59D90] md:text-[11px]">观影总计</p>
+            </div>
+            <div>
+              <p className="font-mono text-[20px] font-medium tabular-nums text-[#E4C37A] md:text-lg">
+                {watchedTimeline.explicitLogCount}
+              </p>
+              <p className="mt-0.5 text-[12px] text-[#A59D90] md:text-[11px]">打卡日记</p>
+            </div>
+            <div>
+              <p className="font-mono text-[20px] font-medium tabular-nums text-[#FAF7F0] md:text-lg">
+                {watchedTimeline.rewatchCount}
+              </p>
+              <p className="mt-0.5 text-[12px] text-[#A59D90] md:text-[11px]">重温次数</p>
+            </div>
+          </div>
+        )}
+
+        {viewMode === 'era' && (
+          <div className="mt-4 grid grid-cols-3 gap-2 border-t border-white/10 pt-3.5 text-center">
+            <div>
+              <p className="font-mono text-[20px] font-medium tabular-nums text-[#FAF7F0] md:text-lg">
+                {eraTimeline.decades.length}
+              </p>
+              <p className="mt-0.5 text-[12px] text-[#A59D90] md:text-[11px]">覆盖年代</p>
+            </div>
+            <div>
+              <p className="font-mono text-[20px] font-medium tabular-nums text-[#E4C37A] md:text-lg">
+                {eraTimeline.earliestYear ?? '—'}
+              </p>
+              <p className="mt-0.5 text-[12px] text-[#A59D90] md:text-[11px]">最早年份</p>
+            </div>
+            <div>
+              <p className="font-mono text-[20px] font-medium tabular-nums text-[#FAF7F0] md:text-lg">
+                {eraTimeline.latestYear ?? '—'}
+              </p>
+              <p className="mt-0.5 text-[12px] text-[#A59D90] md:text-[11px]">最新年份</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 2. Monthly Review Selector (for Collected Mode) & Category Filter */}
+      <div className="space-y-3">
+        {viewMode === 'collected' && (
+          <div
+            role="tablist"
+            aria-label="按月份回顾"
+            data-testid="timeline-month-selector"
+            className="h-scroll-rail no-scrollbar flex items-center gap-2 pb-0.5"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={selectedMonth === ''}
+              onClick={() => setSelectedMonth('')}
+              className={`inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-xl border px-3.5 text-[13px] font-medium whitespace-nowrap cursor-pointer transition-colors md:min-h-[42px] md:text-xs ${
+                selectedMonth === ''
+                  ? 'border-[#1A1816] bg-[#1A1816] text-white'
+                  : 'border-[#DCD6CB] bg-white text-[#4B453E] hover:border-[#1A1816]'
+              }`}
+            >
+              <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>全部月份</span>
+              <span className="font-mono text-[12px] tabular-nums opacity-80 md:text-[11px]">
+                {timeline.summary.totalItems}
+              </span>
+            </button>
+
+            {timeline.allMonths.map((month) => {
+              const active = selectedMonth === month.monthKey;
+              return (
+                <button
+                  key={month.monthKey}
+                  type="button"
+                  role="tab"
+                  data-testid={`timeline-month-btn-${month.monthKey}`}
+                  aria-selected={active}
+                  onClick={() => setSelectedMonth(active ? '' : month.monthKey)}
+                  className={`inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-xl border px-3.5 text-[13px] font-medium whitespace-nowrap cursor-pointer transition-colors md:min-h-[42px] md:text-xs ${
+                    active
+                      ? 'border-[#B43B2B] bg-[#B43B2B] text-white'
+                      : 'border-[#DCD6CB] bg-white text-[#1A1816] hover:border-[#1A1816]'
+                  }`}
+                >
+                  <span>{month.label}</span>
+                  <span className="font-mono text-[12px] tabular-nums opacity-80 md:text-[11px]">
+                    {month.totalCount}件
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Category Segmented Toggle */}
         <div
@@ -233,222 +378,497 @@ export function TimelineMemoriesView({
         </div>
       </div>
 
-      {/* 3. Chronological Month Chapters & Vertical Timeline Rail */}
-      {timeline.visibleMonths.length === 0 ? (
-        <div className="rounded-2xl border border-[#E4DFD5] bg-white px-6 py-10 text-center">
-          <p className="text-sm font-medium text-[#1A1816]">
-            当前月份与分类下暂无收录记录
-          </p>
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedMonth('');
-              setSelectedCategory('all');
-            }}
-            className="mt-4 min-h-[42px] rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-4 text-xs font-medium text-[#1A1816] cursor-pointer"
-          >
-            查看全部时间轴回忆
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-6">
-          {timeline.visibleMonths.map((month) => (
-            <section
-              key={month.monthKey}
-              data-testid={`timeline-month-group-${month.monthKey}`}
-              aria-label={`${month.label}收录回忆`}
-              className="space-y-3.5"
+      {/* 3A. COLLECTED MODE */}
+      {viewMode === 'collected' &&
+        (timeline.visibleMonths.length === 0 ? (
+          <div className="rounded-2xl border border-[#E4DFD5] bg-white px-6 py-10 text-center">
+            <p className="text-sm font-medium text-[#1A1816]">
+              当前月份与分类下暂无收录记录
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedMonth('');
+                setSelectedCategory('all');
+              }}
+              className="mt-4 min-h-[42px] rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-4 text-xs font-medium text-[#1A1816] cursor-pointer"
             >
-              {/* Monthly Review Chapter Card */}
-              <div className="gallery-card border border-[#E6E0D4] p-4">
-                <div className="flex items-baseline justify-between gap-2">
-                  <div className="min-w-0">
-                    <h3 className="font-editorial text-[19px] font-medium text-[#1A1816] md:text-lg">
-                      {month.label}
-                    </h3>
-                    <p className="mt-0.5 text-[13px] text-[#625C54] tabular-nums md:text-xs">
-                      {[
-                        month.filmCount > 0 ? `影视 ${month.filmCount}` : '',
-                        month.personCount > 0 ? `影人 ${month.personCount}` : '',
-                        month.characterCount > 0
-                          ? `角色 ${month.characterCount}`
-                          : '',
-                        month.topTags.length > 0
-                          ? `关键词：${month.topTags.join(' · ')}`
-                          : '',
-                      ]
-                        .filter(Boolean)
-                        .join(' · ')}
-                    </p>
+              查看全部时间轴回忆
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {timeline.visibleMonths.map((month) => (
+              <section
+                key={month.monthKey}
+                data-testid={`timeline-month-group-${month.monthKey}`}
+                aria-label={`${month.label}收录回忆`}
+                className="space-y-3.5"
+              >
+                {/* Monthly Review Chapter Card */}
+                <div className="gallery-card border border-[#E6E0D4] p-4">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <div className="min-w-0">
+                      <h3 className="font-editorial text-[19px] font-medium text-[#1A1816] md:text-lg">
+                        {month.label}
+                      </h3>
+                      <p className="mt-0.5 text-[13px] text-[#625C54] tabular-nums md:text-xs">
+                        {[
+                          month.filmCount > 0 ? `影视 ${month.filmCount}` : '',
+                          month.personCount > 0 ? `影人 ${month.personCount}` : '',
+                          month.characterCount > 0
+                            ? `角色 ${month.characterCount}`
+                            : '',
+                          month.topTags.length > 0
+                            ? `关键词：${month.topTags.join(' · ')}`
+                            : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </p>
+                    </div>
+                    <span className="shrink-0 whitespace-nowrap font-mono text-[13px] font-medium tabular-nums text-[#B43B2B] md:text-xs">
+                      共 {month.totalCount} 件
+                    </span>
                   </div>
-                  <span className="shrink-0 whitespace-nowrap font-mono text-[13px] font-medium tabular-nums text-[#B43B2B] md:text-xs">
-                    共 {month.totalCount} 件
+
+                  {month.items.length >= 2 && (
+                    <div className="h-scroll-rail no-scrollbar mt-3 flex gap-2 border-t border-[#F0ECE3] pt-3">
+                      {month.items.slice(0, 8).map((mini) => (
+                        <button
+                          key={`strip-${mini.id}`}
+                          type="button"
+                          onClick={() => onSelectItem(mini)}
+                          aria-label={`快速查看「${mini.title}」`}
+                          className="h-14 w-11 shrink-0 overflow-hidden rounded-lg border border-[#E4DFD5] bg-[#FAF9F6] cursor-pointer active:scale-[0.96] transition-transform"
+                        >
+                          <ArchivalImage
+                            src={mini.coverUrl}
+                            alt={mini.title}
+                            title={mini.title}
+                            category={mini.category}
+                            compact
+                            className="h-full w-full"
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Vertical Timeline Rail & Day Groups */}
+                <div className="relative pl-5">
+                  <div
+                    aria-hidden="true"
+                    className="absolute left-[7px] top-2 bottom-2 w-px bg-[#D8D0C2]"
+                  />
+
+                  <div className="space-y-4">
+                    {month.days.map((day) => (
+                      <div key={day.dateKey} className="space-y-2.5">
+                        <div className="relative flex items-center gap-2">
+                          <span
+                            aria-hidden="true"
+                            className="absolute -left-5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-[#F7F5F0] bg-[#B43B2B]"
+                          />
+                          <span className="font-mono text-[13px] font-medium tabular-nums text-[#1A1816] md:text-xs">
+                            {day.dayLabel}
+                          </span>
+                          <span className="text-[13px] text-[#8C857B] md:text-xs">
+                            {day.weekdayLabel}
+                          </span>
+                        </div>
+
+                        <div className="space-y-2.5">
+                          {day.items.map((item) => {
+                            const parts = extractTimelineDateParts(item.createdAt);
+                            const completeness = computeItemCompleteness(item);
+                            const isMasterpiece =
+                              completeness.tier === 'masterpiece';
+                            const relatedCount = getRelatedItems(
+                              item,
+                              items
+                            ).length;
+                            const excerpt =
+                              item.quote ||
+                              item.notes ||
+                              item.characterProfile?.bio ||
+                              item.summary;
+
+                            return (
+                              <button
+                                key={item.id}
+                                type="button"
+                                data-testid={`timeline-entry-${item.id}`}
+                                onClick={() => onSelectItem(item)}
+                                aria-label={`查看时间轴条目「${item.title}」详情`}
+                                className={`gallery-card gallery-card-interactive flex w-full items-start gap-3.5 border p-3.5 text-left cursor-pointer active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#B43B2B] md:gap-4 md:p-4 ${
+                                  isMasterpiece
+                                    ? 'gallery-card-masterpiece border-[#C9A45C]/80'
+                                    : 'border-[#E6E0D4] hover:border-[#CFC7B9]'
+                                }`}
+                              >
+                                <div className="gallery-cover-frame w-[66px] shrink-0 bg-[#FAF9F6] min-[420px]:w-[70px] md:w-[60px]">
+                                  <ArchivalImage
+                                    src={item.coverUrl}
+                                    alt={item.title}
+                                    title={item.title}
+                                    category={item.category}
+                                    compact
+                                    className="aspect-[3/4] w-full rounded-[14px]"
+                                  />
+                                </div>
+
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center justify-between gap-2 text-[12px] text-[#7A7268] md:text-[11px]">
+                                    <span className="flex min-w-0 items-center gap-1 font-mono tabular-nums truncate">
+                                      <Clock
+                                        className="h-3 w-3 shrink-0 text-[#9C9488]"
+                                        aria-hidden="true"
+                                      />
+                                      <span>{parts.timeLabel}</span>
+                                      <span aria-hidden="true">·</span>
+                                      <span>{item.accessionNo}</span>
+                                      <span aria-hidden="true">·</span>
+                                      <span>{CATEGORY_LABELS[item.category]}</span>
+                                    </span>
+                                    <span
+                                      className={`shrink-0 whitespace-nowrap font-mono text-[11px] tabular-nums md:text-[10px] ${
+                                        isMasterpiece
+                                          ? 'font-medium text-[#8E6523]'
+                                          : 'text-[#8C857B]'
+                                      }`}
+                                    >
+                                      {completeness.tierLabel}{' '}
+                                      {completeness.score}/5
+                                    </span>
+                                  </div>
+
+                                  <h4 className="mt-1 truncate font-editorial text-[17px] font-medium leading-snug text-[#1A1816] md:text-base">
+                                    {item.title}
+                                  </h4>
+
+                                  {excerpt && (
+                                    <p
+                                      className={`mt-1 line-clamp-2 text-[14px] leading-relaxed md:text-xs ${
+                                        item.quote
+                                          ? 'font-editorial italic text-[#3D3832]'
+                                          : 'text-[#625C54]'
+                                      }`}
+                                    >
+                                      {item.quote ? `“${item.quote}”` : excerpt}
+                                    </p>
+                                  )}
+
+                                  <div className="mt-2 flex items-center flex-wrap gap-x-2 gap-y-0.5 text-[12px] text-[#7A7268] tabular-nums md:text-[11px]">
+                                    {item.rating > 0 && (
+                                      <span className="inline-flex items-center gap-0.5 font-mono text-[#B43B2B]">
+                                        <Star
+                                          className="h-3.5 w-3.5 fill-[#B43B2B] text-[#B43B2B] md:h-3 md:w-3"
+                                          aria-hidden="true"
+                                        />
+                                        {item.rating}.0
+                                      </span>
+                                    )}
+                                    {relatedCount > 0 && (
+                                      <span>关联 {relatedCount} 项</span>
+                                    )}
+                                    {item.tags.length > 0 && (
+                                      <span className="truncate">
+                                        {item.tags.slice(0, 3).join(' · ')}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </section>
+            ))}
+          </div>
+        ))}
+
+      {/* 3B. WATCHED & REWATCH MODE */}
+      {viewMode === 'watched' &&
+        (watchedTimeline.months.length === 0 ? (
+          <div className="rounded-2xl border border-[#E4DFD5] bg-white px-6 py-10 text-center">
+            <Film className="mx-auto h-7 w-7 text-[#C4BCB0]" aria-hidden="true" />
+            <p className="mt-2 text-sm font-medium text-[#1A1816]">
+              暂无观影与重温记录
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-[#7A7268]">
+              打开任意影视档案详情，在「观影与重温记录」里记录日期、媒介与短感即可在此生成专属观影编年。
+            </p>
+          </div>
+        ) : (
+          <div data-testid="timeline-watched-list" className="space-y-6">
+            {watchedTimeline.months.map((month) => (
+              <section
+                key={month.monthKey}
+                aria-label={`${month.label}观影记录`}
+                className="space-y-3"
+              >
+                <div className="flex items-baseline justify-between border-b border-[#E4DFD5] pb-2">
+                  <h3 className="font-editorial text-[19px] font-medium text-[#1A1816] md:text-lg">
+                    {month.label}
+                  </h3>
+                  <span className="font-mono text-[13px] tabular-nums text-[#B43B2B] md:text-xs">
+                    {month.events.length} 次观影
                   </span>
                 </div>
 
-                {/* Mini Monthly Collage Strip (for 2+ entries in that month) */}
-                {month.items.length >= 2 && (
-                  <div className="h-scroll-rail no-scrollbar mt-3 flex gap-2 border-t border-[#F0ECE3] pt-3">
-                    {month.items.slice(0, 8).map((mini) => (
-                      <button
-                        key={`strip-${mini.id}`}
-                        type="button"
-                        onClick={() => onSelectItem(mini)}
-                        aria-label={`快速查看「${mini.title}」`}
-                        className="h-14 w-11 shrink-0 overflow-hidden rounded-lg border border-[#E4DFD5] bg-[#FAF9F6] cursor-pointer active:scale-[0.96] transition-transform"
-                      >
-                        <ArchivalImage
-                          src={mini.coverUrl}
-                          alt={mini.title}
-                          title={mini.title}
-                          category={mini.category}
-                          compact
-                          className="h-full w-full"
-                        />
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+                <div className="relative pl-5">
+                  <div
+                    aria-hidden="true"
+                    className="absolute left-[7px] top-2 bottom-2 w-px bg-[#D8D0C2]"
+                  />
 
-              {/* Vertical Timeline Rail & Day Groups */}
-              <div className="relative pl-5">
-                <div
-                  aria-hidden="true"
-                  className="absolute left-[7px] top-2 bottom-2 w-px bg-[#D8D0C2]"
-                />
+                  <div className="space-y-3">
+                    {month.events.map((ev) => {
+                      const mediumLabel =
+                        ev.medium && ev.medium in WATCH_MEDIUM_LABELS
+                          ? WATCH_MEDIUM_LABELS[ev.medium as WatchMedium]
+                          : ev.medium || '';
+                      const watchBadge =
+                        ev.watchNumber === 1
+                          ? '首刷'
+                          : `第 ${ev.watchNumber} 刷`;
 
-                <div className="space-y-4">
-                  {month.days.map((day) => (
-                    <div key={day.dateKey} className="space-y-2.5">
-                      {/* Day Milestone Marker */}
-                      <div className="relative flex items-center gap-2">
-                        <span
-                          aria-hidden="true"
-                          className="absolute -left-5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-[#F7F5F0] bg-[#B43B2B]"
-                        />
-                        <span className="font-mono text-[13px] font-medium tabular-nums text-[#1A1816] md:text-xs">
-                          {day.dayLabel}
-                        </span>
-                        <span className="text-[13px] text-[#8C857B] md:text-xs">
-                          {day.weekdayLabel}
-                        </span>
-                      </div>
+                      return (
+                        <div key={ev.eventId} className="relative">
+                          <span
+                            aria-hidden="true"
+                            className={`absolute -left-5 top-4 flex h-4 w-4 items-center justify-center rounded-full border-2 border-[#F7F5F0] ${
+                              ev.watchNumber > 1 ? 'bg-[#C9A45C]' : 'bg-[#B43B2B]'
+                            }`}
+                          />
 
-                      {/* Entries Collected on This Day */}
-                      <div className="space-y-2.5">
-                        {day.items.map((item) => {
-                          const parts = extractTimelineDateParts(item.createdAt);
-                          const completeness = computeItemCompleteness(item);
-                          const isMasterpiece =
-                            completeness.tier === 'masterpiece';
-                          const relatedCount = getRelatedItems(
-                            item,
-                            items
-                          ).length;
-                          const excerpt =
-                            item.quote ||
-                            item.notes ||
-                            item.characterProfile?.bio ||
-                            item.summary;
+                          <button
+                            type="button"
+                            data-testid={`watched-event-${ev.eventId}`}
+                            onClick={() => onSelectItem(ev.item)}
+                            className="gallery-card gallery-card-interactive flex w-full items-start gap-3.5 border border-[#E6E0D4] p-3.5 text-left cursor-pointer active:scale-[0.99] hover:border-[#CFC7B9]"
+                          >
+                            <div className="gallery-cover-frame w-[60px] shrink-0 bg-[#FAF9F6]">
+                              <ArchivalImage
+                                src={ev.item.coverUrl}
+                                alt={ev.item.title}
+                                title={ev.item.title}
+                                category={ev.item.category}
+                                compact
+                                className="aspect-[3/4] w-full rounded-[12px]"
+                              />
+                            </div>
 
-                          return (
-                            <button
-                              key={item.id}
-                              type="button"
-                              data-testid={`timeline-entry-${item.id}`}
-                              onClick={() => onSelectItem(item)}
-                              aria-label={`查看时间轴条目「${item.title}」详情`}
-                              className={`gallery-card gallery-card-interactive flex w-full items-start gap-3.5 border p-3.5 text-left cursor-pointer active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#B43B2B] md:gap-4 md:p-4 ${
-                                isMasterpiece
-                                  ? 'gallery-card-masterpiece border-[#C9A45C]/80'
-                                  : 'border-[#E6E0D4] hover:border-[#CFC7B9]'
-                              }`}
-                            >
-                              <div className="gallery-cover-frame w-[66px] shrink-0 bg-[#FAF9F6] min-[420px]:w-[70px] md:w-[60px]">
-                                <ArchivalImage
-                                  src={item.coverUrl}
-                                  alt={item.title}
-                                  title={item.title}
-                                  category={item.category}
-                                  compact
-                                  className="aspect-[3/4] w-full rounded-[14px]"
-                                />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-[#7A7268] md:text-[11px]">
+                                <span className="font-mono tabular-nums text-[#1A1816]">
+                                  {ev.dayLabel} {ev.weekdayLabel}
+                                </span>
+                                <span
+                                  className={`inline-flex items-center gap-1 font-mono text-[11px] font-medium ${
+                                    ev.watchNumber > 1
+                                      ? 'text-[#9B7228]'
+                                      : 'text-[#B43B2B]'
+                                  }`}
+                                >
+                                  {ev.watchNumber > 1 && (
+                                    <Repeat className="h-3 w-3" aria-hidden="true" />
+                                  )}
+                                  <span>{watchBadge}</span>
+                                  {mediumLabel && (
+                                    <>
+                                      <span aria-hidden="true">·</span>
+                                      <span>{mediumLabel}</span>
+                                    </>
+                                  )}
+                                  {!ev.isExplicitLog && (
+                                    <span className="text-[#9C9488]">· 按收录日</span>
+                                  )}
+                                </span>
                               </div>
 
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center justify-between gap-2 text-[12px] text-[#7A7268] md:text-[11px]">
-                                  <span className="flex min-w-0 items-center gap-1 font-mono tabular-nums truncate">
-                                    <Clock
-                                      className="h-3 w-3 shrink-0 text-[#9C9488]"
+                              <h4 className="mt-1 truncate font-editorial text-[17px] font-medium text-[#1A1816] md:text-base">
+                                {ev.item.title}
+                              </h4>
+
+                              {ev.note ? (
+                                <p className="mt-1 line-clamp-2 text-[14px] leading-relaxed text-[#3D3832] md:text-xs">
+                                  {ev.note}
+                                </p>
+                              ) : ev.item.quote ? (
+                                <p className="mt-1 line-clamp-2 font-editorial text-[14px] italic leading-relaxed text-[#625C54] md:text-xs">
+                                  “{ev.item.quote}”
+                                </p>
+                              ) : null}
+
+                              <div className="mt-1.5 flex items-center gap-2 text-[12px] text-[#8C857B] tabular-nums md:text-[11px]">
+                                {ev.item.rating > 0 && (
+                                  <span className="inline-flex items-center gap-0.5 font-mono text-[#B43B2B]">
+                                    <Star
+                                      className="h-3 w-3 fill-[#B43B2B] text-[#B43B2B]"
                                       aria-hidden="true"
                                     />
-                                    <span>{parts.timeLabel}</span>
-                                    <span aria-hidden="true">·</span>
-                                    <span>{item.accessionNo}</span>
-                                    <span aria-hidden="true">·</span>
-                                    <span>{CATEGORY_LABELS[item.category]}</span>
+                                    {ev.item.rating}.0
                                   </span>
-                                  <span
-                                    className={`shrink-0 whitespace-nowrap font-mono text-[11px] tabular-nums md:text-[10px] ${
-                                      isMasterpiece
-                                        ? 'font-medium text-[#8E6523]'
-                                        : 'text-[#8C857B]'
-                                    }`}
-                                  >
-                                    {completeness.tierLabel}{' '}
-                                    {completeness.score}/5
-                                  </span>
-                                </div>
-
-                                <h4 className="mt-1 truncate font-editorial text-[17px] font-medium leading-snug text-[#1A1816] md:text-base">
-                                  {item.title}
-                                </h4>
-
-                                {excerpt && (
-                                  <p
-                                    className={`mt-1 line-clamp-2 text-[14px] leading-relaxed md:text-xs ${
-                                      item.quote
-                                        ? 'font-editorial italic text-[#3D3832]'
-                                        : 'text-[#625C54]'
-                                    }`}
-                                  >
-                                    {item.quote ? `“${item.quote}”` : excerpt}
-                                  </p>
                                 )}
-
-                                <div className="mt-2 flex items-center flex-wrap gap-x-2 gap-y-0.5 text-[12px] text-[#7A7268] tabular-nums md:text-[11px]">
-                                  {item.rating > 0 && (
-                                    <span className="inline-flex items-center gap-0.5 font-mono text-[#B43B2B]">
-                                      <Star
-                                        className="h-3.5 w-3.5 fill-[#B43B2B] text-[#B43B2B] md:h-3 md:w-3"
-                                        aria-hidden="true"
-                                      />
-                                      {item.rating}.0
-                                    </span>
-                                  )}
-                                  {relatedCount > 0 && (
-                                    <span>关联 {relatedCount} 项</span>
-                                  )}
-                                  {item.tags.length > 0 && (
-                                    <span className="truncate">
-                                      {item.tags.slice(0, 3).join(' · ')}
-                                    </span>
-                                  )}
-                                </div>
+                                {ev.item.year && <span>{ev.item.year}</span>}
+                                {ev.item.region && (
+                                  <span className="truncate">{ev.item.region}</span>
+                                )}
                               </div>
-                            </button>
-                          );
-                        })}
+                            </div>
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </section>
+            ))}
+          </div>
+        ))}
+
+      {/* 3C. ERA / DECADE HISTORY MODE */}
+      {viewMode === 'era' &&
+        (eraTimeline.decades.length === 0 && eraTimeline.undatedItems.length === 0 ? (
+          <div className="rounded-2xl border border-[#E4DFD5] bg-white px-6 py-10 text-center">
+            <History className="mx-auto h-7 w-7 text-[#C4BCB0]" aria-hidden="true" />
+            <p className="mt-2 text-sm font-medium text-[#1A1816]">
+              当前分类下暂无可按年代排列的档案
+            </p>
+          </div>
+        ) : (
+          <div data-testid="timeline-era-list" className="space-y-6">
+            {eraTimeline.decades.map((decade) => (
+              <section
+                key={decade.decadeKey}
+                data-testid={`timeline-era-${decade.decadeKey}`}
+                aria-label={`${decade.label}作品`}
+                className="space-y-3"
+              >
+                <div className="flex items-baseline justify-between border-b border-[#E4DFD5] pb-2">
+                  <div className="flex items-baseline gap-2">
+                    <h3 className="font-editorial text-[20px] font-medium text-[#1A1816] md:text-lg">
+                      {decade.label}
+                    </h3>
+                    <span className="font-mono text-[12px] text-[#8C857B] tabular-nums">
+                      {decade.startYear}–{decade.startYear + 9}
+                    </span>
+                  </div>
+                  <span className="font-mono text-[13px] tabular-nums text-[#B43B2B] md:text-xs">
+                    {decade.items.length} 件
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                  {decade.items.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => onSelectItem(item)}
+                      className="gallery-card gallery-card-interactive flex w-full items-center gap-3 border border-[#E6E0D4] p-3 text-left cursor-pointer active:scale-[0.99] hover:border-[#CFC7B9]"
+                    >
+                      <div className="gallery-cover-frame w-[54px] shrink-0 bg-[#FAF9F6]">
+                        <ArchivalImage
+                          src={item.coverUrl}
+                          alt={item.title}
+                          title={item.title}
+                          category={item.category}
+                          compact
+                          className="aspect-[3/4] w-full rounded-[10px]"
+                        />
                       </div>
-                    </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 font-mono text-[12px] text-[#7A7268] tabular-nums md:text-[11px]">
+                          <span className="font-semibold text-[#B43B2B]">
+                            {item.year}
+                          </span>
+                          <span aria-hidden="true">·</span>
+                          <span>{CATEGORY_LABELS[item.category]}</span>
+                          {item.region && (
+                            <>
+                              <span aria-hidden="true">·</span>
+                              <span className="truncate">{item.region}</span>
+                            </>
+                          )}
+                        </div>
+                        <h4 className="mt-0.5 truncate font-editorial text-[16px] font-medium text-[#1A1816]">
+                          {item.title}
+                        </h4>
+                        <div className="mt-1 flex items-center gap-2 text-[12px] text-[#8C857B] tabular-nums md:text-[11px]">
+                          {item.rating > 0 && (
+                            <span className="inline-flex items-center gap-0.5 font-mono text-[#B43B2B]">
+                              <Star
+                                className="h-3 w-3 fill-[#B43B2B] text-[#B43B2B]"
+                                aria-hidden="true"
+                              />
+                              {item.rating}.0
+                            </span>
+                          )}
+                          {item.tags.length > 0 && (
+                            <span className="truncate">
+                              {item.tags.slice(0, 2).join(' · ')}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </button>
                   ))}
                 </div>
-              </div>
-            </section>
-          ))}
-        </div>
-      )}
+              </section>
+            ))}
+
+            {eraTimeline.undatedItems.length > 0 && (
+              <section aria-label="未标年份档案" className="space-y-3">
+                <div className="flex items-baseline justify-between border-b border-[#E4DFD5] pb-2">
+                  <h3 className="font-editorial text-[18px] font-medium text-[#625C54]">
+                    未标年份档案
+                  </h3>
+                  <span className="font-mono text-[12px] tabular-nums text-[#8C857B]">
+                    {eraTimeline.undatedItems.length} 件
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                  {eraTimeline.undatedItems.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => onSelectItem(item)}
+                      className="gallery-card gallery-card-interactive flex w-full items-center gap-3 border border-[#E6E0D4] p-3 text-left cursor-pointer"
+                    >
+                      <div className="gallery-cover-frame w-[50px] shrink-0 bg-[#FAF9F6]">
+                        <ArchivalImage
+                          src={item.coverUrl}
+                          alt={item.title}
+                          title={item.title}
+                          category={item.category}
+                          compact
+                          className="aspect-[3/4] w-full rounded-[10px]"
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-mono text-[11px] text-[#8C857B]">
+                          {CATEGORY_LABELS[item.category]} · {item.accessionNo}
+                        </p>
+                        <h4 className="mt-0.5 truncate font-editorial text-[16px] font-medium text-[#1A1816]">
+                          {item.title}
+                        </h4>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
+          </div>
+        ))}
     </section>
   );
 }
+

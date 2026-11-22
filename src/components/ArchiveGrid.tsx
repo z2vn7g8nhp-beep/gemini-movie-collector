@@ -1,4 +1,4 @@
-import { ArrowUpRight, Film, Layers, Sparkles, Star, User } from 'lucide-react';
+import { ArrowUpRight, Check, Film, Layers, Sparkles, Star, User } from 'lucide-react';
 import type { ArchiveItem } from '../types/archive';
 import {
   CATEGORY_LABELS,
@@ -18,12 +18,14 @@ interface ArchiveGridProps {
   activeTag?: string;
   activeAlbumName?: string;
   viewMode?: ArchiveViewMode;
+  batchMode?: boolean;
+  selectedIds?: string[];
+  onToggleBatchSelect?: (id: string) => void;
   onSelectItem: (item: ArchiveItem) => void;
   onOpenCardModal?: (item: ArchiveItem) => void;
   onJumpToSearch: (query?: string) => void;
   onJumpToCreate: () => void;
   onResetFilters: () => void;
-  onLoadSampleCollection?: () => void;
 }
 
 export function ArchiveGrid({
@@ -33,13 +35,16 @@ export function ArchiveGrid({
   activeTag = '',
   activeAlbumName = '',
   viewMode = 'grid',
+  batchMode = false,
+  selectedIds = [],
+  onToggleBatchSelect,
   onSelectItem,
   onOpenCardModal,
   onJumpToSearch,
   onJumpToCreate,
   onResetFilters,
-  onLoadSampleCollection,
 }: ArchiveGridProps) {
+  const selectedIdSet = new Set(selectedIds);
   if (allItems.length === 0) {
     return (
       <section className="mx-auto max-w-[1180px] px-4 pt-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] min-[420px]:px-5 md:px-8 md:pt-6 md:pb-16">
@@ -71,17 +76,6 @@ export function ArchiveGrid({
               >
                 手动建档
               </button>
-              {onLoadSampleCollection && (
-                <button
-                  type="button"
-                  data-testid="load-sample-collection-btn"
-                  onClick={onLoadSampleCollection}
-                  className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl px-4 text-sm font-medium text-[#625C54] underline decoration-[#D4CDC0] underline-offset-4 whitespace-nowrap cursor-pointer transition-colors hover:bg-[#F3EFE8] hover:text-[#1A1816] hover:decoration-[#1A1816]"
-                >
-                  <span>载入 6 件精选示例馆藏</span>
-                  <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
-                </button>
-              )}
             </div>
           </div>
 
@@ -198,17 +192,41 @@ export function ArchiveGrid({
             const isMasterpiece = completeness.tier === 'masterpiece';
             const excerpt = item.quote || item.notes || item.summary;
 
+            const isSelected = batchMode && selectedIdSet.has(item.id);
             return (
               <article
                 key={item.id}
-                className="group relative flex items-center gap-3.5 px-3.5 py-3 transition-colors hover:bg-[#FAF7F0] sm:px-5 sm:py-3.5"
+                className={`group relative flex items-center gap-3.5 px-3.5 py-3 transition-colors sm:px-5 sm:py-3.5 ${
+                  isSelected ? 'bg-[#FDF6F4]' : 'hover:bg-[#FAF7F0]'
+                }`}
               >
                 <button
                   type="button"
-                  onClick={() => onSelectItem(item)}
-                  aria-label={`查看${CATEGORY_LABELS[item.category]}「${item.title}」详情`}
+                  onClick={() =>
+                    batchMode && onToggleBatchSelect
+                      ? onToggleBatchSelect(item.id)
+                      : onSelectItem(item)
+                  }
+                  aria-pressed={batchMode ? isSelected : undefined}
+                  aria-label={
+                    batchMode
+                      ? `${isSelected ? '取消选择' : '选择'}「${item.title}」`
+                      : `查看${CATEGORY_LABELS[item.category]}「${item.title}」详情`
+                  }
                   className="flex min-w-0 flex-1 items-center gap-3.5 text-left cursor-pointer"
                 >
+                  {batchMode && (
+                    <span
+                      aria-hidden="true"
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border ${
+                        isSelected
+                          ? 'border-[#B43B2B] bg-[#B43B2B] text-white'
+                          : 'border-[#CFC7B9] bg-white text-transparent'
+                      }`}
+                    >
+                      <Check className="h-3.5 w-3.5" />
+                    </span>
+                  )}
                   <div className="gallery-cover-frame w-[52px] shrink-0 sm:w-[58px]">
                     <ArchivalImage
                       src={item.coverUrl}
@@ -322,19 +340,32 @@ export function ArchiveGrid({
             .filter(Boolean)
             .join(' · ');
 
+          const isSelected = batchMode && selectedIdSet.has(item.id);
+
           return (
             <article key={item.id} className="group relative flex min-w-0 flex-col">
               <div
                 className={`gallery-card gallery-card-interactive relative flex flex-1 flex-col overflow-hidden border ${
-                  isMasterpiece
-                    ? 'gallery-card-masterpiece border-[#C9A45C]/80'
-                    : 'border-[#E6E0D4] hover:border-[#CFC5B4]'
+                  isSelected
+                    ? 'border-[#B43B2B] ring-2 ring-[#B43B2B]/80'
+                    : isMasterpiece
+                      ? 'gallery-card-masterpiece border-[#C9A45C]/80'
+                      : 'border-[#E6E0D4] hover:border-[#CFC5B4]'
                 }`}
               >
                 <button
                   type="button"
-                  onClick={() => onSelectItem(item)}
-                  aria-label={`查看${CATEGORY_LABELS[item.category]}「${item.title}」详情`}
+                  onClick={() =>
+                    batchMode && onToggleBatchSelect
+                      ? onToggleBatchSelect(item.id)
+                      : onSelectItem(item)
+                  }
+                  aria-pressed={batchMode ? isSelected : undefined}
+                  aria-label={
+                    batchMode
+                      ? `${isSelected ? '取消选择' : '选择'}「${item.title}」`
+                      : `查看${CATEGORY_LABELS[item.category]}「${item.title}」详情`
+                  }
                   className="flex flex-1 flex-col text-left cursor-pointer active:scale-[0.99]"
                 >
                   {/* Art-Gallery Passe-Partout Cover Frame */}
@@ -348,13 +379,26 @@ export function ArchiveGrid({
                         className="aspect-[3/4] w-full rounded-[14px]"
                         imgClassName="group-hover:scale-[1.04]"
                       />
-                      {isMasterpiece && (
+                      {batchMode ? (
                         <span
-                          aria-label="典藏级档案"
-                          className="pointer-events-none absolute right-2 top-2 rounded-lg border border-[#E6C57A]/75 bg-[#1B1814]/85 px-2 py-0.5 font-editorial text-[11px] tracking-[0.14em] text-[#F2D68A] backdrop-blur-[2px]"
+                          aria-hidden="true"
+                          className={`absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-full border-2 shadow-sm ${
+                            isSelected
+                              ? 'border-white bg-[#B43B2B] text-white'
+                              : 'border-white/90 bg-[#1A1816]/65 text-transparent'
+                          }`}
                         >
-                          典藏
+                          <Check className="h-4 w-4" />
                         </span>
+                      ) : (
+                        isMasterpiece && (
+                          <span
+                            aria-label="典藏级档案"
+                            className="pointer-events-none absolute right-2 top-2 rounded-lg border border-[#E6C57A]/75 bg-[#1B1814]/85 px-2 py-0.5 font-editorial text-[11px] tracking-[0.14em] text-[#F2D68A] backdrop-blur-[2px]"
+                          >
+                            典藏
+                          </span>
+                        )
                       )}
                     </div>
                   </div>

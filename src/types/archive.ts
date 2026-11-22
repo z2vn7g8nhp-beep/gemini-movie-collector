@@ -6,6 +6,21 @@ export type SortOption = 'recent' | 'rating' | 'year' | 'title';
 
 export type SearchSourceOption = 'imdb';
 
+export type WatchMedium = 'cinema' | 'imax' | 'streaming' | 'bluray' | 'tv' | 'other';
+
+export interface WatchLogEntry {
+  id: string;
+  watchedAt: string; // YYYY-MM-DD
+  medium?: WatchMedium;
+  note?: string;
+}
+
+export type DecadeFilterOption = 'all' | '2020s' | '2010s' | '2000s' | '1990s' | 'classic';
+
+export type RatingBucketFilterOption = 'all' | '5' | '4plus' | 'unrated';
+
+export type CompletenessFilterOption = 'all' | 'masterpiece' | 'needs-polish';
+
 export interface CharacterProfile {
   alias?: string;
   identity?: string;
@@ -41,6 +56,7 @@ export interface ArchiveItem {
   relatedWorkTitle?: string;
   portrayedBy?: string;
   characterProfile?: CharacterProfile;
+  watchLogs?: WatchLogEntry[];
   sourceName?: string;
   sourceUrl?: string;
   createdAt: string;
@@ -69,6 +85,10 @@ export interface ArchiveFilterState {
   category: 'all' | ArchiveCategory;
   status: 'all' | CollectionStatus;
   tag?: string;
+  decade?: DecadeFilterOption;
+  region?: string;
+  ratingBucket?: RatingBucketFilterOption;
+  completeness?: CompletenessFilterOption;
   query: string;
   sortBy: SortOption;
 }
@@ -91,6 +111,7 @@ export interface ArchiveDraftInput {
   relatedWorkTitle?: string;
   portrayedBy?: string;
   characterProfile?: CharacterProfile;
+  watchLogs?: WatchLogEntry[];
   sourceName?: string;
   sourceUrl?: string;
 }

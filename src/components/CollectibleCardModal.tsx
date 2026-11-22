@@ -4,7 +4,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Circle,
+  Download,
   Edit3,
+  Loader2,
   RotateCw,
   Star,
   X,
@@ -15,6 +17,11 @@ import {
   getRelatedItems,
   getStatusLabel,
 } from '../utils/archive';
+import {
+  renderCollectibleCardPng,
+  saveOrShareDataUrl,
+  type ExportTheme,
+} from '../utils/cardCanvasExport';
 import { computeItemCompleteness } from '../utils/collector';
 import { ArchivalImage } from './ArchivalImage';
 
@@ -24,6 +31,7 @@ interface CollectibleCardModalProps {
   onClose: () => void;
   onSelectItem: (item: ArchiveItem) => void;
   onOpenDetailEdit: (item: ArchiveItem) => void;
+  onNotice?: (message: string) => void;
 }
 
 export function CollectibleCardModal({
@@ -32,11 +40,18 @@ export function CollectibleCardModal({
   onClose,
   onSelectItem,
   onOpenDetailEdit,
+  onNotice,
 }: CollectibleCardModalProps) {
   const [flipped, setFlipped] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportTheme, setExportTheme] = useState<ExportTheme>('darkroom');
+  const [exportUrl, setExportUrl] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     setFlipped(false);
+    setExportOpen(false);
+    setExportUrl(null);
   }, [item?.id]);
 
   useEffect(() => {
@@ -101,6 +116,33 @@ export function CollectibleCardModal({
     item.summary ||
     '尚未写下收藏手记或台词，点击下方「去打磨」点亮典藏级档案。';
 
+  const handleGenerateExport = async (theme: ExportTheme = exportTheme) => {
+    setExportOpen(true);
+    setExportTheme(theme);
+    setExporting(true);
+    setExportUrl(null);
+    try {
+      const url = await renderCollectibleCardPng(item, theme);
+      setExportUrl(url);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleSaveExport = async () => {
+    if (!exportUrl) return;
+    const res = await saveOrShareDataUrl(
+      exportUrl,
+      `cinearchive-card-${item.accessionNo}.png`,
+      `${item.title} · 光影志藏卡`
+    );
+    onNotice?.(
+      res === 'shared'
+        ? '已唤起系统分享实体藏卡'
+        : '已保存高清藏卡图片，手机端也可长按预览图存至相册'
+    );
+  };
+
   return (
     <div
       role="dialog"
@@ -121,15 +163,97 @@ export function CollectibleCardModal({
             {hasSiblings ? `${currentIndex + 1} of ${allItems.length}` : '1 of 1'}
           </span>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="关闭藏卡赏析"
-          className="flex h-11 w-11 items-center justify-center rounded-xl text-[#E8E2D7] hover:bg-white/10 cursor-pointer"
-        >
-          <X className="h-5 w-5" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            data-testid="export-card-png-btn"
+            onClick={() =>
+              exportOpen ? setExportOpen(false) : void handleGenerateExport(exportTheme)
+            }
+            className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-[#C9A45C]/60 bg-[#C9A45C]/15 px-3 text-xs font-medium text-[#F5DC9B] whitespace-nowrap cursor-pointer active:scale-[0.97]"
+          >
+            <Download className="h-3.5 w-3.5" aria-hidden="true" />
+            <span>{exportOpen ? '返回藏卡' : '导出高清图'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="关闭藏卡赏析"
+            className="flex h-11 w-11 items-center justify-center rounded-xl text-[#E8E2D7] hover:bg-white/10 cursor-pointer"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
       </div>
+
+      {exportOpen ? (
+        <div
+          data-testid="collectible-card-export-panel"
+          className="flex w-full max-w-[388px] flex-col gap-3 rounded-3xl border border-[#3A352E] bg-[#1C1A17] p-4 text-[#FAF7F0] shadow-2xl md:max-w-[360px]"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-editorial text-sm font-medium text-[#FAF7F0]">
+              实体藏卡高清长图
+            </span>
+            <div className="grid grid-cols-2 gap-1 rounded-xl bg-white/10 p-0.5">
+              <button
+                type="button"
+                aria-pressed={exportTheme === 'darkroom'}
+                onClick={() => void handleGenerateExport('darkroom')}
+                className={`min-h-[32px] rounded-lg px-2.5 text-xs font-medium cursor-pointer ${
+                  exportTheme === 'darkroom'
+                    ? 'bg-[#FAF7F0] text-[#1A1816]'
+                    : 'text-[#CFC7B9]'
+                }`}
+              >
+                暗房黑金
+              </button>
+              <button
+                type="button"
+                aria-pressed={exportTheme === 'ivory'}
+                onClick={() => void handleGenerateExport('ivory')}
+                className={`min-h-[32px] rounded-lg px-2.5 text-xs font-medium cursor-pointer ${
+                  exportTheme === 'ivory'
+                    ? 'bg-[#FAF7F0] text-[#1A1816]'
+                    : 'text-[#CFC7B9]'
+                }`}
+              >
+                象牙纸白
+              </button>
+            </div>
+          </div>
+
+          <div className="flex min-h-[340px] items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-[#12110F] p-2">
+            {exporting || !exportUrl ? (
+              <div className="flex items-center gap-2 text-xs text-[#CFC7B9]">
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                <span>正在绘制高清藏卡…</span>
+              </div>
+            ) : (
+              <img
+                src={exportUrl}
+                alt={`${item.title}高清藏卡预览`}
+                className="max-h-[52dvh] w-auto rounded-xl object-contain"
+              />
+            )}
+          </div>
+
+          <p className="text-center text-[11px] text-[#A59D90]">
+            手机端可直接长按图片保存到相册，或点击下方一键保存 / 分享
+          </p>
+
+          <button
+            type="button"
+            disabled={!exportUrl}
+            onClick={() => void handleSaveExport()}
+            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#B43B2B] text-sm font-medium text-white cursor-pointer active:scale-[0.98] disabled:opacity-45"
+          >
+            <Download className="h-4 w-4" aria-hidden="true" />
+            <span>保存 / 分享藏卡 PNG</span>
+          </button>
+        </div>
+      ) : (
+        <>
 
       {/* 3D Flip Card Stage */}
       <div className="card-perspective w-full max-w-[388px] md:max-w-[360px]">
@@ -375,6 +499,8 @@ export function CollectibleCardModal({
       <p className="mt-2.5 hidden font-mono text-[11px] text-[#9C9488] md:block">
         {hasSiblings ? '← → 切换藏卡 · 空格翻面 · Esc 关闭' : '空格翻面 · Esc 关闭'}
       </p>
+        </>
+      )}
     </div>
   );
 }

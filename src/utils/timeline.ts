@@ -263,3 +263,200 @@ export function buildTimelineGroups(
     visibleMonths,
   };
 }
+
+export type TimelineViewMode = 'collected' | 'watched' | 'era';
+
+export interface WatchedTimelineEvent {
+  eventId: string;
+  item: ArchiveItem;
+  watchedAt: string; // YYYY-MM-DD
+  monthKey: string;
+  monthLabel: string;
+  dayLabel: string;
+  weekdayLabel: string;
+  watchNumber: number; // 1 = 首刷, 2 = 二刷, etc.
+  totalWatches: number;
+  medium?: string;
+  note?: string;
+  isExplicitLog: boolean;
+}
+
+export interface WatchedMonthGroup {
+  monthKey: string;
+  label: string;
+  events: WatchedTimelineEvent[];
+}
+
+export interface WatchedTimelineResult {
+  totalEvents: number;
+  rewatchCount: number;
+  explicitLogCount: number;
+  months: WatchedMonthGroup[];
+}
+
+export function buildWatchedTimeline(
+  items: ArchiveItem[],
+  options: {
+    order?: TimelineOrder;
+    category?: 'all' | ArchiveCategory;
+  } = {}
+): WatchedTimelineResult {
+  const order = options.order ?? 'desc';
+  const category = options.category ?? 'all';
+  const events: WatchedTimelineEvent[] = [];
+  let rewatchCount = 0;
+  let explicitLogCount = 0;
+
+  for (const item of items) {
+    if (category !== 'all' && item.category !== category) continue;
+
+    const logs = Array.isArray(item.watchLogs) ? item.watchLogs : [];
+    if (logs.length > 0) {
+      // Chronological ascending to assign watchNumber (1 = 首刷, 2 = 二刷...)
+      const ascLogs = [...logs].sort((a, b) =>
+        a.watchedAt.localeCompare(b.watchedAt)
+      );
+      if (ascLogs.length > 1) {
+        rewatchCount += ascLogs.length - 1;
+      }
+      explicitLogCount += ascLogs.length;
+
+      ascLogs.forEach((log, idx) => {
+        const parts = extractTimelineDateParts(`${log.watchedAt}T12:00:00`);
+        events.push({
+          eventId: `${item.id}-${log.id}`,
+          item,
+          watchedAt: log.watchedAt,
+          monthKey: parts.monthKey,
+          monthLabel: parts.monthLabel,
+          dayLabel: parts.dayLabel,
+          weekdayLabel: parts.weekdayLabel,
+          watchNumber: idx + 1,
+          totalWatches: ascLogs.length,
+          medium: log.medium,
+          note: log.note,
+          isExplicitLog: true,
+        });
+      });
+    } else if (
+      item.category === 'film' &&
+      (item.status === 'watched' || item.status === 'favorite')
+    ) {
+      const parts = extractTimelineDateParts(item.createdAt);
+      events.push({
+        eventId: `${item.id}-fallback`,
+        item,
+        watchedAt: parts.dateKey,
+        monthKey: parts.monthKey,
+        monthLabel: parts.monthLabel,
+        dayLabel: parts.dayLabel,
+        weekdayLabel: parts.weekdayLabel,
+        watchNumber: 1,
+        totalWatches: 1,
+        isExplicitLog: false,
+      });
+    }
+  }
+
+  events.sort((a, b) => {
+    const cmp = a.watchedAt.localeCompare(b.watchedAt);
+    if (cmp !== 0) return order === 'desc' ? -cmp : cmp;
+    return order === 'desc'
+      ? b.watchNumber - a.watchNumber
+      : a.watchNumber - b.watchNumber;
+  });
+
+  const byMonth = new Map<string, WatchedMonthGroup>();
+  for (const ev of events) {
+    let grp = byMonth.get(ev.monthKey);
+    if (!grp) {
+      grp = { monthKey: ev.monthKey, label: ev.monthLabel, events: [] };
+      byMonth.set(ev.monthKey, grp);
+    }
+    grp.events.push(ev);
+  }
+
+  return {
+    totalEvents: events.length,
+    rewatchCount,
+    explicitLogCount,
+    months: Array.from(byMonth.values()),
+  };
+}
+
+export interface EraDecadeGroup {
+  decadeKey: string;
+  label: string;
+  startYear: number;
+  items: ArchiveItem[];
+}
+
+export interface EraTimelineResult {
+  totalDatedItems: number;
+  undatedItems: ArchiveItem[];
+  earliestYear: number | null;
+  latestYear: number | null;
+  decades: EraDecadeGroup[];
+}
+
+export function buildEraTimeline(
+  items: ArchiveItem[],
+  options: {
+    order?: TimelineOrder;
+    category?: 'all' | ArchiveCategory;
+  } = {}
+): EraTimelineResult {
+  const order = options.order ?? 'desc';
+  const category = options.category ?? 'all';
+  const filtered =
+    category === 'all'
+      ? items
+      : items.filter((it) => it.category === category);
+
+  const byDecade = new Map<number, ArchiveItem[]>();
+  const undatedItems: ArchiveItem[] = [];
+  let earliestYear: number | null = null;
+  let latestYear: number | null = null;
+
+  for (const item of filtered) {
+    const y = Number.parseInt(item.year || '', 10);
+    if (!Number.isFinite(y) || y < 1880 || y > 2100) {
+      undatedItems.push(item);
+      continue;
+    }
+    if (earliestYear === null || y < earliestYear) earliestYear = y;
+    if (latestYear === null || y > latestYear) latestYear = y;
+    const decadeStart = Math.floor(y / 10) * 10;
+    const list = byDecade.get(decadeStart) ?? [];
+    list.push(item);
+    byDecade.set(decadeStart, list);
+  }
+
+  const sortedDecadeStarts = Array.from(byDecade.keys()).sort((a, b) =>
+    order === 'desc' ? b - a : a - b
+  );
+
+  const decades: EraDecadeGroup[] = sortedDecadeStarts.map((startYear) => {
+    const decadeItems = [...(byDecade.get(startYear) ?? [])].sort((a, b) => {
+      const ya = Number.parseInt(a.year || '0', 10) || 0;
+      const yb = Number.parseInt(b.year || '0', 10) || 0;
+      if (ya !== yb) return order === 'desc' ? yb - ya : ya - yb;
+      return a.title.localeCompare(b.title, 'zh-CN');
+    });
+    return {
+      decadeKey: `${startYear}s`,
+      label: `${startYear} 年代`,
+      startYear,
+      items: decadeItems,
+    };
+  });
+
+  return {
+    totalDatedItems: filtered.length - undatedItems.length,
+    undatedItems,
+    earliestYear,
+    latestYear,
+    decades,
+  };
+}
+

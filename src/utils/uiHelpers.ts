@@ -13,6 +13,10 @@ export interface ActiveLibraryFilterState {
   status: 'all' | CollectionStatus;
   tag: string;
   albumId: string;
+  decade?: string;
+  region?: string;
+  ratingBucket?: string;
+  completeness?: string;
   query: string;
   sortBy: SortOption;
 }
@@ -25,6 +29,10 @@ export function countActiveLibraryFilters(
   if (state.status !== 'all') count += 1;
   if (state.tag.trim()) count += 1;
   if (state.albumId.trim()) count += 1;
+  if (state.decade && state.decade !== 'all') count += 1;
+  if (state.region && state.region.trim()) count += 1;
+  if (state.ratingBucket && state.ratingBucket !== 'all') count += 1;
+  if (state.completeness && state.completeness !== 'all') count += 1;
   if (state.query.trim()) count += 1;
   if (state.sortBy !== 'recent') count += 1;
   return count;

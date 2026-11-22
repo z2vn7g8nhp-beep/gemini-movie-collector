@@ -8,6 +8,7 @@ interface DetailRelationGraphProps {
   item: ArchiveItem;
   allItems: ArchiveItem[];
   onSelectItem: (item: ArchiveItem) => void;
+  onOpenGlobalMap?: () => void;
 }
 
 const CATEGORY_RING_COLOR: Record<ArchiveCategory, string> = {
@@ -32,6 +33,7 @@ export function DetailRelationGraph({
   item,
   allItems,
   onSelectItem,
+  onOpenGlobalMap,
 }: DetailRelationGraphProps) {
   const uid = useId().replace(/:/g, '');
   const graph = useMemo(
@@ -78,9 +80,21 @@ export function DetailRelationGraph({
               : '可视化展示当前档案与馆内其他条目的深层脉络'}
           </p>
         </div>
-        <span className="shrink-0 whitespace-nowrap font-mono text-[12px] tabular-nums text-[#E4C37A] md:text-[11px]">
-          {graph.nodes.length} 节点
-        </span>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="whitespace-nowrap font-mono text-[12px] tabular-nums text-[#E4C37A] md:text-[11px]">
+            {graph.nodes.length} 节点
+          </span>
+          {onOpenGlobalMap && (
+            <button
+              type="button"
+              onClick={onOpenGlobalMap}
+              className="inline-flex min-h-[32px] items-center gap-1 rounded-lg border border-white/15 bg-white/8 px-2.5 text-[11px] font-medium text-[#FAF7F0] whitespace-nowrap cursor-pointer hover:bg-white/15"
+            >
+              <span>全馆星图</span>
+              <ArrowUpRight className="h-3 w-3 text-[#D4AF6A]" aria-hidden="true" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Compact Interactive SVG Network */}

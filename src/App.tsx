@@ -1,16 +1,38 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BookOpen, LayoutGrid, List, RotateCcw, Search, Tag, X } from 'lucide-react';
+import {
+  BookOpen,
+  CheckSquare,
+  Compass,
+  Dices,
+  Grid3x3,
+  LayoutGrid,
+  List,
+  Quote,
+  RotateCcw,
+  Search,
+  SlidersHorizontal,
+  Tag,
+  X,
+} from 'lucide-react';
+import { AlbumCuratorModal } from './components/AlbumCuratorModal';
 import { ArchiveGrid, type ArchiveViewMode } from './components/ArchiveGrid';
+import { BatchActionBar } from './components/BatchActionBar';
 import { CollectibleCardModal } from './components/CollectibleCardModal';
 import { CollectorSpotlightRail } from './components/CollectorSpotlightRail';
 import { DailyCheckInBanner } from './components/DailyCheckInBanner';
 import { DetailDrawer } from './components/DetailDrawer';
+import { GlobalRelationMapModal } from './components/GlobalRelationMapModal';
 import { ManualCreateView } from './components/ManualCreateView';
 import { MobileNavBar, AppTopBar, type AppTab } from './components/MobileNavBar';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { PostCollectLinkSheet } from './components/PostCollectLinkSheet';
+import { PosterWallExportModal } from './components/PosterWallExportModal';
 import { ProfileBackupView } from './components/ProfileBackupView';
-import { RandomEncounterModal } from './components/RandomEncounterModal';
+import { QuotesWallModal } from './components/QuotesWallModal';
+import {
+  RandomEncounterModal,
+  type EncounterMode,
+} from './components/RandomEncounterModal';
 import { SearchTabView } from './components/SearchTabView';
 import { TimelineMemoriesView } from './components/TimelineMemoriesView';
 import { detectRuntimeMode, getRuntimeModeSync } from './services/archiveApi';
@@ -21,7 +43,10 @@ import type {
   CollectionStatus,
   CollectorAlbum,
   CollectorState,
+  CompletenessFilterOption,
+  DecadeFilterOption,
   OnlineSearchResult,
+  RatingBucketFilterOption,
   SortOption,
 } from './types/archive';
 import {
@@ -43,6 +68,13 @@ import {
   recordCheckIn,
   resolveAlbumItems,
 } from './utils/collector';
+import {
+  applyBatchAddToAlbum,
+  applyBatchStatusUpdate,
+  applyBatchTagAdd,
+  DECADE_FILTER_OPTIONS,
+  extractRegionRegistry,
+} from './utils/curation';
 import {
   evaluateDailyCheckInReminder,
   getBrowserNotificationPermission,
@@ -93,7 +125,10 @@ function loadLocalFallback(): ArchiveItem[] | null {
     const raw = window.localStorage.getItem(LOCAL_STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as ArchiveItem[]) : null;
+    if (!Array.isArray(parsed)) return null;
+    return (parsed as ArchiveItem[]).filter(
+      (item) => typeof item?.id === 'string' && !item.id.startsWith('seed-')
+    );
   } catch {
     return null;
   }
@@ -176,8 +211,20 @@ export default function App() {
   const [sortBy, setSortBy] = useState<SortOption>(
     () => initialUiStateRef.current.sortBy ?? 'recent'
   );
+  const [decadeFilter, setDecadeFilter] = useState<DecadeFilterOption>('all');
+  const [regionFilter, setRegionFilter] = useState('');
+  const [ratingBucketFilter, setRatingBucketFilter] =
+    useState<RatingBucketFilterOption>('all');
+  const [completenessFilter, setCompletenessFilter] =
+    useState<CompletenessFilterOption>('all');
+  const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
+
   const [viewMode, setViewMode] = useState<ArchiveViewMode>(() => loadViewMode());
   const quickSearchInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Batch curation state
+  const [batchMode, setBatchMode] = useState(false);
+  const [batchSelectedIds, setBatchSelectedIds] = useState<string[]>([]);
 
   // Handoff state to Search / Create tabs
   const [pendingSearchQuery, setPendingSearchQuery] = useState('');
@@ -194,8 +241,19 @@ export default function App() {
     return localItems.some((it) => it.id === savedId) ? savedId : null;
   });
   const [cardModalItemId, setCardModalItemId] = useState<string | null>(null);
+  const [encounterOpen, setEncounterOpen] = useState(false);
+  const [encounterInitialMode, setEncounterInitialMode] =
+    useState<EncounterMode>('all');
   const [encounterItemId, setEncounterItemId] = useState<string | null>(null);
   const [encounterDrawCount, setEncounterDrawCount] = useState(0);
+  const [posterWallConfig, setPosterWallConfig] = useState<{
+    open: boolean;
+    itemIds?: string[];
+    title?: string;
+  }>({ open: false });
+  const [quotesWallOpen, setQuotesWallOpen] = useState(false);
+  const [globalMapOpen, setGlobalMapOpen] = useState(false);
+  const [editingAlbum, setEditingAlbum] = useState<CollectorAlbum | null>(null);
   const [pendingLinkSuggestion, setPendingLinkSuggestion] = useState<{
     sourceItemId: string;
     recommendations: LinkRecommendation[];
@@ -431,7 +489,13 @@ export default function App() {
 
   // Prevent background page scroll / horizontal drift on iOS Safari while full-screen sheet or modal is open
   const hasBlockingOverlay = Boolean(
-    selectedItemId || cardModalItemId || encounterItemId
+    selectedItemId ||
+      cardModalItemId ||
+      encounterOpen ||
+      posterWallConfig.open ||
+      quotesWallOpen ||
+      globalMapOpen ||
+      editingAlbum
   );
   useEffect(() => {
     if (!hasBlockingOverlay) return;
@@ -572,6 +636,7 @@ export default function App() {
 
   const stats = useMemo(() => computeArchiveStats(items), [items]);
   const tagRegistry = useMemo(() => collectTagRegistry(items), [items]);
+  const regionRegistry = useMemo(() => extractRegionRegistry(items), [items]);
   const activeAlbum = useMemo(
     () => collector.albums.find((a) => a.id === activeAlbumId) ?? null,
     [collector.albums, activeAlbumId]
@@ -587,8 +652,24 @@ export default function App() {
       tag: activeTag,
       query: libraryQuery,
       sortBy,
+      decade: decadeFilter,
+      region: regionFilter,
+      ratingBucket: ratingBucketFilter,
+      completeness: completenessFilter,
     });
-  }, [displayItems, activeAlbum, activeCategory, statusFilter, activeTag, libraryQuery, sortBy]);
+  }, [
+    displayItems,
+    activeAlbum,
+    activeCategory,
+    statusFilter,
+    activeTag,
+    libraryQuery,
+    sortBy,
+    decadeFilter,
+    regionFilter,
+    ratingBucketFilter,
+    completenessFilter,
+  ]);
 
   const selectedItem = useMemo(
     () => displayItems.find((i) => i.id === selectedItemId) ?? null,
@@ -611,8 +692,23 @@ export default function App() {
       setNotice('藏馆暂无条目，先联网收录几件吧');
       return;
     }
+    setEncounterInitialMode('all');
     setEncounterItemId(picked.id);
     setEncounterDrawCount((n) => n + 1);
+    setEncounterOpen(true);
+  };
+
+  const handleOpenWatchlistBlindBox = () => {
+    if (items.length === 0) {
+      setNotice('藏馆暂无条目，先联网收录几件吧');
+      return;
+    }
+    const picked = pickRandomEncounterItem(items, encounterItemId ?? undefined);
+    if (picked && !encounterItemId) {
+      setEncounterItemId(picked.id);
+    }
+    setEncounterInitialMode('watchlist');
+    setEncounterOpen(true);
   };
 
   const persistCollector = async (nextState: CollectorState) => {
@@ -680,6 +776,71 @@ export default function App() {
     if (target) setNotice(`已移除图鉴「${target.name}」`);
   };
 
+  const handleSaveEditedAlbum = async (updated: CollectorAlbum) => {
+    const nextState: CollectorState = {
+      ...collector,
+      albums: collector.albums.map((a) => (a.id === updated.id ? updated : a)),
+    };
+    await persistCollector(nextState);
+    setNotice(`已更新专题图鉴「${updated.name}」`);
+  };
+
+  const handleToggleBatchSelect = (id: string) => {
+    setBatchSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleBatchStatus = async (status: CollectionStatus) => {
+    if (batchSelectedIds.length === 0) return;
+    const { items: nextItems, updatedCount } = applyBatchStatusUpdate(
+      items,
+      batchSelectedIds,
+      status
+    );
+    await persistSnapshot(nextItems);
+    setNotice(
+      updatedCount > 0
+        ? `已批量更新 ${updatedCount} 件档案状态`
+        : '所选档案已是该状态'
+    );
+    setBatchSelectedIds([]);
+  };
+
+  const handleBatchAddTag = async (tag: string) => {
+    if (batchSelectedIds.length === 0 || !tag.trim()) return;
+    const { items: nextItems, updatedCount } = applyBatchTagAdd(
+      items,
+      batchSelectedIds,
+      tag
+    );
+    await persistSnapshot(nextItems);
+    setNotice(
+      updatedCount > 0
+        ? `已为 ${updatedCount} 件档案添加标签「${tag.trim()}」`
+        : `所选档案均已包含标签「${tag.trim()}」`
+    );
+    setBatchSelectedIds([]);
+  };
+
+  const handleBatchAddToAlbum = async (albumId: string) => {
+    if (batchSelectedIds.length === 0) return;
+    const targetAlbum = collector.albums.find((a) => a.id === albumId);
+    if (!targetAlbum) return;
+    const { albums: nextAlbums, addedCount } = applyBatchAddToAlbum(
+      collector.albums,
+      albumId,
+      batchSelectedIds
+    );
+    await persistCollector({ ...collector, albums: nextAlbums });
+    setNotice(
+      addedCount > 0
+        ? `已将 ${addedCount} 件档案收入图鉴「${targetAlbum.name}」`
+        : `所选档案已在图鉴「${targetAlbum.name}」中`
+    );
+    setBatchSelectedIds([]);
+  };
+
   const persistSnapshot = async (nextItems: ArchiveItem[]) => {
     setItems(nextItems);
     saveLocalFallback(nextItems);
@@ -700,13 +861,6 @@ export default function App() {
     } catch {
       // Saved locally
     }
-  };
-
-  const handleLoadSampleCollection = async () => {
-    if (items.length > 0) return;
-    const { SEED_COLLECTION } = await import('./data/seedCollection');
-    await persistSnapshot(SEED_COLLECTION);
-    setNotice(`已载入 ${SEED_COLLECTION.length} 件精选示例馆藏，点击任意档案即可赏析`);
   };
 
   const buildItemsWithNewAndBidirectionalLinks = (
@@ -1089,6 +1243,10 @@ export default function App() {
     setActiveAlbumId('');
     setLibraryQuery('');
     setSortBy('recent');
+    setDecadeFilter('all');
+    setRegionFilter('');
+    setRatingBucketFilter('all');
+    setCompletenessFilter('all');
   };
 
   const handleFilterByTag = (tag: string) => {
@@ -1098,8 +1256,21 @@ export default function App() {
     setStatusFilter('all');
     setActiveAlbumId('');
     setLibraryQuery('');
+    setDecadeFilter('all');
+    setRegionFilter('');
+    setRatingBucketFilter('all');
+    setCompletenessFilter('all');
     setActiveTag(tag);
   };
+
+  const activeAdvancedFilterCount = useMemo(() => {
+    let n = 0;
+    if (decadeFilter !== 'all') n += 1;
+    if (regionFilter.trim()) n += 1;
+    if (ratingBucketFilter !== 'all') n += 1;
+    if (completenessFilter !== 'all') n += 1;
+    return n;
+  }, [decadeFilter, regionFilter, ratingBucketFilter, completenessFilter]);
 
   const activeFilterCount = useMemo(
     () =>
@@ -1110,8 +1281,23 @@ export default function App() {
         albumId: activeAlbumId,
         query: libraryQuery,
         sortBy,
+        decade: decadeFilter,
+        region: regionFilter,
+        ratingBucket: ratingBucketFilter,
+        completeness: completenessFilter,
       }),
-    [activeCategory, statusFilter, activeTag, activeAlbumId, libraryQuery, sortBy]
+    [
+      activeCategory,
+      statusFilter,
+      activeTag,
+      activeAlbumId,
+      libraryQuery,
+      sortBy,
+      decadeFilter,
+      regionFilter,
+      ratingBucketFilter,
+      completenessFilter,
+    ]
   );
 
   // Ensure strictly at most one daily check-in CTA is shown per screen:
@@ -1193,9 +1379,82 @@ export default function App() {
               }}
               onCreateAlbum={handleCreateAlbum}
               onDeleteAlbum={handleDeleteAlbum}
+              onEditAlbum={(alb) => setEditingAlbum(alb)}
+              onExportAlbumPoster={(alb, matched) =>
+                setPosterWallConfig({
+                  open: true,
+                  itemIds: matched.map((m) => m.id),
+                  title: alb.name,
+                })
+              }
               onJumpToSearch={jumpToSearch}
               onJumpToProfile={() => setActiveTab('profile')}
             />
+
+            {/* Compact Mobile-First Gallery Studio Strip */}
+            {items.length > 0 && (
+              <section
+                aria-label="策展与视觉工坊"
+                data-testid="gallery-studio-bar"
+                className="mx-auto max-w-[1180px] px-4 pt-3 min-[420px]:px-5 md:px-8"
+              >
+                <div className="grid grid-cols-4 gap-2">
+                  <button
+                    type="button"
+                    data-testid="studio-watchlist-blindbox-btn"
+                    onClick={handleOpenWatchlistBlindBox}
+                    className="flex min-h-[54px] flex-col items-center justify-center gap-1 rounded-2xl border border-[#E4DFD5] bg-white px-1.5 py-2 text-[#1A1816] shadow-[0_1px_2px_rgba(26,24,22,0.03)] cursor-pointer active:scale-[0.97] hover:border-[#B43B2B] transition-all sm:min-h-[44px] sm:flex-row sm:gap-2"
+                  >
+                    <Dices className="h-4 w-4 text-[#B43B2B]" aria-hidden="true" />
+                    <span className="text-[12px] font-medium whitespace-nowrap">
+                      今晚看啥
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    data-testid="studio-quotes-wall-btn"
+                    onClick={() => setQuotesWallOpen(true)}
+                    className="flex min-h-[54px] flex-col items-center justify-center gap-1 rounded-2xl border border-[#E4DFD5] bg-white px-1.5 py-2 text-[#1A1816] shadow-[0_1px_2px_rgba(26,24,22,0.03)] cursor-pointer active:scale-[0.97] hover:border-[#1A1816] transition-all sm:min-h-[44px] sm:flex-row sm:gap-2"
+                  >
+                    <Quote className="h-4 w-4 text-[#A67C37]" aria-hidden="true" />
+                    <span className="text-[12px] font-medium whitespace-nowrap">
+                      金句本
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    data-testid="studio-global-map-btn"
+                    onClick={() => setGlobalMapOpen(true)}
+                    className="flex min-h-[54px] flex-col items-center justify-center gap-1 rounded-2xl border border-[#E4DFD5] bg-white px-1.5 py-2 text-[#1A1816] shadow-[0_1px_2px_rgba(26,24,22,0.03)] cursor-pointer active:scale-[0.97] hover:border-[#1A1816] transition-all sm:min-h-[44px] sm:flex-row sm:gap-2"
+                  >
+                    <Compass className="h-4 w-4 text-[#4E7A6A]" aria-hidden="true" />
+                    <span className="text-[12px] font-medium whitespace-nowrap">
+                      关系星图
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    data-testid="studio-poster-wall-btn"
+                    onClick={() =>
+                      setPosterWallConfig({
+                        open: true,
+                        itemIds: filteredItems.slice(0, 9).map((i) => i.id),
+                        title: activeAlbum ? activeAlbum.name : '我的私人光影志',
+                      })
+                    }
+                    className="flex min-h-[54px] flex-col items-center justify-center gap-1 rounded-2xl border border-[#E4DFD5] bg-white px-1.5 py-2 text-[#1A1816] shadow-[0_1px_2px_rgba(26,24,22,0.03)] cursor-pointer active:scale-[0.97] hover:border-[#1A1816] transition-all sm:min-h-[44px] sm:flex-row sm:gap-2"
+                  >
+                    <Grid3x3 className="h-4 w-4 text-[#1A1816]" aria-hidden="true" />
+                    <span className="text-[12px] font-medium whitespace-nowrap">
+                      海报墙
+                    </span>
+                  </button>
+                </div>
+              </section>
+            )}
 
             {/* Top Search + Category + Filter Control Zone */}
             <section className="mx-auto max-w-[1180px] px-4 pt-3.5 pb-2 min-[420px]:px-5 md:px-8 md:pt-4">
@@ -1364,65 +1623,215 @@ export default function App() {
                     </div>
 
                     <div className="flex items-center justify-between gap-2 sm:justify-end">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          data-testid="toggle-advanced-filters-btn"
+                          aria-expanded={advancedFiltersOpen}
+                          onClick={() => setAdvancedFiltersOpen((v) => !v)}
+                          className={`inline-flex h-9 items-center gap-1 rounded-xl border px-2.5 text-xs font-medium whitespace-nowrap cursor-pointer transition-colors ${
+                            advancedFiltersOpen || activeAdvancedFilterCount > 0
+                              ? 'border-[#1A1816] bg-[#1A1816] text-white'
+                              : 'border-[#DCD6CB] bg-white text-[#4B453E] hover:border-[#1A1816]'
+                          }`}
+                        >
+                          <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
+                          <span>筛选</span>
+                          {activeAdvancedFilterCount > 0 && (
+                            <span className="font-mono text-[11px] tabular-nums">
+                              ({activeAdvancedFilterCount})
+                            </span>
+                          )}
+                        </button>
+
+                        <button
+                          type="button"
+                          data-testid="toggle-batch-mode-btn"
+                          aria-pressed={batchMode}
+                          onClick={() => {
+                            setBatchMode((prev) => {
+                              if (prev) setBatchSelectedIds([]);
+                              return !prev;
+                            });
+                          }}
+                          className={`inline-flex h-9 items-center gap-1 rounded-xl border px-2.5 text-xs font-medium whitespace-nowrap cursor-pointer transition-colors ${
+                            batchMode
+                              ? 'border-[#B43B2B] bg-[#B43B2B] text-white'
+                              : 'border-[#DCD6CB] bg-white text-[#4B453E] hover:border-[#1A1816]'
+                          }`}
+                        >
+                          <CheckSquare className="h-3.5 w-3.5" aria-hidden="true" />
+                          <span>{batchMode ? '退出批量' : '批量'}</span>
+                        </button>
+
                         {activeFilterCount > 0 && (
                           <button
                             type="button"
                             data-testid="reset-filters-inline-btn"
                             onClick={handleResetFilters}
-                            className="inline-flex h-9 items-center gap-1 rounded-xl border border-[#E5BFB9] bg-[#FDF4F2] px-2.5 text-xs font-medium text-[#B43B2B] whitespace-nowrap cursor-pointer transition-colors hover:bg-[#FBE6E1]"
+                            className="inline-flex h-9 items-center gap-1 rounded-xl border border-[#E5BFB9] bg-[#FDF4F2] px-2 text-xs font-medium text-[#B43B2B] whitespace-nowrap cursor-pointer transition-colors hover:bg-[#FBE6E1]"
                           >
                             <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-                            <span>重置 ({activeFilterCount})</span>
+                            <span>重置</span>
                           </button>
                         )}
+                      </div>
+
+                      <div className="flex items-center gap-2">
                         <span
                           data-testid="stat-total"
                           className="font-mono text-[13px] tabular-nums text-[#7A7268] shrink-0 md:text-xs"
                         >
-                          共 {filteredItems.length} 件
+                          {filteredItems.length} 件
                         </span>
-                      </div>
 
-                      {/* Grid / List View Mode Switcher */}
-                      <div
-                        role="group"
-                        aria-label="视图切换"
-                        className="inline-flex rounded-xl bg-[#ECE8DF] p-0.5"
-                      >
-                        <button
-                          type="button"
-                          data-testid="view-mode-grid"
-                          aria-pressed={viewMode === 'grid'}
-                          aria-label="画廊网格视图"
-                          onClick={() => setViewMode('grid')}
-                          className={`flex h-8 w-9 items-center justify-center rounded-lg cursor-pointer transition-colors ${
-                            viewMode === 'grid'
-                              ? 'bg-white text-[#1A1816] shadow-xs'
-                              : 'text-[#625C54] hover:text-[#1A1816]'
-                          }`}
+                        {/* Grid / List View Mode Switcher */}
+                        <div
+                          role="group"
+                          aria-label="视图切换"
+                          className="inline-flex rounded-xl bg-[#ECE8DF] p-0.5"
                         >
-                          <LayoutGrid className="h-4 w-4" aria-hidden="true" />
-                        </button>
-                        <button
-                          type="button"
-                          data-testid="view-mode-list"
-                          aria-pressed={viewMode === 'list'}
-                          aria-label="名录列表视图"
-                          onClick={() => setViewMode('list')}
-                          className={`flex h-8 w-9 items-center justify-center rounded-lg cursor-pointer transition-colors ${
-                            viewMode === 'list'
-                              ? 'bg-white text-[#1A1816] shadow-xs'
-                              : 'text-[#625C54] hover:text-[#1A1816]'
-                          }`}
-                        >
-                          <List className="h-4 w-4" aria-hidden="true" />
-                        </button>
+                          <button
+                            type="button"
+                            data-testid="view-mode-grid"
+                            aria-pressed={viewMode === 'grid'}
+                            aria-label="画廊网格视图"
+                            onClick={() => setViewMode('grid')}
+                            className={`flex h-8 w-9 items-center justify-center rounded-lg cursor-pointer transition-colors ${
+                              viewMode === 'grid'
+                                ? 'bg-white text-[#1A1816] shadow-xs'
+                                : 'text-[#625C54] hover:text-[#1A1816]'
+                            }`}
+                          >
+                            <LayoutGrid className="h-4 w-4" aria-hidden="true" />
+                          </button>
+                          <button
+                            type="button"
+                            data-testid="view-mode-list"
+                            aria-pressed={viewMode === 'list'}
+                            aria-label="名录列表视图"
+                            onClick={() => setViewMode('list')}
+                            className={`flex h-8 w-9 items-center justify-center rounded-lg cursor-pointer transition-colors ${
+                              viewMode === 'list'
+                                ? 'bg-white text-[#1A1816] shadow-xs'
+                                : 'text-[#625C54] hover:text-[#1A1816]'
+                            }`}
+                          >
+                            <List className="h-4 w-4" aria-hidden="true" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
                 )}
               </div>
+
+              {/* Collapsible Multi-Dimensional Faceted Filters */}
+              {items.length > 0 && advancedFiltersOpen && (
+                <div
+                  data-testid="advanced-filters-panel"
+                  className="mt-3 rounded-2xl border border-[#E4DFD5] bg-white p-3.5"
+                >
+                  <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                    <div>
+                      <label
+                        htmlFor="filter-decade"
+                        className="mb-1 block text-[11px] font-medium text-[#7A7268]"
+                      >
+                        上映年代
+                      </label>
+                      <select
+                        id="filter-decade"
+                        data-testid="filter-decade-select"
+                        value={decadeFilter}
+                        onChange={(e) =>
+                          setDecadeFilter(e.target.value as DecadeFilterOption)
+                        }
+                        className="h-10 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-2.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:text-xs"
+                      >
+                        {DECADE_FILTER_OPTIONS.map((opt) => (
+                          <option key={opt.id} value={opt.id}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="filter-region"
+                        className="mb-1 block text-[11px] font-medium text-[#7A7268]"
+                      >
+                        国家 / 地区
+                      </label>
+                      <select
+                        id="filter-region"
+                        data-testid="filter-region-select"
+                        value={regionFilter}
+                        onChange={(e) => setRegionFilter(e.target.value)}
+                        className="h-10 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-2.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:text-xs"
+                      >
+                        <option value="">全部地区</option>
+                        {regionRegistry.map((reg) => (
+                          <option key={reg.name} value={reg.name}>
+                            {reg.name} ({reg.count})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="filter-rating-bucket"
+                        className="mb-1 block text-[11px] font-medium text-[#7A7268]"
+                      >
+                        评分档位
+                      </label>
+                      <select
+                        id="filter-rating-bucket"
+                        data-testid="filter-rating-select"
+                        value={ratingBucketFilter}
+                        onChange={(e) =>
+                          setRatingBucketFilter(
+                            e.target.value as RatingBucketFilterOption
+                          )
+                        }
+                        className="h-10 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-2.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:text-xs"
+                      >
+                        <option value="all">全部评分</option>
+                        <option value="5">五星神作</option>
+                        <option value="4plus">四星及以上</option>
+                        <option value="3minus">三星及以下</option>
+                        <option value="unrated">尚未评分</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="filter-completeness"
+                        className="mb-1 block text-[11px] font-medium text-[#7A7268]"
+                      >
+                        成色进度
+                      </label>
+                      <select
+                        id="filter-completeness"
+                        data-testid="filter-completeness-select"
+                        value={completenessFilter}
+                        onChange={(e) =>
+                          setCompletenessFilter(
+                            e.target.value as CompletenessFilterOption
+                          )
+                        }
+                        className="h-10 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-2.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:text-xs"
+                      >
+                        <option value="all">全部成色</option>
+                        <option value="masterpiece">典藏级 (5/5)</option>
+                        <option value="needs-polish">待打磨 (&lt;5/5)</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {items.length > 0 && (activeAlbum || activeTag) && (
                 <div className="mt-2.5 flex flex-wrap gap-2">
@@ -1490,13 +1899,43 @@ export default function App() {
               activeTag={activeTag}
               activeAlbumName={activeAlbum?.name || ''}
               viewMode={viewMode}
+              batchMode={batchMode}
+              selectedIds={batchSelectedIds}
+              onToggleBatchSelect={handleToggleBatchSelect}
               onSelectItem={(item) => setSelectedItemId(item.id)}
               onOpenCardModal={(item) => setCardModalItemId(item.id)}
               onJumpToSearch={jumpToSearch}
               onJumpToCreate={() => jumpToCreate()}
               onResetFilters={handleResetFilters}
-              onLoadSampleCollection={() => void handleLoadSampleCollection()}
             />
+
+            {batchMode && (
+              <BatchActionBar
+                selectedCount={batchSelectedIds.length}
+                totalVisibleCount={filteredItems.length}
+                albums={collector.albums}
+                tagSuggestions={tagRegistry.slice(0, 8).map((t) => t.name)}
+                onSelectAll={() =>
+                  setBatchSelectedIds(filteredItems.map((it) => it.id))
+                }
+                onClearSelection={() => setBatchSelectedIds([])}
+                onExitBatchMode={() => {
+                  setBatchMode(false);
+                  setBatchSelectedIds([]);
+                }}
+                onBatchStatus={handleBatchStatus}
+                onBatchAddTag={handleBatchAddTag}
+                onBatchAddToAlbum={handleBatchAddToAlbum}
+                onOpenPosterWallWithSelection={() => {
+                  if (batchSelectedIds.length === 0) return;
+                  setPosterWallConfig({
+                    open: true,
+                    itemIds: batchSelectedIds.slice(0, 9),
+                    title: '精选光影海报墙',
+                  });
+                }}
+              />
+            )}
           </>
         )}
 
@@ -1609,6 +2048,10 @@ export default function App() {
           setSelectedItemId(null);
           setCardModalItemId(it.id);
         }}
+        onOpenGlobalMap={() => {
+          setSelectedItemId(null);
+          setGlobalMapOpen(true);
+        }}
         onJumpToMedalHall={() => {
           setSelectedItemId(null);
           setActiveTab('profile');
@@ -1630,21 +2073,79 @@ export default function App() {
           setCardModalItemId(null);
           setSelectedItemId(it.id);
         }}
+        onNotice={(msg) => setNotice(msg)}
       />
 
       <RandomEncounterModal
+        open={encounterOpen}
+        initialMode={encounterInitialMode}
         item={encounterItem}
-        allItems={items}
+        allItems={displayItems}
         drawCount={encounterDrawCount}
         onClose={() => {
+          setEncounterOpen(false);
           setEncounterItemId(null);
           setEncounterDrawCount(0);
         }}
         onDrawAnother={handleTriggerRandomEncounter}
         onOpenFullDetail={(it) => {
+          setEncounterOpen(false);
           setEncounterItemId(null);
           setEncounterDrawCount(0);
           setSelectedItemId(it.id);
+        }}
+        onMarkWatching={async (it) => {
+          await handleUpdateItem(it.id, { status: 'watching' });
+          setNotice(`已将「${it.title}」标记为在追 / 今晚开看`);
+        }}
+        onJumpToSearch={() => {
+          setEncounterOpen(false);
+          jumpToSearch();
+        }}
+      />
+
+      <PosterWallExportModal
+        open={posterWallConfig.open}
+        allItems={displayItems}
+        initialSelectedIds={posterWallConfig.itemIds}
+        initialTitle={posterWallConfig.title}
+        onClose={() => setPosterWallConfig({ open: false })}
+        onNotice={(msg) => setNotice(msg)}
+      />
+
+      <QuotesWallModal
+        open={quotesWallOpen}
+        allItems={displayItems}
+        onClose={() => setQuotesWallOpen(false)}
+        onSelectItem={(it) => {
+          setQuotesWallOpen(false);
+          setSelectedItemId(it.id);
+        }}
+        onNotice={(msg) => setNotice(msg)}
+      />
+
+      <GlobalRelationMapModal
+        open={globalMapOpen}
+        allItems={displayItems}
+        onClose={() => setGlobalMapOpen(false)}
+        onSelectItem={(it) => {
+          setGlobalMapOpen(false);
+          setSelectedItemId(it.id);
+        }}
+      />
+
+      <AlbumCuratorModal
+        album={editingAlbum}
+        allItems={displayItems}
+        onClose={() => setEditingAlbum(null)}
+        onSaveAlbum={handleSaveEditedAlbum}
+        onExportAlbumPoster={(alb, matched) => {
+          setEditingAlbum(null);
+          setPosterWallConfig({
+            open: true,
+            itemIds: matched.map((m) => m.id),
+            title: alb.name,
+          });
         }}
       />
     </div>

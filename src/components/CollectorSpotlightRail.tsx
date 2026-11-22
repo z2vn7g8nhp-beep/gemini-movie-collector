@@ -5,8 +5,10 @@ import {
   CalendarCheck2,
   Check,
   Dices,
+  Grid3x3,
   Layers,
   Plus,
+  SlidersHorizontal,
   Trash2,
   X,
 } from 'lucide-react';
@@ -43,6 +45,8 @@ interface CollectorSpotlightRailProps {
     targetCount: number;
   }) => Promise<void>;
   onDeleteAlbum: (albumId: string) => Promise<void>;
+  onEditAlbum?: (album: CollectorAlbum) => void;
+  onExportAlbumPoster?: (album: CollectorAlbum, matchedItems: ArchiveItem[]) => void;
   onJumpToSearch: (prefillQuery?: string) => void;
   onJumpToProfile: () => void;
 }
@@ -60,6 +64,8 @@ export function CollectorSpotlightRail({
   onSelectAlbum,
   onCreateAlbum,
   onDeleteAlbum,
+  onEditAlbum,
+  onExportAlbumPoster,
   onJumpToSearch,
   onJumpToProfile,
 }: CollectorSpotlightRailProps) {
@@ -499,14 +505,39 @@ export function CollectorSpotlightRail({
                               : ` · 还差 ${remainingCount} 件`}
                           </p>
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => void onDeleteAlbum(album.id)}
-                          aria-label={`删除图鉴册「${album.name}」`}
-                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#8C857B] hover:bg-[#EFECE5] hover:text-[#B43B2B] cursor-pointer"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                        <div className="flex shrink-0 items-center gap-0.5">
+                          {onEditAlbum && (
+                            <button
+                              type="button"
+                              data-testid={`edit-album-btn-${album.id}`}
+                              onClick={() => onEditAlbum(album)}
+                              aria-label={`自由选片编辑「${album.name}」`}
+                              title="自由选片"
+                              className="flex h-8 w-8 items-center justify-center rounded-lg text-[#625C54] hover:bg-[#EFECE5] hover:text-[#1A1816] cursor-pointer"
+                            >
+                              <SlidersHorizontal className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                          {onExportAlbumPoster && matched.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => onExportAlbumPoster(album, matched)}
+                              aria-label={`导出「${album.name}」海报墙`}
+                              title="导出海报墙"
+                              className="flex h-8 w-8 items-center justify-center rounded-lg text-[#8E6523] hover:bg-[#EFECE5] cursor-pointer"
+                            >
+                              <Grid3x3 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => void onDeleteAlbum(album.id)}
+                            aria-label={`删除图鉴册「${album.name}」`}
+                            className="flex h-8 w-8 items-center justify-center rounded-lg text-[#8C857B] hover:bg-[#EFECE5] hover:text-[#B43B2B] cursor-pointer"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </div>
 
                       {/* Collection Progress Bar & Percentage */}

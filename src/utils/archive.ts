@@ -13,6 +13,8 @@ import {
   collectNormalizedTitleKeys,
   yearsAreCompatible,
 } from './relationMatching';
+import { computeItemCompleteness } from './collector';
+import { itemMatchesRegion, matchYearToDecade } from './curation';
 
 export const CATEGORY_LABELS: Record<ArchiveCategory, string> = {
   film: '影视',
@@ -160,6 +162,26 @@ export function filterAndSortItems(
       !item.tags.some((t) => t.trim().toLowerCase() === normalizedTag)
     ) {
       return false;
+    }
+    if (filter.decade && filter.decade !== 'all') {
+      if (!matchYearToDecade(item.year, filter.decade)) return false;
+    }
+    if (filter.region && filter.region.trim()) {
+      if (!itemMatchesRegion(item, filter.region)) return false;
+    }
+    if (filter.ratingBucket && filter.ratingBucket !== 'all') {
+      if (filter.ratingBucket === '5' && item.rating !== 5) return false;
+      if (filter.ratingBucket === '4plus' && item.rating < 4) return false;
+      if (filter.ratingBucket === 'unrated' && item.rating > 0) return false;
+    }
+    if (filter.completeness && filter.completeness !== 'all') {
+      const comp = computeItemCompleteness(item);
+      if (filter.completeness === 'masterpiece' && comp.tier !== 'masterpiece') {
+        return false;
+      }
+      if (filter.completeness === 'needs-polish' && comp.tier === 'masterpiece') {
+        return false;
+      }
     }
     if (!normalizedQuery) return true;
 
@@ -576,6 +598,29 @@ export function parseImportPayload(jsonText: string): {
                     : undefined,
               }
             : undefined,
+        watchLogs: Array.isArray(entry.watchLogs)
+          ? (entry.watchLogs as unknown[])
+              .filter(
+                (
+                  w: unknown
+                ): w is { id?: string; watchedAt: string; medium?: string; note?: string } =>
+                  Boolean(
+                    w &&
+                      typeof w === 'object' &&
+                      typeof (w as { watchedAt?: unknown }).watchedAt === 'string'
+                  )
+              )
+              .map((w, idx: number) => ({
+                id: typeof w.id === 'string' && w.id ? w.id : `wl-imp-${idx}`,
+                watchedAt: w.watchedAt,
+                medium: w.medium as ArchiveItem['watchLogs'] extends Array<infer T>
+                  ? T extends { medium?: infer M }
+                    ? M
+                    : never
+                  : never,
+                note: typeof w.note === 'string' ? w.note : undefined,
+              }))
+          : undefined,
         summaryRevision:
           typeof entry.summaryRevision === 'number' && Number.isSafeInteger(entry.summaryRevision)
           && entry.summaryRevision > 0 ? entry.summaryRevision : undefined,

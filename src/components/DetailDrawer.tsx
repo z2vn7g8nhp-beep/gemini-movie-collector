@@ -61,6 +61,7 @@ import { CoverPickerModal } from './CoverPickerModal';
 import { DetailMedalShowcase } from './DetailMedalShowcase';
 import { DetailRelationGraph } from './DetailRelationGraph';
 import { DetailTagManager } from './DetailTagManager';
+import { WatchLogSection } from './WatchLogSection';
 
 function retainKnownLists(next: OnlineRelationsResponse, previous: OnlineRelationsResponse | null) {
   if (!previous) return next;
@@ -87,6 +88,7 @@ interface DetailDrawerProps {
   onFilterByTag: (tag: string) => void;
   onOpenCardModal?: (item: ArchiveItem) => void;
   onJumpToMedalHall?: () => void;
+  onOpenGlobalMap?: () => void;
   onUpdateItem: (id: string, patch: Partial<ArchiveItem>) => Promise<void>;
   onDeleteItem: (id: string) => Promise<void>;
   onCollectAndLink: (
@@ -126,6 +128,7 @@ export function DetailDrawer({
   onFilterByTag,
   onOpenCardModal,
   onJumpToMedalHall,
+  onOpenGlobalMap,
   onUpdateItem,
   onDeleteItem,
   onCollectAndLink,
@@ -977,6 +980,11 @@ export function DetailDrawer({
                 <SummarySource revision={item.summaryRevision} />
               </p>
             )
+          )}
+
+          {/* Watch & Rewatch Log Module for Films */}
+          {item.category === 'film' && (
+            <WatchLogSection item={item} onUpdateItem={onUpdateItem} />
           )}
 
           {/* Dedicated Tag Management: Autocomplete + Instant Same-Tag Filtering */}
@@ -1875,6 +1883,7 @@ export function DetailDrawer({
             item={item}
             allItems={allItems}
             onSelectItem={onSelectRelated}
+            onOpenGlobalMap={onOpenGlobalMap}
           />
 
           {/* Quiet Destructive Action Row */}
