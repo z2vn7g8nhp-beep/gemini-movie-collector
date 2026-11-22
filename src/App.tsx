@@ -100,6 +100,7 @@ import {
   countActiveLibraryFilters,
   getAdjacentArchiveItem,
 } from './utils/uiHelpers';
+import { buildQuickStatusNotice } from './utils/quickStatusMenu';
 
 const LOCAL_STORAGE_KEY = 'cinearchive.collection.v2';
 const COLLECTOR_STORAGE_KEY = 'cinearchive.collector.v1';
@@ -1143,6 +1144,19 @@ export default function App() {
     }
   };
 
+  const handleQuickUpdateStatus = async (
+    item: ArchiveItem,
+    nextStatus: CollectionStatus
+  ) => {
+    const changed = item.status !== nextStatus;
+    if (changed) {
+      await handleUpdateItem(item.id, { status: nextStatus });
+    }
+    setNotice(
+      buildQuickStatusNotice(item.title, nextStatus, item.category, changed)
+    );
+  };
+
   const handleDeleteItem = async (id: string) => {
     const target = items.find((i) => i.id === id);
     setItems((prev) => {
@@ -1903,6 +1917,7 @@ export default function App() {
               selectedIds={batchSelectedIds}
               onToggleBatchSelect={handleToggleBatchSelect}
               onSelectItem={(item) => setSelectedItemId(item.id)}
+              onQuickUpdateStatus={handleQuickUpdateStatus}
               onOpenCardModal={(item) => setCardModalItemId(item.id)}
               onJumpToSearch={jumpToSearch}
               onJumpToCreate={() => jumpToCreate()}

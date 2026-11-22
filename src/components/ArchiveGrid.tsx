@@ -1,5 +1,6 @@
-import { ArrowUpRight, Check, Film, Layers, Sparkles, Star, User } from 'lucide-react';
-import type { ArchiveItem } from '../types/archive';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Check, Film, Layers, Sparkles, Star, User } from 'lucide-react';
+import type { ArchiveItem, CollectionStatus } from '../types/archive';
 import {
   CATEGORY_LABELS,
   formatRelatedSummary,
@@ -7,7 +8,13 @@ import {
   getStatusLabel,
 } from '../utils/archive';
 import { computeItemCompleteness } from '../utils/collector';
+import {
+  LONG_PRESS_DURATION_MS,
+  isPointerDragExceeded,
+  type Point2D,
+} from '../utils/quickStatusMenu';
 import { ArchivalImage } from './ArchivalImage';
+import { QuickStatusPopover } from './QuickStatusPopover';
 
 export type ArchiveViewMode = 'grid' | 'list';
 
@@ -22,10 +29,16 @@ interface ArchiveGridProps {
   selectedIds?: string[];
   onToggleBatchSelect?: (id: string) => void;
   onSelectItem: (item: ArchiveItem) => void;
+  onQuickUpdateStatus?: (item: ArchiveItem, status: CollectionStatus) => void;
   onOpenCardModal?: (item: ArchiveItem) => void;
   onJumpToSearch: (query?: string) => void;
   onJumpToCreate: () => void;
   onResetFilters: () => void;
+}
+
+interface QuickMenuState {
+  itemId: string;
+  anchor: Point2D;
 }
 
 export function ArchiveGrid({
@@ -39,12 +52,165 @@ export function ArchiveGrid({
   selectedIds = [],
   onToggleBatchSelect,
   onSelectItem,
+  onQuickUpdateStatus,
   onOpenCardModal,
   onJumpToSearch,
   onJumpToCreate,
   onResetFilters,
 }: ArchiveGridProps) {
   const selectedIdSet = new Set(selectedIds);
+  const [quickMenu, setQuickMenu] = useState<QuickMenuState | null>(null);
+  const [pressingItemId, setPressingItemId] = useState<string | null>(null);
+
+  const longPressTimerRef = useRef<number | null>(null);
+  const suppressClearTimerRef = useRef<number | null>(null);
+  const suppressClickItemIdRef = useRef<string | null>(null);
+  const pressStartRef = useRef<{
+    itemId: string;
+    pointerId: number;
+    x: number;
+    y: number;
+  } | null>(null);
+
+  const cancelLongPress = useCallback(() => {
+    if (longPressTimerRef.current !== null) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    pressStartRef.current = null;
+    setPressingItemId(null);
+  }, []);
+
+  useEffect(() => {
+    if (batchMode) {
+      cancelLongPress();
+      setQuickMenu(null);
+    }
+  }, [batchMode, cancelLongPress]);
+
+  useEffect(() => {
+    return () => {
+      if (longPressTimerRef.current !== null) {
+        window.clearTimeout(longPressTimerRef.current);
+      }
+      if (suppressClearTimerRef.current !== null) {
+        window.clearTimeout(suppressClearTimerRef.current);
+      }
+    };
+  }, []);
+
+  const openQuickMenuFor = useCallback((item: ArchiveItem, anchor: Point2D) => {
+    setQuickMenu({ itemId: item.id, anchor });
+    try {
+      if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+        navigator.vibrate(12);
+      }
+    } catch {
+      // Ignore haptics unsupported errors
+    }
+  }, []);
+
+  const handleCardPointerDown = useCallback(
+    (item: ArchiveItem, e: React.PointerEvent<HTMLButtonElement>) => {
+      if (batchMode || !onQuickUpdateStatus) return;
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+
+      cancelLongPress();
+      const startX = e.clientX;
+      const startY = e.clientY;
+      pressStartRef.current = {
+        itemId: item.id,
+        pointerId: e.pointerId,
+        x: startX,
+        y: startY,
+      };
+      setPressingItemId(item.id);
+
+      longPressTimerRef.current = window.setTimeout(() => {
+        longPressTimerRef.current = null;
+        pressStartRef.current = null;
+        setPressingItemId(null);
+        suppressClickItemIdRef.current = item.id;
+        if (suppressClearTimerRef.current !== null) {
+          window.clearTimeout(suppressClearTimerRef.current);
+        }
+        suppressClearTimerRef.current = window.setTimeout(() => {
+          suppressClickItemIdRef.current = null;
+          suppressClearTimerRef.current = null;
+        }, 700);
+        openQuickMenuFor(item, { x: startX, y: startY });
+      }, LONG_PRESS_DURATION_MS);
+    },
+    [batchMode, onQuickUpdateStatus, cancelLongPress, openQuickMenuFor]
+  );
+
+  const handleCardPointerMove = useCallback(
+    (e: React.PointerEvent<HTMLButtonElement>) => {
+      const start = pressStartRef.current;
+      if (!start || start.pointerId !== e.pointerId) return;
+      if (isPointerDragExceeded(start, { x: e.clientX, y: e.clientY })) {
+        cancelLongPress();
+      }
+    },
+    [cancelLongPress]
+  );
+
+  const handleCardClick = useCallback(
+    (item: ArchiveItem, e: React.MouseEvent<HTMLButtonElement>) => {
+      if (suppressClickItemIdRef.current === item.id) {
+        e.preventDefault();
+        e.stopPropagation();
+        suppressClickItemIdRef.current = null;
+        if (suppressClearTimerRef.current !== null) {
+          window.clearTimeout(suppressClearTimerRef.current);
+          suppressClearTimerRef.current = null;
+        }
+        return;
+      }
+      if (batchMode && onToggleBatchSelect) {
+        onToggleBatchSelect(item.id);
+      } else {
+        onSelectItem(item);
+      }
+    },
+    [batchMode, onToggleBatchSelect, onSelectItem]
+  );
+
+  const handleCardContextMenu = useCallback(
+    (item: ArchiveItem, e: React.MouseEvent<HTMLButtonElement>) => {
+      if (batchMode || !onQuickUpdateStatus) return;
+      if (
+        pressStartRef.current?.itemId === item.id ||
+        suppressClickItemIdRef.current === item.id ||
+        quickMenu?.itemId === item.id
+      ) {
+        e.preventDefault();
+      }
+    },
+    [batchMode, onQuickUpdateStatus, quickMenu]
+  );
+
+  const handleCardKeyDown = useCallback(
+    (item: ArchiveItem, e: React.KeyboardEvent<HTMLButtonElement>) => {
+      if (batchMode || !onQuickUpdateStatus) return;
+      if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
+        e.preventDefault();
+        const rect = e.currentTarget.getBoundingClientRect();
+        openQuickMenuFor(item, {
+          x: rect.left + rect.width / 2,
+          y: rect.top + rect.height / 2,
+        });
+      }
+    },
+    [batchMode, onQuickUpdateStatus, openQuickMenuFor]
+  );
+
+  const quickMenuItem = quickMenu
+    ? items.find((i) => i.id === quickMenu.itemId) ??
+      allItems.find((i) => i.id === quickMenu.itemId) ??
+      null
+    : null;
+
   if (allItems.length === 0) {
     return (
       <section className="mx-auto max-w-[1180px] px-4 pt-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] min-[420px]:px-5 md:px-8 md:pt-6 md:pb-16">
@@ -193,27 +359,37 @@ export function ArchiveGrid({
             const excerpt = item.quote || item.notes || item.summary;
 
             const isSelected = batchMode && selectedIdSet.has(item.id);
+            const isPressing = pressingItemId === item.id;
             return (
               <article
                 key={item.id}
                 className={`group relative flex items-center gap-3.5 px-3.5 py-3 transition-colors sm:px-5 sm:py-3.5 ${
-                  isSelected ? 'bg-[#FDF6F4]' : 'hover:bg-[#FAF7F0]'
+                  isSelected
+                    ? 'bg-[#FDF6F4]'
+                    : isPressing
+                      ? 'bg-[#F6F1E7]'
+                      : 'hover:bg-[#FAF7F0]'
                 }`}
               >
                 <button
                   type="button"
-                  onClick={() =>
-                    batchMode && onToggleBatchSelect
-                      ? onToggleBatchSelect(item.id)
-                      : onSelectItem(item)
-                  }
+                  data-testid={`archive-card-${item.id}`}
+                  data-status={item.status}
+                  onClick={(e) => handleCardClick(item, e)}
+                  onPointerDown={(e) => handleCardPointerDown(item, e)}
+                  onPointerMove={handleCardPointerMove}
+                  onPointerUp={cancelLongPress}
+                  onPointerCancel={cancelLongPress}
+                  onPointerLeave={cancelLongPress}
+                  onContextMenu={(e) => handleCardContextMenu(item, e)}
+                  onKeyDown={(e) => handleCardKeyDown(item, e)}
                   aria-pressed={batchMode ? isSelected : undefined}
                   aria-label={
                     batchMode
                       ? `${isSelected ? '取消选择' : '选择'}「${item.title}」`
                       : `查看${CATEGORY_LABELS[item.category]}「${item.title}」详情`
                   }
-                  className="flex min-w-0 flex-1 items-center gap-3.5 text-left cursor-pointer"
+                  className="flex min-w-0 flex-1 items-center gap-3.5 text-left select-none [-webkit-touch-callout:none] cursor-pointer"
                 >
                   {batchMode && (
                     <span
@@ -314,6 +490,14 @@ export function ArchiveGrid({
             );
           })}
         </div>
+        {quickMenu && quickMenuItem && onQuickUpdateStatus && (
+          <QuickStatusPopover
+            item={quickMenuItem}
+            anchor={quickMenu.anchor}
+            onSelectStatus={onQuickUpdateStatus}
+            onClose={() => setQuickMenu(null)}
+          />
+        )}
       </section>
     );
   }
@@ -341,6 +525,7 @@ export function ArchiveGrid({
             .join(' · ');
 
           const isSelected = batchMode && selectedIdSet.has(item.id);
+          const isPressing = pressingItemId === item.id;
 
           return (
             <article key={item.id} className="group relative flex min-w-0 flex-col">
@@ -348,25 +533,32 @@ export function ArchiveGrid({
                 className={`gallery-card gallery-card-interactive relative flex flex-1 flex-col overflow-hidden border ${
                   isSelected
                     ? 'border-[#B43B2B] ring-2 ring-[#B43B2B]/80'
-                    : isMasterpiece
-                      ? 'gallery-card-masterpiece border-[#C9A45C]/80'
-                      : 'border-[#E6E0D4] hover:border-[#CFC5B4]'
+                    : isPressing
+                      ? 'scale-[0.985] border-[#B43B2B]/70 ring-2 ring-[#B43B2B]/25'
+                      : isMasterpiece
+                        ? 'gallery-card-masterpiece border-[#C9A45C]/80'
+                        : 'border-[#E6E0D4] hover:border-[#CFC5B4]'
                 }`}
               >
                 <button
                   type="button"
-                  onClick={() =>
-                    batchMode && onToggleBatchSelect
-                      ? onToggleBatchSelect(item.id)
-                      : onSelectItem(item)
-                  }
+                  data-testid={`archive-card-${item.id}`}
+                  data-status={item.status}
+                  onClick={(e) => handleCardClick(item, e)}
+                  onPointerDown={(e) => handleCardPointerDown(item, e)}
+                  onPointerMove={handleCardPointerMove}
+                  onPointerUp={cancelLongPress}
+                  onPointerCancel={cancelLongPress}
+                  onPointerLeave={cancelLongPress}
+                  onContextMenu={(e) => handleCardContextMenu(item, e)}
+                  onKeyDown={(e) => handleCardKeyDown(item, e)}
                   aria-pressed={batchMode ? isSelected : undefined}
                   aria-label={
                     batchMode
                       ? `${isSelected ? '取消选择' : '选择'}「${item.title}」`
                       : `查看${CATEGORY_LABELS[item.category]}「${item.title}」详情`
                   }
-                  className="flex flex-1 flex-col text-left cursor-pointer active:scale-[0.99]"
+                  className="flex flex-1 flex-col text-left select-none [-webkit-touch-callout:none] cursor-pointer active:scale-[0.99]"
                 >
                   {/* Art-Gallery Passe-Partout Cover Frame */}
                   <div className="p-2 pb-0">
@@ -490,6 +682,15 @@ export function ArchiveGrid({
           );
         })}
       </div>
+
+      {quickMenu && quickMenuItem && onQuickUpdateStatus && (
+        <QuickStatusPopover
+          item={quickMenuItem}
+          anchor={quickMenu.anchor}
+          onSelectStatus={onQuickUpdateStatus}
+          onClose={() => setQuickMenu(null)}
+        />
+      )}
     </section>
   );
 }
