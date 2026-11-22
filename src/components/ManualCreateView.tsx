@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link2, Sparkles, Star } from 'lucide-react';
+import { Check, Circle, Link2, Sparkles, Star } from 'lucide-react';
 import type {
   ArchiveCategory,
   ArchiveDraftInput,
@@ -14,7 +14,9 @@ import {
   parseTagsInput,
   validateArchiveInput,
 } from '../utils/archive';
+import { computeItemCompleteness } from '../utils/collector';
 import { findDraftLinkRecommendations } from '../utils/smartLink';
+import { ArchivalImage } from './ArchivalImage';
 
 interface ManualCreateViewProps {
   existingItems: ArchiveItem[];
@@ -170,13 +172,68 @@ export function ManualCreateView({
     }
   };
 
+  const previewTags = useMemo(() => parseTagsInput(tagsText), [tagsText]);
+  const previewCompleteness = useMemo(() => {
+    const mockItem: ArchiveItem = {
+      id: 'preview',
+      accessionNo: 'PREVIEW',
+      category,
+      title: title.trim() || '未命名藏品',
+      originalTitle: originalTitle.trim() || undefined,
+      subtitle: subtitle.trim() || undefined,
+      year: year.trim() || undefined,
+      region: region.trim() || undefined,
+      coverUrl: coverUrl.trim() || undefined,
+      summary: summary.trim(),
+      quote: quote.trim() || undefined,
+      notes: notes.trim(),
+      rating,
+      status,
+      tags: previewTags,
+      relatedIds: selectedRelatedIds,
+      relatedWorkTitle: relatedWorkTitle.trim() || undefined,
+      portrayedBy: portrayedBy.trim() || undefined,
+      createdAt: '',
+      updatedAt: '',
+    };
+    return computeItemCompleteness(mockItem);
+  }, [
+    category,
+    title,
+    originalTitle,
+    subtitle,
+    year,
+    region,
+    coverUrl,
+    summary,
+    quote,
+    notes,
+    rating,
+    status,
+    previewTags,
+    selectedRelatedIds,
+    relatedWorkTitle,
+    portrayedBy,
+  ]);
+
+  const previewChecklist = [
+    { key: 'cover', label: '封面剧照链接', done: previewCompleteness.criteria.cover },
+    { key: 'rating', label: '星级评分', done: previewCompleteness.criteria.rating },
+    { key: 'story', label: '台词或手记', done: previewCompleteness.criteria.story },
+    { key: 'tags', label: '至少 2 个标签', done: previewCompleteness.criteria.tags },
+    { key: 'depth', label: '关联馆内藏品', done: previewCompleteness.criteria.depth },
+  ];
+
+  const isMasterpiecePreview = previewCompleteness.tier === 'masterpiece';
+
   return (
-    <section className="mx-auto max-w-[760px] px-4 pt-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] min-[420px]:px-5 md:px-8 md:pt-8 md:pb-16">
-      <form
-        onSubmit={handleSubmit}
-        noValidate
-        className="space-y-5 rounded-2xl border border-[#E4DFD5] bg-white p-4 min-[420px]:p-5 sm:p-6"
-      >
+    <section className="mx-auto max-w-[1120px] px-4 pt-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] min-[420px]:px-5 md:px-8 md:pt-7 md:pb-16">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:items-start">
+        <form
+          onSubmit={handleSubmit}
+          noValidate
+          className="gallery-card space-y-5 border border-[#E4DFD5] p-4 min-[420px]:p-5 sm:p-6 lg:col-span-7"
+        >
         <div>
           <span className="block text-[13px] font-medium text-[#625C54] md:text-xs">
             建档分类
@@ -579,11 +636,139 @@ export function ManualCreateView({
         <button
           type="submit"
           disabled={submitting}
-          className="h-12 w-full rounded-xl bg-[#B43B2B] text-[16px] font-medium text-white cursor-pointer active:scale-[0.98] transition-transform hover:bg-[#932D20] disabled:opacity-60 md:text-sm"
+          className="h-12 w-full rounded-xl bg-[#B43B2B] text-[16px] font-medium text-white cursor-pointer active:scale-[0.98] transition-all hover:bg-[#932D20] disabled:opacity-60 md:text-sm"
         >
           {submitting ? '建档中…' : '确认收录到藏馆'}
         </button>
       </form>
+
+      {/* Desktop Sticky Live Archival Card Preview */}
+      <aside
+        aria-label="实时藏卡预览"
+        className="hidden lg:sticky lg:top-20 lg:col-span-5 lg:block"
+      >
+        <div
+          className={`gallery-card border p-5 ${
+            isMasterpiecePreview
+              ? 'gallery-card-masterpiece border-[#C9A45C]'
+              : 'border-[#E4DFD5]'
+          }`}
+        >
+          <div className="flex items-center justify-between gap-2 border-b border-[#EFECE4] pb-3">
+            <div>
+              <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-[#8C857B]">
+                实时展签预览
+              </p>
+              <p className="mt-0.5 text-xs text-[#625C54]">
+                填写字段即刻生成你的馆藏画廊卡片
+              </p>
+            </div>
+            <span
+              className={`font-mono text-xs font-medium tabular-nums ${
+                isMasterpiecePreview ? 'text-[#8E6523]' : 'text-[#625C54]'
+              }`}
+            >
+              {previewCompleteness.tierLabel} · {previewCompleteness.score}/5
+            </span>
+          </div>
+
+          <div className="mt-4 flex gap-4">
+            <div className="gallery-cover-frame w-[112px] shrink-0 bg-[#FAF9F6]">
+              <ArchivalImage
+                src={coverUrl.trim() || undefined}
+                alt={title.trim() || '封面预览'}
+                title={title.trim() || '光影藏品'}
+                category={category}
+                compact
+                className="aspect-[3/4] w-full rounded-[14px]"
+              />
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <p className="font-mono text-[11px] text-[#7A7268] tabular-nums">
+                {[CATEGORY_LABELS[category], year.trim(), region.trim()]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </p>
+              <h3 className="mt-1 line-clamp-2 font-editorial text-xl font-medium leading-snug text-[#1A1816]">
+                {title.trim() || '等待输入片名 / 名称…'}
+              </h3>
+              {(originalTitle.trim() || subtitle.trim()) && (
+                <p className="mt-1 truncate text-xs text-[#625C54]">
+                  {originalTitle.trim() || subtitle.trim()}
+                </p>
+              )}
+
+              <div className="mt-2.5 flex items-center gap-2 text-xs text-[#625C54] tabular-nums">
+                <span>{getStatusLabel(status, category)}</span>
+                {rating > 0 && (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <span className="inline-flex items-center gap-0.5 font-mono font-medium text-[#B43B2B]">
+                      <Star className="h-3 w-3 fill-[#B43B2B] text-[#B43B2B]" aria-hidden="true" />
+                      {rating}.0
+                    </span>
+                  </>
+                )}
+              </div>
+
+              {(quote.trim() || notes.trim()) && (
+                <p
+                  className={`mt-2.5 line-clamp-2 text-xs leading-relaxed ${
+                    quote.trim()
+                      ? 'font-editorial italic text-[#3D3832]'
+                      : 'text-[#625C54]'
+                  }`}
+                >
+                  {quote.trim() ? `“${quote.trim()}”` : notes.trim()}
+                </p>
+              )}
+
+              {previewTags.length > 0 && (
+                <p className="mt-2 truncate text-[11px] text-[#7A7268]">
+                  {previewTags.slice(0, 4).join(' · ')}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* 5-Tick Live Completeness Meter */}
+          <div className="mt-4 border-t border-[#EFECE4] pt-3.5">
+            <div className="grid grid-cols-5 gap-1">
+              {[0, 1, 2, 3, 4].map((idx) => (
+                <span
+                  key={idx}
+                  className={`h-1.5 rounded-full transition-colors ${
+                    idx < previewCompleteness.score
+                      ? isMasterpiecePreview
+                        ? 'bg-[#C9A45C]'
+                        : 'bg-[#B43B2B]'
+                      : 'bg-[#E8E2D7]'
+                  }`}
+                />
+              ))}
+            </div>
+            <ul className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+              {previewChecklist.map((entry) => (
+                <li
+                  key={entry.key}
+                  className={`flex items-center gap-1.5 ${
+                    entry.done ? 'text-[#1A1816]' : 'text-[#8C857B]'
+                  }`}
+                >
+                  {entry.done ? (
+                    <Check className="h-3.5 w-3.5 shrink-0 text-[#2A6B46]" aria-hidden="true" />
+                  ) : (
+                    <Circle className="h-3.5 w-3.5 shrink-0 text-[#CFC7B9]" aria-hidden="true" />
+                  )}
+                  <span className="truncate">{entry.label}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </aside>
+      </div>
     </section>
   );
 }

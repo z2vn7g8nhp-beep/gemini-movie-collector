@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
 @theme {
-  --font-serif: "Songti SC", "STSong", "Noto Serif SC", "Source Han Serif SC", "SimSun", Georgia, Cambria, "Times New Roman", serif;
-  --font-sans: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+  --font-serif: "Noto Serif SC", "Songti SC", "STSong", "Source Han Serif SC", "SimSun", Georgia, Cambria, "Times New Roman", serif;
+  --font-sans: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
 
   --color-canvas: #F7F5F0;
   --color-surface: #FFFFFF;
@@ -41,9 +41,9 @@
     touch-action: pan-y;
     background-color: var(--color-canvas);
     background-image:
-      radial-gradient(rgba(120, 102, 76, 0.045) 0.65px, transparent 0.65px),
-      radial-gradient(ellipse at top, rgba(255, 252, 245, 0.85), rgba(242, 237, 227, 0.45));
-    background-size: 16px 16px, 100% 100%;
+      radial-gradient(rgba(120, 102, 76, 0.04) 0.65px, transparent 0.65px),
+      radial-gradient(ellipse at top, rgba(255, 252, 245, 0.9), rgba(242, 237, 227, 0.45));
+    background-size: 18px 18px, 100% 100%;
   }
 
   #root {
@@ -56,6 +56,15 @@
   h1, h2, h3, .font-editorial {
     font-family: var(--font-serif);
     text-wrap: balance;
+  }
+
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid #B43B2B;
+    outline-offset: 2px;
   }
 
   .tabular-nums {
@@ -89,34 +98,37 @@
   background-color: #FFFDF9;
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.92) inset,
-    0 2px 5px rgba(28, 22, 15, 0.04),
-    0 10px 24px -12px rgba(28, 22, 15, 0.13);
-  transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 220ms ease, border-color 180ms ease;
+    0 2px 5px rgba(28, 22, 15, 0.035),
+    0 10px 24px -14px rgba(28, 22, 15, 0.12);
+  transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 200ms cubic-bezier(0.16, 1, 0.3, 1), border-color 180ms ease;
 }
 
-.gallery-card:hover {
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.96) inset,
-    0 4px 10px rgba(28, 22, 15, 0.06),
-    0 16px 30px -14px rgba(28, 22, 15, 0.17);
+@media (hover: hover) {
+  .gallery-card-interactive:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.96) inset,
+      0 6px 14px rgba(28, 22, 15, 0.06),
+      0 18px 34px -16px rgba(28, 22, 15, 0.18);
+  }
 }
 
 .gallery-card-masterpiece {
   box-shadow:
     0 1px 0 rgba(255, 249, 232, 0.95) inset,
-    0 3px 8px rgba(166, 124, 55, 0.12),
-    0 14px 28px -12px rgba(128, 92, 28, 0.22);
+    0 3px 8px rgba(166, 124, 55, 0.11),
+    0 14px 28px -12px rgba(128, 92, 28, 0.2);
 }
 
 .gallery-card-dark {
   position: relative;
   border-radius: 22px;
   background-image:
-    radial-gradient(circle at 18% 0%, rgba(212, 175, 106, 0.08), transparent 52%),
+    radial-gradient(circle at 18% 0%, rgba(212, 175, 106, 0.1), transparent 54%),
     linear-gradient(180deg, #211E1A 0%, #171512 100%);
   box-shadow:
     0 1px 0 rgba(255, 246, 224, 0.08) inset,
-    0 10px 28px -12px rgba(15, 12, 8, 0.42);
+    0 12px 30px -14px rgba(15, 12, 8, 0.44);
 }
 
 /* Softly rounded poster mat with subtle granular film-print shadow */
@@ -138,7 +150,7 @@
   pointer-events: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='96' height='96' filter='url(%23g)' opacity='0.18'/%3E%3C/svg%3E");
   mix-blend-mode: soft-light;
-  opacity: 0.45;
+  opacity: 0.42;
   box-shadow:
     inset 0 0 0 1px rgba(255, 252, 244, 0.22),
     inset 0 -10px 18px -14px rgba(18, 14, 10, 0.28);
@@ -202,7 +214,7 @@
 @keyframes encounterCardReveal {
   0% {
     opacity: 0;
-    transform: translateY(28px) scale(0.92);
+    transform: translateY(22px) scale(0.95);
   }
   100% {
     opacity: 1;
@@ -213,7 +225,7 @@
 @keyframes encounterCardSwap {
   0% {
     opacity: 0;
-    transform: translateY(14px) scale(0.95) rotate(-1.2deg);
+    transform: translateY(12px) scale(0.96) rotate(-1deg);
   }
   100% {
     opacity: 1;
@@ -221,14 +233,61 @@
   }
 }
 
+@keyframes drawerSlideRight {
+  from {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes sheetSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes toastPopIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 10px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
 .encounter-backdrop-in {
-  animation: encounterBackdropIn 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: encounterBackdropIn 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .encounter-card-reveal {
-  animation: encounterCardReveal 380ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: encounterCardReveal 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .encounter-card-swap {
-  animation: encounterCardSwap 340ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: encounterCardSwap 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.drawer-panel-in {
+  animation: sheetSlideUp 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (min-width: 768px) {
+  .drawer-panel-in {
+    animation: drawerSlideRight 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+}
+
+.toast-pop-in {
+  animation: toastPopIn 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }

@@ -66,6 +66,7 @@ export default defineConfig(() => {
         },
         workbox: {
           cleanupOutdatedCaches: true,
+          maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
           globPatterns: ['**/*.{js,css,html,ico,png,jpg,svg,woff,woff2}'],
           globIgnores: ['**/film-credits-*.js', '**/role-pairs-*.js'],
           navigateFallback: 'index.html',

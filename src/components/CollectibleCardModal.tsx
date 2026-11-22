@@ -107,7 +107,7 @@ export function CollectibleCardModal({
       aria-modal="true"
       aria-label={`实体藏卡赏析：${item.title}`}
       data-testid="collectible-card-modal"
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center overflow-hidden bg-[#141210]/85 px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
+      className="encounter-backdrop-in fixed inset-0 z-50 flex flex-col items-center justify-center overflow-hidden bg-[#141210]/85 backdrop-blur-xs px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -367,11 +367,14 @@ export function CollectibleCardModal({
           disabled={!hasSiblings}
           onClick={goNext}
           aria-label="下一张藏卡"
-          className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/10 text-[#F5F1E8] cursor-pointer disabled:opacity-30 md:h-11 md:w-11"
+          className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/10 text-[#F5F1E8] cursor-pointer transition-colors hover:bg-white/20 disabled:opacity-30 md:h-11 md:w-11"
         >
           <ChevronRight className="h-5 w-5" />
         </button>
       </div>
+      <p className="mt-2.5 hidden font-mono text-[11px] text-[#9C9488] md:block">
+        {hasSiblings ? '← → 切换藏卡 · 空格翻面 · Esc 关闭' : '空格翻面 · Esc 关闭'}
+      </p>
     </div>
   );
 }

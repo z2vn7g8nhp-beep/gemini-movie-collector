@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BookOpen, Search, Tag, X } from 'lucide-react';
-import { ArchiveGrid } from './components/ArchiveGrid';
+import { BookOpen, LayoutGrid, List, RotateCcw, Search, Tag, X } from 'lucide-react';
+import { ArchiveGrid, type ArchiveViewMode } from './components/ArchiveGrid';
 import { CollectibleCardModal } from './components/CollectibleCardModal';
 import { CollectorSpotlightRail } from './components/CollectorSpotlightRail';
 import { DailyCheckInBanner } from './components/DailyCheckInBanner';
@@ -64,9 +64,24 @@ import {
   loadPersistedUiState,
   savePersistedUiState,
 } from './utils/relationsCache';
+import {
+  countActiveLibraryFilters,
+  getAdjacentArchiveItem,
+} from './utils/uiHelpers';
 
 const LOCAL_STORAGE_KEY = 'cinearchive.collection.v2';
 const COLLECTOR_STORAGE_KEY = 'cinearchive.collector.v1';
+const VIEW_MODE_STORAGE_KEY = 'cinearchive.viewMode.v1';
+
+function loadViewMode(): ArchiveViewMode {
+  try {
+    return window.localStorage.getItem(VIEW_MODE_STORAGE_KEY) === 'list'
+      ? 'list'
+      : 'grid';
+  } catch {
+    return 'grid';
+  }
+}
 
 const EMPTY_COLLECTOR: CollectorState = {
   checkInDates: [],
@@ -161,6 +176,8 @@ export default function App() {
   const [sortBy, setSortBy] = useState<SortOption>(
     () => initialUiStateRef.current.sortBy ?? 'recent'
   );
+  const [viewMode, setViewMode] = useState<ArchiveViewMode>(() => loadViewMode());
+  const quickSearchInputRef = useRef<HTMLInputElement | null>(null);
 
   // Handoff state to Search / Create tabs
   const [pendingSearchQuery, setPendingSearchQuery] = useState('');
@@ -224,6 +241,10 @@ export default function App() {
       ])
     )
   );
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }, [activeTab]);
 
   // Persist lightweight UI session state so returning to the iOS PWA restores
   // the exact tab, filters, and open detail drawer without feeling like a reload.
@@ -423,6 +444,37 @@ export default function App() {
       document.body.style.overflow = prevBodyOverflow;
     };
   }, [hasBlockingOverlay]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(VIEW_MODE_STORAGE_KEY, viewMode);
+    } catch {
+      // Ignore storage errors
+    }
+  }, [viewMode]);
+
+  // Global "/" shortcut to jump directly to library search on desktop
+  useEffect(() => {
+    if (activeTab !== 'library' || hasBlockingOverlay) return;
+    const handleSlashFocus = (e: KeyboardEvent) => {
+      if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      e.preventDefault();
+      quickSearchInputRef.current?.focus();
+      quickSearchInputRef.current?.select();
+    };
+    window.addEventListener('keydown', handleSlashFocus);
+    return () => window.removeEventListener('keydown', handleSlashFocus);
+  }, [activeTab, hasBlockingOverlay]);
 
   const dailyReminder = useMemo(
     () =>
@@ -648,6 +700,13 @@ export default function App() {
     } catch {
       // Saved locally
     }
+  };
+
+  const handleLoadSampleCollection = async () => {
+    if (items.length > 0) return;
+    const { SEED_COLLECTION } = await import('./data/seedCollection');
+    await persistSnapshot(SEED_COLLECTION);
+    setNotice(`已载入 ${SEED_COLLECTION.length} 件精选示例馆藏，点击任意档案即可赏析`);
   };
 
   const buildItemsWithNewAndBidirectionalLinks = (
@@ -1042,18 +1101,71 @@ export default function App() {
     setActiveTag(tag);
   };
 
+  const activeFilterCount = useMemo(
+    () =>
+      countActiveLibraryFilters({
+        category: activeCategory,
+        status: statusFilter,
+        tag: activeTag,
+        albumId: activeAlbumId,
+        query: libraryQuery,
+        sortBy,
+      }),
+    [activeCategory, statusFilter, activeTag, activeAlbumId, libraryQuery, sortBy]
+  );
+
+  // Ensure strictly at most one daily check-in CTA is shown per screen:
+  // When CollectorSpotlightRail (library with items) or Profile passport card is visible,
+  // it already hosts the primary check-in action.
+  const hasInPageCheckInCta =
+    (activeTab === 'library' && items.length > 0) || activeTab === 'profile';
+  const showDailyBanner =
+    hydrated && dailyReminder.shouldShowBanner && !hasInPageCheckInCta;
+  const showTopCheckInIcon =
+    hydrated &&
+    dailyReminder.shouldShowTopIcon &&
+    !showDailyBanner &&
+    !hasInPageCheckInCta;
+
+  const drawerNavList = useMemo(() => {
+    if (!selectedItemId) return displayItems;
+    return filteredItems.some((it) => it.id === selectedItemId)
+      ? filteredItems
+      : displayItems;
+  }, [filteredItems, displayItems, selectedItemId]);
+
+  const prevDrawerItem = useMemo(
+    () =>
+      selectedItem
+        ? getAdjacentArchiveItem(drawerNavList, selectedItem.id, 'prev')
+        : null,
+    [drawerNavList, selectedItem]
+  );
+  const nextDrawerItem = useMemo(
+    () =>
+      selectedItem
+        ? getAdjacentArchiveItem(drawerNavList, selectedItem.id, 'next')
+        : null,
+    [drawerNavList, selectedItem]
+  );
+  const drawerPositionLabel = useMemo(() => {
+    if (!selectedItem || drawerNavList.length <= 1) return undefined;
+    const idx = drawerNavList.findIndex((it) => it.id === selectedItem.id);
+    return idx >= 0 ? `${idx + 1} / ${drawerNavList.length}` : undefined;
+  }, [drawerNavList, selectedItem]);
+
   return (
     <div className="flex min-h-[100dvh] w-full max-w-full flex-col overflow-x-clip bg-[#F7F5F0] text-[#1A1816]">
       <AppTopBar
         activeTab={activeTab}
         onSelectTab={setActiveTab}
         totalCount={stats.total}
-        needsDailyCheckIn={hydrated && dailyReminder.shouldShowTopIcon}
+        needsDailyCheckIn={showTopCheckInIcon}
         onQuickCheckIn={() => void handleCheckInToday()}
       />
 
       <main className="w-full min-w-0 flex-1">
-        {hydrated && (
+        {showDailyBanner && (
           <DailyCheckInBanner
             reminder={dailyReminder}
             browserNotifyEnabled={reminderPrefs.browserNotifyEnabled}
@@ -1085,9 +1197,9 @@ export default function App() {
               onJumpToProfile={() => setActiveTab('profile')}
             />
 
-            {/* Top Mobile-First Search + Category Control Zone */}
-            <section className="mx-auto max-w-[1160px] px-4 pt-4 pb-2 min-[420px]:px-5 md:px-8 md:pt-6">
-              {/* Prominent Dual-Purpose Search Bar (Filter Library OR Submit to Online Search!) */}
+            {/* Top Search + Category + Filter Control Zone */}
+            <section className="mx-auto max-w-[1180px] px-4 pt-3.5 pb-2 min-[420px]:px-5 md:px-8 md:pt-4">
+              {/* Prominent Dual-Purpose Search Bar (Filter Library OR Submit to Online Search) */}
               <form
                 onSubmit={handleQuickBarSubmit}
                 className="flex min-w-0 items-center gap-2.5"
@@ -1101,6 +1213,7 @@ export default function App() {
                     aria-hidden="true"
                   />
                   <input
+                    ref={quickSearchInputRef}
                     id="library-quick-search"
                     type="search"
                     enterKeyHint="search"
@@ -1109,36 +1222,47 @@ export default function App() {
                     placeholder={
                       items.length === 0
                         ? '搜片名、影人或角色，回车直接联网收录…'
-                        : '筛查馆藏，或回车直连全网搜片…'
+                        : '筛查馆藏，或回车全网搜片…'
                     }
-                    className="h-12 w-full rounded-2xl border border-[#DCD6CB] bg-white pl-10 pr-10 text-[16px] text-[#1A1816] placeholder:text-[#8C857B] focus:border-[#1A1816] focus:outline-none md:text-[15px]"
+                    className="h-12 w-full rounded-2xl border border-[#DCD6CB] bg-white pl-10 pr-10 text-[16px] text-[#1A1816] shadow-[0_1px_2px_rgba(26,24,22,0.03)] placeholder:text-[#8C857B] transition-colors focus:border-[#1A1816] focus:outline-none md:h-11 md:pr-14 md:text-sm [&::-webkit-search-cancel-button]:hidden"
                   />
-                  {libraryQuery && (
+                  {libraryQuery ? (
                     <button
                       type="button"
                       onClick={() => setLibraryQuery('')}
                       aria-label="清空输入"
-                      className="absolute right-1 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl text-[#625C54] cursor-pointer"
+                      className="absolute right-1 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl text-[#625C54] hover:text-[#1A1816] cursor-pointer"
                     >
                       <X className="h-4 w-4" />
                     </button>
+                  ) : (
+                    <kbd
+                      aria-hidden="true"
+                      className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-md border border-[#E0D9CD] bg-[#FAF8F3] px-1.5 py-0.5 font-mono text-[11px] text-[#8C857B] md:inline-block"
+                    >
+                      /
+                    </kbd>
                   )}
                 </div>
 
                 <button
                   type="submit"
-                  className="h-12 shrink-0 rounded-2xl bg-[#1A1816] px-4 min-[420px]:px-5 text-[15px] font-medium text-white whitespace-nowrap cursor-pointer active:scale-[0.97] transition-transform hover:bg-[#B43B2B] md:text-sm"
+                  className="h-12 shrink-0 rounded-2xl bg-[#1A1816] px-4 min-[420px]:px-5 text-[15px] font-medium text-white whitespace-nowrap cursor-pointer active:scale-[0.97] transition-all hover:bg-[#B43B2B] md:h-11 md:text-sm"
                 >
                   联网搜
                 </button>
               </form>
 
-              {/* Category Segmented Tabs + Live Count */}
-              <div className="mt-3.5 flex items-center justify-between gap-2">
+              {/* Unified Category Tabs + Filter/Sort/View Controls */}
+              <div
+                className={`mt-3.5 flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between ${
+                  items.length > 0 ? 'border-b border-[#E4DFD5] pb-3.5' : ''
+                }`}
+              >
                 <div
                   role="group"
                   aria-label="藏品分类"
-                  className="grid flex-1 grid-cols-4 gap-1 rounded-xl bg-[#ECE8DF] p-1 sm:max-w-md"
+                  className="grid w-full grid-cols-4 gap-1 rounded-xl bg-[#ECE8DF] p-1 sm:max-w-[380px]"
                 >
                   {LIBRARY_CATS.map((cat) => {
                     const active = activeCategory === cat.id;
@@ -1156,10 +1280,10 @@ export default function App() {
                         type="button"
                         aria-pressed={active}
                         onClick={() => setActiveCategory(cat.id)}
-                        className={`min-h-[42px] rounded-lg px-1.5 text-[13px] min-[420px]:text-[14px] font-medium whitespace-nowrap cursor-pointer transition-colors md:min-h-[38px] md:text-xs ${
+                        className={`min-h-[42px] rounded-lg px-1.5 text-[13px] min-[420px]:text-[14px] font-medium whitespace-nowrap cursor-pointer transition-colors md:min-h-[36px] md:text-xs ${
                           active
                             ? 'bg-white text-[#1A1816] shadow-xs'
-                            : 'text-[#625C54]'
+                            : 'text-[#625C54] hover:text-[#1A1816]'
                         }`}
                       >
                         {cat.label}
@@ -1170,14 +1294,11 @@ export default function App() {
                     );
                   })}
                 </div>
-              </div>
 
-              {/* Compact Status, Tag & Sort Bar (shown once user has collected items) */}
-              {items.length > 0 && (
-                <div className="mt-3 border-b border-[#E4DFD5] pb-3.5">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                {items.length > 0 && (
+                  <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between lg:justify-end">
                     <div
-                      className={`grid w-full min-w-0 gap-2 sm:flex sm:w-auto sm:flex-1 sm:items-center ${
+                      className={`grid w-full min-w-0 gap-2 sm:flex sm:w-auto sm:items-center ${
                         tagRegistry.length > 0 ? 'grid-cols-3' : 'grid-cols-2'
                       }`}
                     >
@@ -1242,20 +1363,73 @@ export default function App() {
                       </select>
                     </div>
 
-                    <div className="flex items-center justify-end">
-                      <span
-                        data-testid="stat-total"
-                        className="font-mono text-[13px] tabular-nums text-[#7A7268] shrink-0 md:text-xs"
+                    <div className="flex items-center justify-between gap-2 sm:justify-end">
+                      <div className="flex items-center gap-2">
+                        {activeFilterCount > 0 && (
+                          <button
+                            type="button"
+                            data-testid="reset-filters-inline-btn"
+                            onClick={handleResetFilters}
+                            className="inline-flex h-9 items-center gap-1 rounded-xl border border-[#E5BFB9] bg-[#FDF4F2] px-2.5 text-xs font-medium text-[#B43B2B] whitespace-nowrap cursor-pointer transition-colors hover:bg-[#FBE6E1]"
+                          >
+                            <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                            <span>重置 ({activeFilterCount})</span>
+                          </button>
+                        )}
+                        <span
+                          data-testid="stat-total"
+                          className="font-mono text-[13px] tabular-nums text-[#7A7268] shrink-0 md:text-xs"
+                        >
+                          共 {filteredItems.length} 件
+                        </span>
+                      </div>
+
+                      {/* Grid / List View Mode Switcher */}
+                      <div
+                        role="group"
+                        aria-label="视图切换"
+                        className="inline-flex rounded-xl bg-[#ECE8DF] p-0.5"
                       >
-                        共 {filteredItems.length} 件
-                      </span>
+                        <button
+                          type="button"
+                          data-testid="view-mode-grid"
+                          aria-pressed={viewMode === 'grid'}
+                          aria-label="画廊网格视图"
+                          onClick={() => setViewMode('grid')}
+                          className={`flex h-8 w-9 items-center justify-center rounded-lg cursor-pointer transition-colors ${
+                            viewMode === 'grid'
+                              ? 'bg-white text-[#1A1816] shadow-xs'
+                              : 'text-[#625C54] hover:text-[#1A1816]'
+                          }`}
+                        >
+                          <LayoutGrid className="h-4 w-4" aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
+                          data-testid="view-mode-list"
+                          aria-pressed={viewMode === 'list'}
+                          aria-label="名录列表视图"
+                          onClick={() => setViewMode('list')}
+                          className={`flex h-8 w-9 items-center justify-center rounded-lg cursor-pointer transition-colors ${
+                            viewMode === 'list'
+                              ? 'bg-white text-[#1A1816] shadow-xs'
+                              : 'text-[#625C54] hover:text-[#1A1816]'
+                          }`}
+                        >
+                          <List className="h-4 w-4" aria-hidden="true" />
+                        </button>
+                      </div>
                     </div>
                   </div>
+                )}
+              </div>
 
+              {items.length > 0 && (activeAlbum || activeTag) && (
+                <div className="mt-2.5 flex flex-wrap gap-2">
                   {activeAlbum && (
                     <div
                       data-testid="active-album-banner"
-                      className="mt-2.5 flex items-center justify-between gap-2 rounded-xl border border-[#C9A45C] bg-[#FFFDF9] px-3.5 py-2"
+                      className="flex flex-1 min-w-[240px] items-center justify-between gap-2 rounded-xl border border-[#C9A45C] bg-[#FFFDF9] px-3.5 py-2"
                     >
                       <div className="flex min-w-0 items-center gap-1.5 text-[13px] text-[#1A1816] md:text-xs">
                         <BookOpen
@@ -1271,7 +1445,7 @@ export default function App() {
                         type="button"
                         onClick={() => setActiveAlbumId('')}
                         aria-label="清除图鉴筛选"
-                        className="inline-flex min-h-[38px] shrink-0 items-center gap-1 rounded-lg px-2.5 text-[13px] font-medium text-[#625C54] hover:bg-[#F3EFE8] hover:text-[#1A1816] cursor-pointer md:text-xs"
+                        className="inline-flex min-h-[36px] shrink-0 items-center gap-1 rounded-lg px-2.5 text-[13px] font-medium text-[#625C54] hover:bg-[#F3EFE8] hover:text-[#1A1816] cursor-pointer md:text-xs"
                       >
                         <X className="h-3.5 w-3.5" aria-hidden="true" />
                         <span>清除</span>
@@ -1282,7 +1456,7 @@ export default function App() {
                   {activeTag && (
                     <div
                       data-testid="active-tag-banner"
-                      className="mt-2.5 flex items-center justify-between gap-2 rounded-xl border border-[#DCD6CB] bg-white px-3.5 py-2"
+                      className="flex flex-1 min-w-[240px] items-center justify-between gap-2 rounded-xl border border-[#DCD6CB] bg-white px-3.5 py-2"
                     >
                       <div className="flex min-w-0 items-center gap-1.5 text-[13px] text-[#1A1816] md:text-xs">
                         <Tag
@@ -1298,7 +1472,7 @@ export default function App() {
                         type="button"
                         onClick={() => setActiveTag('')}
                         aria-label="清除标签筛选"
-                        className="inline-flex min-h-[38px] shrink-0 items-center gap-1 rounded-lg px-2.5 text-[13px] font-medium text-[#625C54] hover:bg-[#F3EFE8] hover:text-[#1A1816] cursor-pointer md:text-xs"
+                        className="inline-flex min-h-[36px] shrink-0 items-center gap-1 rounded-lg px-2.5 text-[13px] font-medium text-[#625C54] hover:bg-[#F3EFE8] hover:text-[#1A1816] cursor-pointer md:text-xs"
                       >
                         <X className="h-3.5 w-3.5" aria-hidden="true" />
                         <span>清除</span>
@@ -1315,10 +1489,13 @@ export default function App() {
               searchQuery={libraryQuery}
               activeTag={activeTag}
               activeAlbumName={activeAlbum?.name || ''}
+              viewMode={viewMode}
               onSelectItem={(item) => setSelectedItemId(item.id)}
+              onOpenCardModal={(item) => setCardModalItemId(item.id)}
               onJumpToSearch={jumpToSearch}
               onJumpToCreate={() => jumpToCreate()}
               onResetFilters={handleResetFilters}
+              onLoadSampleCollection={() => void handleLoadSampleCollection()}
             />
           </>
         )}
@@ -1379,13 +1556,21 @@ export default function App() {
         <div
           role="status"
           aria-live="polite"
-          className={`fixed left-1/2 z-50 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-xl bg-[#1A1816] px-4 py-2.5 text-center text-[13px] font-medium text-white shadow-lg md:text-xs ${
+          className={`toast-pop-in fixed left-1/2 z-50 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-2.5 rounded-xl border border-white/10 bg-[#1A1816] px-4 py-2.5 text-[13px] font-medium text-[#FAF7F0] shadow-xl md:text-xs ${
             pendingLinkSuggestion
               ? 'top-[calc(64px+env(safe-area-inset-top))] md:top-[76px]'
               : 'bottom-[calc(76px+env(safe-area-inset-bottom))] md:bottom-6'
           }`}
         >
-          {notice}
+          <span className="truncate">{notice}</span>
+          <button
+            type="button"
+            onClick={() => setNotice(null)}
+            aria-label="关闭提示"
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[#A59D90] hover:bg-white/10 hover:text-white cursor-pointer"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
         </div>
       )}
 
@@ -1414,6 +1599,9 @@ export default function App() {
       <DetailDrawer
         item={selectedItem}
         allItems={items}
+        positionLabel={drawerPositionLabel}
+        onPrevItem={prevDrawerItem ? () => setSelectedItemId(prevDrawerItem.id) : undefined}
+        onNextItem={nextDrawerItem ? () => setSelectedItemId(nextDrawerItem.id) : undefined}
         onClose={() => setSelectedItemId(null)}
         onSelectRelated={(rel) => setSelectedItemId(rel.id)}
         onFilterByTag={handleFilterByTag}

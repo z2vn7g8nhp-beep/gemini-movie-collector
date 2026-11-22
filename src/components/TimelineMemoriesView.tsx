@@ -58,9 +58,9 @@ export function TimelineMemoriesView({
     return (
       <section
         data-testid="timeline-memories-view"
-        className="mx-auto max-w-[780px] px-4 pt-6 pb-[calc(6.5rem+env(safe-area-inset-bottom))] min-[420px]:px-5 md:px-8 md:pt-10 md:pb-16"
+        className="mx-auto max-w-[1040px] px-4 pt-6 pb-[calc(6.5rem+env(safe-area-inset-bottom))] min-[420px]:px-5 md:px-8 md:pt-8 md:pb-16"
       >
-        <div className="rounded-2xl border border-[#E4DFD5] bg-white px-6 py-12 text-center">
+        <div className="gallery-card border border-[#E4DFD5] px-6 py-12 text-center">
           <p className="font-mono text-[13px] tracking-[0.14em] text-[#8C857B] md:text-xs">
             时间轴回忆
           </p>
@@ -95,7 +95,7 @@ export function TimelineMemoriesView({
     <section
       aria-label="时间轴回忆"
       data-testid="timeline-memories-view"
-      className="mx-auto max-w-[780px] space-y-4 px-4 pt-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] min-[420px]:px-5 md:px-8 md:pt-8 md:pb-16"
+      className="mx-auto max-w-[1040px] space-y-5 px-4 pt-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] min-[420px]:px-5 md:px-8 md:pt-7 md:pb-16"
     >
       {/* 1. Archival Chronicle Header Card */}
       <div className="gallery-card-dark border border-[#342F28] p-5 text-[#F5F1E8]">
@@ -359,7 +359,7 @@ export function TimelineMemoriesView({
                               data-testid={`timeline-entry-${item.id}`}
                               onClick={() => onSelectItem(item)}
                               aria-label={`查看时间轴条目「${item.title}」详情`}
-                              className={`gallery-card flex w-full items-start gap-3.5 border p-3.5 text-left cursor-pointer active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#B43B2B] md:gap-3 md:p-3 ${
+                              className={`gallery-card gallery-card-interactive flex w-full items-start gap-3.5 border p-3.5 text-left cursor-pointer active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#B43B2B] md:gap-4 md:p-4 ${
                                 isMasterpiece
                                   ? 'gallery-card-masterpiece border-[#C9A45C]/80'
                                   : 'border-[#E6E0D4] hover:border-[#CFC7B9]'

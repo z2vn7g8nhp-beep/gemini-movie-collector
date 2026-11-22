@@ -3,6 +3,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Check,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ChevronUp,
   ExternalLink,
   ImagePlus,
@@ -11,6 +13,7 @@ import {
   Loader2,
   Plus,
   RefreshCw,
+  RotateCcw,
   Search,
   Sparkles,
   Star,
@@ -76,6 +79,9 @@ function retainKnownLists(next: OnlineRelationsResponse, previous: OnlineRelatio
 interface DetailDrawerProps {
   item: ArchiveItem | null;
   allItems: ArchiveItem[];
+  positionLabel?: string;
+  onPrevItem?: () => void;
+  onNextItem?: () => void;
   onClose: () => void;
   onSelectRelated: (item: ArchiveItem) => void;
   onFilterByTag: (tag: string) => void;
@@ -112,6 +118,9 @@ const STATUS_CHOICES: CollectionStatus[] = [
 export function DetailDrawer({
   item: savedItem,
   allItems,
+  positionLabel,
+  onPrevItem,
+  onNextItem,
   onClose,
   onSelectRelated,
   onFilterByTag,
@@ -173,6 +182,8 @@ export function DetailDrawer({
   const [dossierError, setDossierError] = useState('');
   const [dossierReloadTick, setDossierReloadTick] = useState(0);
   const [editTab, setEditTab] = useState<'notes' | 'dossier'>('notes');
+  const bodyScrollRef = useRef<HTMLDivElement | null>(null);
+  const relationsSectionRef = useRef<HTMLDivElement | null>(null);
   const editFormRef = useRef<HTMLFormElement | null>(null);
 
   // Live online relation discovery state (for films & people only)
@@ -393,11 +404,38 @@ export function DetailDrawer({
   useEffect(() => {
     if (!item) return;
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (coverPickerOpen) return;
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      if (e.key === 'ArrowLeft' && onPrevItem) {
+        e.preventDefault();
+        onPrevItem();
+      } else if (e.key === 'ArrowRight' && onNextItem) {
+        e.preventDefault();
+        onNextItem();
+      }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [item, onClose]);
+  }, [item, coverPickerOpen, onClose, onPrevItem, onNextItem]);
+
+  useEffect(() => {
+    if (item?.id) {
+      bodyScrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+    }
+  }, [item?.id]);
 
   if (!item) return null;
 
@@ -464,6 +502,14 @@ export function DetailDrawer({
   const quickCreateTargets: ArchiveCategory[] =
     item.category === 'film' ? ['person', 'character'] : ['film', 'character'];
 
+  const handleJumpToTop = () => {
+    bodyScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleJumpToRelations = () => {
+    relationsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   const handleJumpToEditNotes = () => {
     setEditTab('notes');
     requestAnimationFrame(() => {
@@ -476,6 +522,41 @@ export function DetailDrawer({
     requestAnimationFrame(() => {
       editFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
+  };
+
+  const isDirty = (() => {
+    if (rating !== item.rating) return true;
+    if (status !== item.status) return true;
+    if (quote.trim() !== (item.quote || '').trim()) return true;
+    if (notes.trim() !== (item.notes || '').trim()) return true;
+    if (relatedWorkTitle.trim() !== (item.relatedWorkTitle || '').trim()) return true;
+    if (portrayedBy.trim() !== (item.portrayedBy || '').trim()) return true;
+    if (coverUrlInput.trim() !== (item.coverUrl || '').trim()) return true;
+    if (isCharacter) {
+      const p = item.characterProfile;
+      if (charAlias.trim() !== (p?.alias || '').trim()) return true;
+      if (charIdentity.trim() !== (p?.identity || '').trim()) return true;
+      if (charAffiliation.trim() !== (p?.affiliation || '').trim()) return true;
+      if (charOrigin.trim() !== (p?.origin || '').trim()) return true;
+      if (charAbilities.trim() !== (p?.abilities || '').trim()) return true;
+      if (charFirstAppearance.trim() !== (p?.firstAppearance || '').trim()) return true;
+      if (charCreator.trim() !== (p?.creator || '').trim()) return true;
+      if (charHighlights.trim() !== (p?.highlights || '').trim()) return true;
+      if (charBio.trim() !== (p?.bio || item.summary || '').trim()) return true;
+    }
+    return false;
+  })();
+
+  const handleResetDraft = () => {
+    setRating(item.rating);
+    setStatus(item.status);
+    setQuote(item.quote || '');
+    setNotes(item.notes || '');
+    setRelatedWorkTitle(item.relatedWorkTitle || '');
+    setPortrayedBy(item.portrayedBy || '');
+    setCoverUrlInput(item.coverUrl || '');
+    syncCharacterFormFromProfile(item.characterProfile, item.summary);
+    setSavedFeedback('');
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -557,13 +638,13 @@ export function DetailDrawer({
       role="dialog"
       aria-modal="true"
       aria-labelledby="detail-drawer-title"
-      className="fixed inset-0 z-50 flex items-end justify-center bg-[#1A1816]/50 md:items-stretch md:justify-end"
+      className="encounter-backdrop-in fixed inset-0 z-50 flex items-end justify-center bg-[#1A1816]/55 backdrop-blur-[2px] md:items-stretch md:justify-end"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       {/* Mobile Bottom Sheet (rounded-t-3xl) -> Side Drawer on Desktop */}
-      <div className="relative flex max-h-[92dvh] w-full max-w-full flex-col overflow-hidden rounded-t-3xl bg-[#F7F5F0] shadow-2xl md:h-full md:max-h-full md:max-w-xl md:rounded-none">
+      <div className="drawer-panel-in relative flex max-h-[92dvh] w-full max-w-full flex-col overflow-hidden rounded-t-3xl bg-[#F7F5F0] shadow-2xl md:h-full md:max-h-full md:max-w-[600px] md:rounded-none md:border-l md:border-[#DFD9CD]">
         {/* Mobile Drag Handle */}
         <div
           className="flex justify-center pt-2.5 pb-1 md:hidden"
@@ -573,19 +654,51 @@ export function DetailDrawer({
         </div>
 
         {/* Sticky Sheet Header */}
-        <div className="flex items-center justify-between border-b border-[#E4DFD5] px-4 py-3 min-[420px]:px-5">
+        <div className="flex items-center justify-between gap-2 border-b border-[#E4DFD5] bg-[#F7F5F0]/95 px-4 py-2.5 min-[420px]:px-5">
           <div className="flex min-w-0 items-center gap-2 font-mono text-[13px] tabular-nums text-[#625C54] md:text-xs">
             <span className="truncate">{item.accessionNo}</span>
             <span aria-hidden="true">/</span>
             <span className="shrink-0">{CATEGORY_LABELS[item.category]}档案</span>
+            {positionLabel && (
+              <>
+                <span aria-hidden="true" className="hidden sm:inline">·</span>
+                <span className="hidden text-[#8C857B] sm:inline">{positionLabel}</span>
+              </>
+            )}
           </div>
-          <div className="flex shrink-0 items-center gap-1.5">
+          <div className="flex shrink-0 items-center gap-1">
+            {(onPrevItem || onNextItem) && (
+              <div className="mr-0.5 flex items-center rounded-xl border border-[#E0D9CD] bg-white p-0.5">
+                <button
+                  type="button"
+                  data-testid="drawer-prev-item-btn"
+                  disabled={!onPrevItem}
+                  onClick={onPrevItem}
+                  aria-label="上一件藏品"
+                  title="上一件藏品 (←)"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-[#4B453E] transition-colors hover:bg-[#F3EFE8] hover:text-[#1A1816] disabled:opacity-35 cursor-pointer"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  data-testid="drawer-next-item-btn"
+                  disabled={!onNextItem}
+                  onClick={onNextItem}
+                  aria-label="下一件藏品"
+                  title="下一件藏品 (→)"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-[#4B453E] transition-colors hover:bg-[#F3EFE8] hover:text-[#1A1816] disabled:opacity-35 cursor-pointer"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            )}
             {onOpenCardModal && (
               <button
                 type="button"
                 onClick={() => onOpenCardModal(item)}
                 aria-label="以实体藏卡模式赏析"
-                className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-[#DCD6CB] bg-white px-3.5 text-[13px] font-medium text-[#1A1816] whitespace-nowrap cursor-pointer hover:border-[#1A1816] md:text-xs"
+                className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-[#DCD6CB] bg-white px-3 text-[13px] font-medium text-[#1A1816] whitespace-nowrap cursor-pointer transition-colors hover:border-[#1A1816] md:text-xs"
               >
                 <Layers className="h-3.5 w-3.5 text-[#A67C37]" aria-hidden="true" />
                 <span>藏卡</span>
@@ -595,15 +708,57 @@ export function DetailDrawer({
               type="button"
               onClick={onClose}
               aria-label="关闭档案详情"
-              className="flex h-11 w-11 items-center justify-center rounded-xl text-[#625C54] hover:bg-[#EAE4D9] hover:text-[#1A1816] cursor-pointer"
+              title="关闭 (Esc)"
+              className="flex h-10 w-10 items-center justify-center rounded-xl text-[#625C54] transition-colors hover:bg-[#EAE4D9] hover:text-[#1A1816] cursor-pointer"
             >
               <X className="h-5 w-5" />
             </button>
           </div>
         </div>
 
+        {/* Compact Section Quick-Jump Anchor Strip */}
+        <nav
+          aria-label="档案快捷定位"
+          className="flex items-center gap-1 border-b border-[#EAE4D9] bg-[#FAF8F3] px-4 py-1.5 min-[420px]:px-5"
+        >
+          <button
+            type="button"
+            onClick={handleJumpToTop}
+            className="min-h-[32px] rounded-lg px-2.5 text-[12px] font-medium text-[#4B453E] transition-colors hover:bg-[#EFECE4] hover:text-[#1A1816] cursor-pointer"
+          >
+            档案概览
+          </button>
+          <button
+            type="button"
+            onClick={handleJumpToRelations}
+            className="min-h-[32px] rounded-lg px-2.5 text-[12px] font-medium text-[#4B453E] transition-colors hover:bg-[#EFECE4] hover:text-[#1A1816] cursor-pointer"
+          >
+            标签与关联
+            {relatedItems.length > 0 && (
+              <span className="ml-1 font-mono text-[11px] tabular-nums text-[#8C857B]">
+                {relatedItems.length}
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={handleJumpToEditNotes}
+            className="min-h-[32px] rounded-lg px-2.5 text-[12px] font-medium text-[#4B453E] transition-colors hover:bg-[#EFECE4] hover:text-[#1A1816] cursor-pointer"
+          >
+            手记与编辑
+            {isDirty && (
+              <span className="ml-1 text-[#B43B2B]" aria-label="有未保存修改">
+                · 未保存
+              </span>
+            )}
+          </button>
+        </nav>
+
         {/* Scrollable Sheet Body */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-5 pb-10 min-[420px]:px-5 sm:px-6">
+        <div
+          ref={bodyScrollRef}
+          className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-5 pb-10 min-[420px]:px-5 sm:px-6"
+        >
           {/* Header Block: Cover + Key Metadata */}
           <div className="flex gap-4">
             <div className="gallery-paper-mat w-[124px] shrink-0 self-start overflow-hidden border border-[#E4DFD5] p-2 min-[420px]:w-[134px] sm:w-[144px]">
@@ -825,13 +980,15 @@ export function DetailDrawer({
           )}
 
           {/* Dedicated Tag Management: Autocomplete + Instant Same-Tag Filtering */}
-          <DetailTagManager
-            item={item}
-            allItems={allItems}
-            onUpdateTags={(nextTags) => onUpdateItem(item.id, { tags: nextTags })}
-            onFilterByTag={onFilterByTag}
-            onSelectRelated={onSelectRelated}
-          />
+          <div ref={relationsSectionRef} className="scroll-mt-3">
+            <DetailTagManager
+              item={item}
+              allItems={allItems}
+              onUpdateTags={(nextTags) => onUpdateItem(item.id, { tags: nextTags })}
+              onFilterByTag={onFilterByTag}
+              onSelectRelated={onSelectRelated}
+            />
+          </div>
 
           {/* Cross-Entity Links: Existing Collected Relations */}
           <section
@@ -1754,14 +1911,34 @@ export function DetailDrawer({
 
         {/* Sticky Bottom Save Bar */}
         <div className="border-t border-[#E4DFD5] bg-white px-4 py-3 pb-[calc(0.85rem+env(safe-area-inset-bottom))] min-[420px]:px-5">
-          <button
-            type="submit"
-            form="detail-edit-form"
-            disabled={saving}
-            className="h-12 w-full rounded-xl bg-[#B43B2B] text-[16px] font-medium text-white cursor-pointer active:scale-[0.98] transition-transform hover:bg-[#932D20] disabled:opacity-60 md:text-sm"
-          >
-            {saving ? '保存中…' : '保存修改'}
-          </button>
+          <div className="flex items-center gap-2.5">
+            {isDirty && (
+              <button
+                type="button"
+                onClick={handleResetDraft}
+                className="inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-[14px] font-medium text-[#4B453E] whitespace-nowrap cursor-pointer transition-colors hover:border-[#1A1816] hover:text-[#1A1816] md:text-xs"
+              >
+                <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                <span>还原</span>
+              </button>
+            )}
+            <button
+              type="submit"
+              form="detail-edit-form"
+              disabled={saving}
+              className={`h-11 flex-1 rounded-xl text-[15px] font-medium text-white cursor-pointer active:scale-[0.98] transition-all disabled:opacity-60 md:text-sm ${
+                isDirty
+                  ? 'bg-[#B43B2B] hover:bg-[#932D20] shadow-xs'
+                  : 'bg-[#1A1816] hover:bg-[#332E29]'
+              }`}
+            >
+              {saving
+                ? '保存中…'
+                : isDirty
+                  ? '保存未同步修改'
+                  : '保存修改'}
+            </button>
+          </div>
         </div>
       </div>
 

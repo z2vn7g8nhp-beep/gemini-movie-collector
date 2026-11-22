@@ -178,7 +178,10 @@ export function ProfileBackupView({
   };
 
   return (
-    <section className="mx-auto max-w-[760px] space-y-4 px-4 pt-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] min-[420px]:px-5 md:px-8 md:pt-8 md:pb-16">
+    <section className="mx-auto max-w-[1180px] space-y-5 px-4 pt-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] min-[420px]:px-5 md:px-8 md:pt-7 md:pb-16">
+      {/* Top 12-Column Exhibition Layout: Left Passport & Rhythm (5 cols) | Right Medals & Stamps (7 cols) */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-12 lg:items-start">
+        <div className="space-y-4 lg:col-span-5">
       {/* 1. Curator Rank & Passport Card */}
       <div
         data-testid="curator-rank-card"
@@ -268,6 +271,63 @@ export function ProfileBackupView({
         </div>
       </div>
 
+      {/* 2. 14-Day Check-In Filmstrip Calendar */}
+      <div className="gallery-card border border-[#E4DFD5] p-4 min-[420px]:p-5">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <h2 className="font-editorial text-[18px] font-medium text-[#1A1816] md:text-base">
+              近 14 日巡馆足迹
+            </h2>
+            <p className="mt-0.5 text-[13px] text-[#7A7268] tabular-nums md:text-xs">
+              连续 {streak.currentStreak} 天 · 最长 {streak.longestStreak} 天 · 累计 {streak.totalDays} 天
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-3.5 grid grid-cols-7 gap-2">
+          {calendarDays.map((cell) => (
+            <div
+              key={cell.dateKey}
+              aria-label={`${cell.dateKey} ${cell.checked ? '已巡馆' : '未巡馆'}`}
+              className={`flex aspect-square flex-col items-center justify-center rounded-xl border font-mono text-[13px] tabular-nums md:text-xs ${
+                cell.checked
+                  ? 'border-[#B43B2B] bg-[#B43B2B] font-medium text-white'
+                  : cell.isToday
+                    ? 'border-[#1A1816] bg-[#FAF9F6] font-medium text-[#1A1816]'
+                    : 'border-[#ECE7DD] bg-[#FAF9F6] text-[#9C9488]'
+              }`}
+            >
+              <span>{cell.dayNum}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 3. Category Breakdown Compact Strip */}
+      <div className="grid grid-cols-3 gap-2.5">
+        <div className="gallery-card border border-[#E4DFD5] p-3.5 text-center">
+          <p className="font-mono text-[22px] font-medium tabular-nums text-[#1A1816] md:text-xl">
+            {stats.film}
+          </p>
+          <p className="mt-0.5 text-[13px] text-[#625C54] md:text-xs">影视作品</p>
+        </div>
+        <div className="gallery-card border border-[#E4DFD5] p-3.5 text-center">
+          <p className="font-mono text-[22px] font-medium tabular-nums text-[#1A1816] md:text-xl">
+            {stats.person}
+          </p>
+          <p className="mt-0.5 text-[13px] text-[#625C54] md:text-xs">影人档案</p>
+        </div>
+        <div className="gallery-card border border-[#E4DFD5] p-3.5 text-center">
+          <p className="font-mono text-[22px] font-medium tabular-nums text-[#1A1816] md:text-xl">
+            {stats.character}
+          </p>
+          <p className="mt-0.5 text-[13px] text-[#625C54] md:text-xs">角色图鉴</p>
+        </div>
+      </div>
+        </div>
+
+        {/* Right 7-Column Honors & Stamps Gallery */}
+        <div className="space-y-4 lg:col-span-7">
       {/* 1.5 Dynamic Cinema Medals Cabinet */}
       <div
         data-testid="cinema-medals-section"
@@ -430,38 +490,6 @@ export function ProfileBackupView({
         </div>
       </div>
 
-      {/* 2. 14-Day Check-In Filmstrip Calendar */}
-      <div className="rounded-2xl border border-[#E4DFD5] bg-white p-4 min-[420px]:p-5">
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <h2 className="font-editorial text-[18px] font-medium text-[#1A1816] md:text-base">
-              近 14 日巡馆足迹
-            </h2>
-            <p className="mt-0.5 text-[13px] text-[#7A7268] tabular-nums md:text-xs">
-              连续 {streak.currentStreak} 天 · 最长 {streak.longestStreak} 天 · 累计 {streak.totalDays} 天
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-3.5 grid grid-cols-7 gap-2 sm:grid-cols-14 sm:gap-1.5">
-          {calendarDays.map((cell) => (
-            <div
-              key={cell.dateKey}
-              aria-label={`${cell.dateKey} ${cell.checked ? '已巡馆' : '未巡馆'}`}
-              className={`flex aspect-square flex-col items-center justify-center rounded-xl border font-mono text-[13px] tabular-nums md:text-xs ${
-                cell.checked
-                  ? 'border-[#B43B2B] bg-[#B43B2B] font-medium text-white'
-                  : cell.isToday
-                    ? 'border-[#1A1816] bg-[#FAF9F6] font-medium text-[#1A1816]'
-                    : 'border-[#ECE7DD] bg-[#FAF9F6] text-[#9C9488]'
-              }`}
-            >
-              <span>{cell.dayNum}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* 3. Collectible Archival Stamp Book (12 Stamps) */}
       <div
         data-testid="collector-stamps-section"
@@ -536,33 +564,16 @@ export function ProfileBackupView({
           })}
         </div>
       </div>
-
-      {/* 4. Category Breakdown Compact Strip */}
-      <div className="grid grid-cols-3 gap-2.5">
-        <div className="rounded-2xl border border-[#E4DFD5] bg-white p-3.5 text-center">
-          <p className="font-mono text-[22px] font-medium tabular-nums text-[#1A1816] md:text-xl">
-            {stats.film}
-          </p>
-          <p className="mt-0.5 text-[13px] text-[#625C54] md:text-xs">影视作品</p>
-        </div>
-        <div className="rounded-2xl border border-[#E4DFD5] bg-white p-3.5 text-center">
-          <p className="font-mono text-[22px] font-medium tabular-nums text-[#1A1816] md:text-xl">
-            {stats.person}
-          </p>
-          <p className="mt-0.5 text-[13px] text-[#625C54] md:text-xs">影人档案</p>
-        </div>
-        <div className="rounded-2xl border border-[#E4DFD5] bg-white p-3.5 text-center">
-          <p className="font-mono text-[22px] font-medium tabular-nums text-[#1A1816] md:text-xl">
-            {stats.character}
-          </p>
-          <p className="mt-0.5 text-[13px] text-[#625C54] md:text-xs">角色图鉴</p>
         </div>
       </div>
 
+      {/* Bottom 2-Column Utilities & Data Management Shelf */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:items-start">
+        <div className="space-y-4 lg:col-span-6">
       {/* Web App Installation & GitHub Pages Card */}
       <div
         data-testid="webapp-install-card"
-        className="rounded-2xl border border-[#E4DFD5] bg-white p-5"
+        className="gallery-card border border-[#E4DFD5] p-5"
       >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-editorial text-[19px] font-medium text-[#1A1816] md:text-lg">
@@ -697,9 +708,11 @@ export function ProfileBackupView({
           </div>
         )}
       </div>
+        </div>
 
+        <div className="space-y-4 lg:col-span-6">
       {/* Export Backup Card */}
-      <div className="rounded-2xl border border-[#E4DFD5] bg-white p-5">
+      <div className="gallery-card border border-[#E4DFD5] p-5">
         <h2 className="font-editorial text-[19px] font-medium text-[#1A1816] md:text-lg">
           备份与导出
         </h2>
@@ -819,6 +832,8 @@ export function ProfileBackupView({
           </div>
         </div>
       )}
+        </div>
+      </div>
 
       {feedback && (
         <p

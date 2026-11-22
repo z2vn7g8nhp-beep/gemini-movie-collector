@@ -1,7 +1,7 @@
 import { localizeFilm } from '../utils/filmIndex';
 import { SummarySource } from './SummarySource';
 import { useEffect, useRef, useState } from 'react';
-import { Check, Loader2, Plus, Search, X } from 'lucide-react';
+import { Check, Clock, Loader2, Plus, Search, Sparkles, X } from 'lucide-react';
 import type {
   ArchiveCategory,
   ArchiveItem,
@@ -9,6 +9,13 @@ import type {
 } from '../types/archive';
 import { searchOnline } from '../services/archiveApi';
 import { CATEGORY_LABELS, isAlreadyCollected } from '../utils/archive';
+import {
+  CURATED_SEARCH_SUGGESTIONS,
+  loadRecentSearches,
+  pushRecentSearchQuery,
+  removeRecentSearchQuery,
+  saveRecentSearches,
+} from '../utils/uiHelpers';
 import { ArchivalImage } from './ArchivalImage';
 
 interface SearchTabViewProps {
@@ -94,6 +101,9 @@ export function SearchTabView({
     () => (initialQuery.trim() ? false : cachedSession?.hasSearched ?? false)
   );
   const [collectingId, setCollectingId] = useState<string | null>(null);
+  const [recentSearches, setRecentSearches] = useState<string[]>(() =>
+    loadRecentSearches()
+  );
 
   const searchVersion = useRef(0);
   const clearSearch = () => {
@@ -121,6 +131,11 @@ export function SearchTabView({
     setLoading(true);
     setError('');
     setHasSearched(true);
+    setRecentSearches((prev) => {
+      const next = pushRecentSearchQuery(prev, trimmed);
+      saveRecentSearches(next);
+      return next;
+    });
     try {
       const data = await searchOnline(trimmed, cat, 'imdb');
       if (version !== searchVersion.current) return;
@@ -171,10 +186,25 @@ export function SearchTabView({
     }
   };
 
+  const handleQuickPick = (pickedQuery: string) => {
+    setQuery(pickedQuery);
+    void runSearch(pickedQuery, category);
+  };
+
+  const handleRemoveRecent = (target: string) => {
+    setRecentSearches((prev) => {
+      const next = removeRecentSearchQuery(prev, target);
+      saveRecentSearches(next);
+      return next;
+    });
+  };
+
+  const suggestions = CURATED_SEARCH_SUGGESTIONS[category];
+
   return (
-    <section className="mx-auto max-w-[920px] px-4 pt-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] min-[420px]:px-5 md:px-8 md:pt-8 md:pb-16">
+    <section className="mx-auto max-w-[1100px] px-4 pt-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] min-[420px]:px-5 md:px-8 md:pt-7 md:pb-16">
       {/* Search Card */}
-      <div className="rounded-2xl border border-[#E4DFD5] bg-white p-4 shadow-xs min-[420px]:p-5">
+      <div className="gallery-card border border-[#E4DFD5] p-4 min-[420px]:p-5 md:p-6">
         {/* Big touch-friendly Category Segmented Control */}
         <div
           role="group"
@@ -266,6 +296,59 @@ export function SearchTabView({
         <p className="mt-3 text-[13px] leading-relaxed text-[#7A7268] md:text-[12px]">
           支持中英文片名和 IMDb / 豆瓣链接。常见影片可用内置中文片名索引查询，评分、海报与简介按联网结果显示。
         </p>
+
+        {/* Curated Quick-Picks & Recent Search History */}
+        {!loading && !hasSearched && (
+          <div className="mt-4 space-y-3 border-t border-[#F0ECE4] pt-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1 text-[12px] font-medium text-[#7A7268]">
+                <Sparkles className="h-3.5 w-3.5 text-[#A67C37]" aria-hidden="true" />
+                推荐检索
+              </span>
+              {suggestions.map((suggestion) => (
+                <button
+                  key={`${category}-${suggestion}`}
+                  type="button"
+                  onClick={() => handleQuickPick(suggestion)}
+                  className="inline-flex min-h-[34px] items-center rounded-lg border border-[#E4DFD5] bg-[#FAF9F6] px-2.5 text-[13px] text-[#2E2A26] transition-colors hover:border-[#1A1816] hover:bg-white cursor-pointer md:text-xs"
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+
+            {recentSearches.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1 text-[12px] font-medium text-[#7A7268]">
+                  <Clock className="h-3.5 w-3.5 text-[#8C857B]" aria-hidden="true" />
+                  最近搜索
+                </span>
+                {recentSearches.map((item) => (
+                  <span
+                    key={`recent-${item}`}
+                    className="inline-flex min-h-[34px] items-center rounded-lg border border-[#EAE4D9] bg-white pl-2.5 pr-1 text-[13px] text-[#4B453E] md:text-xs"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => handleQuickPick(item)}
+                      className="pr-1 hover:text-[#1A1816] cursor-pointer"
+                    >
+                      {item}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveRecent(item)}
+                      aria-label={`移除最近搜索「${item}」`}
+                      className="flex h-6 w-6 items-center justify-center rounded-md text-[#9C9488] hover:bg-[#F3EFE8] hover:text-[#1A1816] cursor-pointer"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Error Banner */}
@@ -289,13 +372,16 @@ export function SearchTabView({
 
       {/* Loading Skeletons */}
       {loading && (
-        <div className="mt-4 space-y-3" aria-label="正在联网检索">
-          {[0, 1, 2].map((idx) => (
+        <div
+          className="mt-5 grid grid-cols-1 gap-3.5 md:grid-cols-2"
+          aria-label="正在联网检索"
+        >
+          {[0, 1, 2, 3].map((idx) => (
             <div
               key={idx}
-              className="flex gap-3.5 rounded-2xl border border-[#E4DFD5] bg-white p-3.5"
+              className="flex animate-pulse gap-3.5 rounded-2xl border border-[#E4DFD5] bg-white p-4"
             >
-              <div className="h-24 w-18 shrink-0 rounded-xl bg-[#EAE4D9]" />
+              <div className="h-[104px] w-[78px] shrink-0 rounded-xl bg-[#EAE4D9]" />
               <div className="flex-1 space-y-2.5 py-1">
                 <div className="h-4 w-2/5 rounded bg-[#EAE4D9]" />
                 <div className="h-3 w-3/5 rounded bg-[#EFECE5]" />
@@ -320,7 +406,7 @@ export function SearchTabView({
             )}
           </div>
 
-          <ul className="space-y-3">
+          <ul className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
             {results.map((item) => {
               const collected = isAlreadyCollected(
                 existingItems,
@@ -337,7 +423,7 @@ export function SearchTabView({
               return (
                 <li
                   key={item.externalId}
-                  className="rounded-2xl border border-[#E4DFD5] bg-white p-3.5 min-[420px]:p-4"
+                  className="gallery-card flex flex-col justify-between border border-[#E4DFD5] p-3.5 transition-colors hover:border-[#CFC7B9] min-[420px]:p-4"
                 >
                   <div className="flex gap-3.5">
                     <ArchivalImage

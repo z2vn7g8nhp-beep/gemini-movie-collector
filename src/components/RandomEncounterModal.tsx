@@ -33,11 +33,21 @@ export function RandomEncounterModal({
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         onClose();
+        return;
+      }
+      const target = e.target as HTMLElement | null;
+      if (target && target.tagName === 'BUTTON') return;
+      if ((e.key === ' ' || e.key === 'r' || e.key === 'R') && allItems.length > 1) {
+        e.preventDefault();
+        onDrawAnother();
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        onOpenFullDetail(item);
       }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [item, onClose]);
+  }, [item, allItems.length, onClose, onDrawAnother, onOpenFullDetail]);
 
   const relatedItems = useMemo(
     () => (item ? getRelatedItems(item, allItems) : []),
@@ -255,6 +265,9 @@ export function RandomEncounterModal({
             <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
+        <p className="hidden bg-[#FAF9F6] pb-2.5 text-center font-mono text-[11px] text-[#8C857B] md:block">
+          {allItems.length > 1 ? '空格 / R 再抽 · Enter 展开 · Esc 关闭' : 'Enter 展开 · Esc 关闭'}
+        </p>
       </div>
     </div>
   );
