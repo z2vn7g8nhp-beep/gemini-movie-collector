@@ -2,12 +2,49 @@ import type { ArchiveCategory, ArchiveItem } from '../types/archive';
 import { getRelatedItems } from './archive';
 import { isThematicTag } from './medals';
 
+export type RelationStrengthTier = 1 | 2 | 3;
+export type NodeIntensityTier = 0 | 1 | 2 | 3;
+
+export type GraphEdgeVisualState = 'idle' | 'highlighted' | 'second-hop' | 'dimmed';
+export type GraphNodeFocusState =
+  | 'idle'
+  | 'focused'
+  | 'direct-neighbor'
+  | 'second-hop'
+  | 'tag-neighbor'
+  | 'dimmed';
+
+export interface EdgeVisualStyle {
+  stroke: string;
+  strokeWidth: number;
+  strokeOpacity: number;
+  strokeDasharray?: string;
+  haloWidth: number;
+  haloOpacity: number;
+  haloColor: string;
+}
+
+export interface NodeVisualStyle {
+  fill: string;
+  stroke: string;
+  textColor: string;
+  dot: string;
+  strokeWidth: number;
+  auraRadiusOffset: number;
+  auraStroke: string;
+  auraOpacity: number;
+}
+
 export interface GlobalGraphNode {
   id: string;
   item: ArchiveItem;
   x: number;
   y: number;
   degree: number;
+  tagDegree: number;
+  weightedDegree: number;
+  intensity: number;
+  intensityTier: NodeIntensityTier;
   radius: number;
   isHub: boolean;
   isIsolated: boolean;
@@ -20,6 +57,14 @@ export interface GlobalGraphEdge {
   targetId: string;
   kind: 'explicit' | 'tag';
   label?: string;
+  strength: RelationStrengthTier;
+  strengthScore: number;
+  strengthWeight: number;
+  strengthLabel: string;
+  mutualCount: number;
+  sharedTagCount: number;
+  sharedTags: string[];
+  isBidirectional: boolean;
 }
 
 export interface GlobalGraphModel {
@@ -31,6 +76,8 @@ export interface GlobalGraphModel {
   isolatedNodes: GlobalGraphNode[];
   explicitEdgeCount: number;
   tagEdgeCount: number;
+  maxStrengthScore: number;
+  maxWeightedDegree: number;
 }
 
 export interface DirectRelationDetail {
@@ -40,6 +87,11 @@ export interface DirectRelationDetail {
   shortLabel: string;
   description: string;
   sharedTags: string[];
+  strength: RelationStrengthTier;
+  strengthScore: number;
+  strengthWeight: number;
+  strengthLabel: string;
+  mutualCount: number;
 }
 
 export interface FocusedNodeRelationContext {
@@ -47,8 +99,13 @@ export interface FocusedNodeRelationContext {
   directRelations: DirectRelationDetail[];
   tagRelations: DirectRelationDetail[];
   directNeighborIds: Set<string>;
+  secondHopNeighborIds: Set<string>;
+  secondHopEdgeIds: Set<string>;
   tagNeighborIds: Set<string>;
+  depthByNodeId: Map<string, 0 | 1 | 2>;
   edgeDetailById: Map<string, DirectRelationDetail>;
+  directStrengthByNodeId: Map<string, RelationStrengthTier>;
+  tagStrengthByNodeId: Map<string, RelationStrengthTier>;
 }
 
 const CANVAS_W = 720;
@@ -79,8 +136,309 @@ function getSharedThematicTags(a: ArchiveItem, b: ArchiveItem): string[] {
   return shared;
 }
 
-function getSharedTag(a: ArchiveItem, b: ArchiveItem): string | null {
-  return getSharedThematicTags(a, b)[0] ?? null;
+const NODE_TIER_PALETTE: Record<
+  ArchiveCategory,
+  Record<
+    NodeIntensityTier,
+    { fill: string; stroke: string; textColor: string; dot: string; auraStroke: string }
+  >
+> = {
+  film: {
+    0: {
+      fill: '#431F1B',
+      stroke: '#7A4D46',
+      textColor: '#D4BDB9',
+      dot: '#8E4940',
+      auraStroke: '#9E483C',
+    },
+    1: {
+      fill: '#6C251D',
+      stroke: '#BA6E63',
+      textColor: '#F5E8E6',
+      dot: '#B4473A',
+      auraStroke: '#C55547',
+    },
+    2: {
+      fill: '#982E21',
+      stroke: '#EA9F94',
+      textColor: '#FFFFFF',
+      dot: '#D14B3A',
+      auraStroke: '#DF5A47',
+    },
+    3: {
+      fill: '#CA3C28',
+      stroke: '#FFE0DA',
+      textColor: '#FFFFFF',
+      dot: '#E85A45',
+      auraStroke: '#F06A54',
+    },
+  },
+  person: {
+    0: {
+      fill: '#473D28',
+      stroke: '#7D6F51',
+      textColor: '#D6CCB6',
+      dot: '#8A7850',
+      auraStroke: '#968259',
+    },
+    1: {
+      fill: '#745F35',
+      stroke: '#B59B65',
+      textColor: '#FAF4E6',
+      dot: '#AD8F51',
+      auraStroke: '#C2A362',
+    },
+    2: {
+      fill: '#A88642',
+      stroke: '#E5CA8E',
+      textColor: '#19150E',
+      dot: '#CBA65B',
+      auraStroke: '#D9B66B',
+    },
+    3: {
+      fill: '#DBB768',
+      stroke: '#FFF2CC',
+      textColor: '#19150E',
+      dot: '#E8C87A',
+      auraStroke: '#F2D48A',
+    },
+  },
+  character: {
+    0: {
+      fill: '#243832',
+      stroke: '#4F6E64',
+      textColor: '#BFD3CC',
+      dot: '#4E7065',
+      auraStroke: '#587F72',
+    },
+    1: {
+      fill: '#33594D',
+      stroke: '#75A394',
+      textColor: '#ECF6F2',
+      dot: '#5A8C7B',
+      auraStroke: '#699F8D',
+    },
+    2: {
+      fill: '#467D6B',
+      stroke: '#A3D2C2',
+      textColor: '#FFFFFF',
+      dot: '#6BA894',
+      auraStroke: '#7ABCA6',
+    },
+    3: {
+      fill: '#66AD95',
+      stroke: '#DDF7EE',
+      textColor: '#101D18',
+      dot: '#7CC4AB',
+      auraStroke: '#8AD4BB',
+    },
+  },
+};
+
+/**
+ * Maps an edge's relation strength and current interaction state to stroke thickness,
+ * color richness, opacity, and subtle glow halo parameters.
+ */
+export function getEdgeVisualStyle(
+  edge: Pick<GlobalGraphEdge, 'kind' | 'strength' | 'strengthWeight'>,
+  state: GraphEdgeVisualState
+): EdgeVisualStyle {
+  const isExplicit = edge.kind === 'explicit';
+  const weightBonus = Math.max(0, Math.min(1, edge.strengthWeight)) * 0.45;
+
+  if (state === 'highlighted') {
+    if (isExplicit) {
+      if (edge.strength === 3) {
+        return {
+          stroke: '#F5D688',
+          strokeWidth: +(3.9 + weightBonus).toFixed(2),
+          strokeOpacity: 0.98,
+          haloWidth: 9.5,
+          haloOpacity: 0.24,
+          haloColor: '#E8C472',
+        };
+      }
+      if (edge.strength === 2) {
+        return {
+          stroke: '#E4C37A',
+          strokeWidth: +(2.45 + weightBonus * 0.6).toFixed(2),
+          strokeOpacity: 0.9,
+          haloWidth: 6.2,
+          haloOpacity: 0.15,
+          haloColor: '#D4AF6A',
+        };
+      }
+      return {
+        stroke: '#C4AA75',
+        strokeWidth: 1.5,
+        strokeOpacity: 0.74,
+        haloWidth: 4.0,
+        haloOpacity: 0.09,
+        haloColor: '#B89D68',
+      };
+    }
+    // Tag edge highlighted
+    if (edge.strength >= 2) {
+      return {
+        stroke: '#E2D6BE',
+        strokeWidth: 1.85,
+        strokeOpacity: 0.74,
+        strokeDasharray: '5 3',
+        haloWidth: 0,
+        haloOpacity: 0,
+        haloColor: 'transparent',
+      };
+    }
+    return {
+      stroke: '#CFC7B9',
+      strokeWidth: 1.15,
+      strokeOpacity: 0.48,
+      strokeDasharray: '3 4',
+      haloWidth: 0,
+      haloOpacity: 0,
+      haloColor: 'transparent',
+    };
+  }
+
+  if (state === 'second-hop') {
+    const baseW = isExplicit
+      ? edge.strength === 3
+        ? 1.9
+        : edge.strength === 2
+          ? 1.45
+          : 1.1
+      : 1.0;
+    return {
+      stroke: isExplicit ? '#D4AF6A' : '#CFC7B9',
+      strokeWidth: baseW,
+      strokeOpacity: isExplicit ? (edge.strength === 3 ? 0.44 : 0.32) : 0.2,
+      strokeDasharray: isExplicit ? '5 3' : '2 4',
+      haloWidth: 0,
+      haloOpacity: 0,
+      haloColor: 'transparent',
+    };
+  }
+
+  if (state === 'dimmed') {
+    const baseW = isExplicit
+      ? edge.strength === 3
+        ? 1.55
+        : edge.strength === 2
+          ? 1.1
+          : 0.85
+      : 0.85;
+    return {
+      stroke: isExplicit ? '#D4AF6A' : '#CFC7B9',
+      strokeWidth: baseW,
+      strokeOpacity: isExplicit ? (edge.strength === 3 ? 0.2 : 0.12) : 0.07,
+      strokeDasharray: isExplicit ? undefined : '3 4',
+      haloWidth: 0,
+      haloOpacity: 0,
+      haloColor: 'transparent',
+    };
+  }
+
+  // Idle / panoramic state — full strength hierarchy across the entire constellation
+  if (isExplicit) {
+    if (edge.strength === 3) {
+      return {
+        stroke: '#F0CC7A',
+        strokeWidth: +(3.35 + weightBonus).toFixed(2),
+        strokeOpacity: 0.94,
+        haloWidth: 7.5,
+        haloOpacity: 0.14,
+        haloColor: '#D4AF6A',
+      };
+    }
+    if (edge.strength === 2) {
+      return {
+        stroke: '#D4AF6A',
+        strokeWidth: +(2.05 + weightBonus * 0.5).toFixed(2),
+        strokeOpacity: 0.72,
+        haloWidth: 0,
+        haloOpacity: 0,
+        haloColor: 'transparent',
+      };
+    }
+    return {
+      stroke: '#AE9568',
+      strokeWidth: 1.25,
+      strokeOpacity: 0.48,
+      haloWidth: 0,
+      haloOpacity: 0,
+      haloColor: 'transparent',
+    };
+  }
+
+  if (edge.strength >= 2) {
+    return {
+      stroke: '#DDD2BC',
+      strokeWidth: 1.55,
+      strokeOpacity: 0.46,
+      strokeDasharray: '5 3',
+      haloWidth: 0,
+      haloOpacity: 0,
+      haloColor: 'transparent',
+    };
+  }
+
+  return {
+    stroke: '#CFC7B9',
+    strokeWidth: 0.95,
+    strokeOpacity: 0.26,
+    strokeDasharray: '3 4',
+    haloWidth: 0,
+    haloOpacity: 0,
+    haloColor: 'transparent',
+  };
+}
+
+/**
+ * Returns the color depth, border weight, text contrast color, and subtle aura ring
+ * for a constellation node based on its category, intensity tier, and focus state.
+ */
+export function getNodeVisualStyle(
+  category: ArchiveCategory,
+  tier: NodeIntensityTier,
+  focusState: GraphNodeFocusState = 'idle'
+): NodeVisualStyle {
+  const palette = NODE_TIER_PALETTE[category][tier];
+  const isFocused = focusState === 'focused';
+  const isDirect = focusState === 'direct-neighbor';
+  const showAura =
+    (focusState === 'idle' && tier === 3) ||
+    (isDirect && tier === 3);
+
+  return {
+    fill: palette.fill,
+    stroke: isFocused
+      ? '#FFFFFF'
+      : isDirect
+        ? tier === 3
+          ? '#FFF4D4'
+          : '#FAF7F0'
+        : palette.stroke,
+    textColor: palette.textColor,
+    dot: palette.dot,
+    strokeWidth: isFocused
+      ? 2.7
+      : isDirect
+        ? tier === 3
+          ? 2.3
+          : tier === 2
+            ? 1.9
+            : 1.5
+        : tier === 3
+          ? 2.0
+          : tier === 2
+            ? 1.6
+            : tier === 1
+              ? 1.3
+              : 1.0,
+    auraRadiusOffset: showAura ? 5 : 0,
+    auraStroke: palette.auraStroke,
+    auraOpacity: showAura ? (isDirect ? 0.45 : 0.34) : 0,
+  };
 }
 
 function normalizedIncludes(haystack?: string, needle?: string): boolean {
@@ -453,8 +811,13 @@ export function getFocusedNodeConnections(
   const directRelations: DirectRelationDetail[] = [];
   const tagRelations: DirectRelationDetail[] = [];
   const directNeighborIds = new Set<string>();
+  const secondHopNeighborIds = new Set<string>();
+  const secondHopEdgeIds = new Set<string>();
   const tagNeighborIds = new Set<string>();
+  const depthByNodeId = new Map<string, 0 | 1 | 2>([[focusedId, 0]]);
   const edgeDetailById = new Map<string, DirectRelationDetail>();
+  const directStrengthByNodeId = new Map<string, RelationStrengthTier>();
+  const tagStrengthByNodeId = new Map<string, RelationStrengthTier>();
 
   for (const edge of graph.edges) {
     if (edge.sourceId !== focusedId && edge.targetId !== focusedId) continue;
@@ -477,20 +840,54 @@ export function getFocusedNodeConnections(
       shortLabel: info.shortLabel,
       description: info.description,
       sharedTags: info.sharedTags,
+      strength: edge.strength,
+      strengthScore: edge.strengthScore,
+      strengthWeight: edge.strengthWeight,
+      strengthLabel: edge.strengthLabel,
+      mutualCount: edge.mutualCount,
     };
 
     edgeDetailById.set(edge.id, detail);
 
     if (edge.kind === 'explicit') {
       directNeighborIds.add(neighborId);
+      depthByNodeId.set(neighborId, 1);
+      directStrengthByNodeId.set(neighborId, edge.strength);
       directRelations.push(detail);
     } else {
       tagNeighborIds.add(neighborId);
+      tagStrengthByNodeId.set(neighborId, edge.strength);
       tagRelations.push(detail);
     }
   }
 
+  // Discover 2-hop extended neighbors via explicit edges from 1-hop direct neighbors
+  for (const edge of graph.edges) {
+    if (edge.kind !== 'explicit') continue;
+    const srcIsDirect = directNeighborIds.has(edge.sourceId);
+    const dstIsDirect = directNeighborIds.has(edge.targetId);
+    if (srcIsDirect && edge.targetId !== focusedId && !directNeighborIds.has(edge.targetId)) {
+      secondHopNeighborIds.add(edge.targetId);
+      secondHopEdgeIds.add(edge.id);
+      if (!depthByNodeId.has(edge.targetId)) {
+        depthByNodeId.set(edge.targetId, 2);
+      }
+    } else if (
+      dstIsDirect &&
+      edge.sourceId !== focusedId &&
+      !directNeighborIds.has(edge.sourceId)
+    ) {
+      secondHopNeighborIds.add(edge.sourceId);
+      secondHopEdgeIds.add(edge.id);
+      if (!depthByNodeId.has(edge.sourceId)) {
+        depthByNodeId.set(edge.sourceId, 2);
+      }
+    }
+  }
+
   const sortRelations = (a: DirectRelationDetail, b: DirectRelationDetail) => {
+    if (b.strength !== a.strength) return b.strength - a.strength;
+    if (b.strengthScore !== a.strengthScore) return b.strengthScore - a.strengthScore;
     const catDiff =
       CATEGORY_ORDER[a.node.item.category] - CATEGORY_ORDER[b.node.item.category];
     if (catDiff !== 0) return catDiff;
@@ -506,8 +903,13 @@ export function getFocusedNodeConnections(
     directRelations,
     tagRelations,
     directNeighborIds,
+    secondHopNeighborIds,
+    secondHopEdgeIds,
     tagNeighborIds,
+    depthByNodeId,
     edgeDetailById,
+    directStrengthByNodeId,
+    tagStrengthByNodeId,
   };
 }
 
@@ -535,12 +937,17 @@ export function buildGlobalRelationGraph(
   const visibleIdSet = new Set(baseItems.map((it) => it.id));
 
   // 1. Collect explicit edges within visible items
-  const edges: GlobalGraphEdge[] = [];
+  const itemById = new Map(baseItems.map((it) => [it.id, it]));
+  const rawExplicitPairs: Array<{ sourceId: string; targetId: string; key: string }> = [];
   const seenEdges = new Set<string>();
   const degreeMap = new Map<string, number>();
+  const tagDegreeMap = new Map<string, number>();
+  const adjacency = new Map<string, Set<string>>();
 
   for (const item of baseItems) {
     degreeMap.set(item.id, 0);
+    tagDegreeMap.set(item.id, 0);
+    adjacency.set(item.id, new Set());
   }
 
   for (const item of baseItems) {
@@ -550,51 +957,140 @@ export function buildGlobalRelationGraph(
       const key = pairKey(item.id, rel.id);
       if (seenEdges.has(key)) continue;
       seenEdges.add(key);
-      edges.push({
-        id: `exp-${key}`,
-        sourceId: item.id,
-        targetId: rel.id,
-        kind: 'explicit',
-      });
+      rawExplicitPairs.push({ sourceId: item.id, targetId: rel.id, key });
       degreeMap.set(item.id, (degreeMap.get(item.id) ?? 0) + 1);
       degreeMap.set(rel.id, (degreeMap.get(rel.id) ?? 0) + 1);
+      adjacency.get(item.id)?.add(rel.id);
+      adjacency.get(rel.id)?.add(item.id);
     }
   }
 
-  const explicitEdgeCount = edges.length;
+  // Score explicit edges based on mutual neighbors (cluster depth/frequency),
+  // shared thematic tags, and bidirectionality
+  const edges: GlobalGraphEdge[] = [];
+  for (const pair of rawExplicitPairs) {
+    const itemA = itemById.get(pair.sourceId)!;
+    const itemB = itemById.get(pair.targetId)!;
+    const adjA = adjacency.get(pair.sourceId) ?? new Set<string>();
+    const adjB = adjacency.get(pair.targetId) ?? new Set<string>();
+    let mutualCount = 0;
+    for (const neighborId of adjA) {
+      if (neighborId !== pair.targetId && adjB.has(neighborId)) {
+        mutualCount += 1;
+      }
+    }
+    const sharedTags = getSharedThematicTags(itemA, itemB);
+    const sharedTagCount = sharedTags.length;
+    const isBidirectional =
+      itemA.relatedIds.includes(itemB.id) && itemB.relatedIds.includes(itemA.id);
 
-  // Optional subtle tag chords (capped to keep constellation legible)
+    const strengthScore =
+      2 +
+      (isBidirectional ? 1 : 0) +
+      Math.min(6, mutualCount * 2) +
+      Math.min(3, sharedTagCount * 1.25);
+
+    const strength: RelationStrengthTier =
+      mutualCount >= 2 ||
+      (mutualCount >= 1 && sharedTagCount >= 1) ||
+      sharedTagCount >= 2
+        ? 3
+        : mutualCount >= 1 || sharedTagCount >= 1
+          ? 2
+          : 1;
+
+    const strengthLabel =
+      strength === 3 ? '核心强连' : strength === 2 ? '稳固直连' : '轻度直连';
+
+    edges.push({
+      id: `exp-${pair.key}`,
+      sourceId: pair.sourceId,
+      targetId: pair.targetId,
+      kind: 'explicit',
+      strength,
+      strengthScore,
+      strengthWeight: 0, // normalized below
+      strengthLabel,
+      mutualCount,
+      sharedTagCount,
+      sharedTags,
+      isBidirectional,
+    });
+  }
+
+  // Optional subtle tag chords (capped to keep constellation legible, prioritizing richer tag overlaps)
   let tagEdgeCount = 0;
   if (includeTagEdges && baseItems.length <= 45) {
+    const tagCandidates: Array<{
+      a: ArchiveItem;
+      b: ArchiveItem;
+      key: string;
+      sharedTags: string[];
+    }> = [];
     for (let i = 0; i < baseItems.length; i += 1) {
       for (let j = i + 1; j < baseItems.length; j += 1) {
-        if (tagEdgeCount >= 36) break;
         const a = baseItems[i];
         const b = baseItems[j];
         const key = pairKey(a.id, b.id);
         if (seenEdges.has(key)) continue;
-        const shared = getSharedTag(a, b);
-        if (!shared) continue;
-        seenEdges.add(key);
-        edges.push({
-          id: `tag-${key}`,
-          sourceId: a.id,
-          targetId: b.id,
-          kind: 'tag',
-          label: shared,
-        });
-        tagEdgeCount += 1;
+        const sharedTags = getSharedThematicTags(a, b);
+        if (sharedTags.length === 0) continue;
+        tagCandidates.push({ a, b, key, sharedTags });
       }
+    }
+    tagCandidates.sort((x, y) => y.sharedTags.length - x.sharedTags.length);
+
+    for (const cand of tagCandidates) {
+      if (tagEdgeCount >= 36) break;
+      if (seenEdges.has(cand.key)) continue;
+      seenEdges.add(cand.key);
+      const sharedTagCount = cand.sharedTags.length;
+      const strength: RelationStrengthTier = sharedTagCount >= 2 ? 2 : 1;
+      const strengthScore = 1 + Math.min(3, (sharedTagCount - 1) * 1.2);
+      edges.push({
+        id: `tag-${cand.key}`,
+        sourceId: cand.a.id,
+        targetId: cand.b.id,
+        kind: 'tag',
+        label: cand.sharedTags[0],
+        strength,
+        strengthScore,
+        strengthWeight: 0,
+        strengthLabel: sharedTagCount >= 2 ? '多重共签' : '共签延伸',
+        mutualCount: 0,
+        sharedTagCount,
+        sharedTags: cand.sharedTags,
+        isBidirectional: false,
+      });
+      tagDegreeMap.set(cand.a.id, (tagDegreeMap.get(cand.a.id) ?? 0) + 1);
+      tagDegreeMap.set(cand.b.id, (tagDegreeMap.get(cand.b.id) ?? 0) + 1);
+      tagEdgeCount += 1;
     }
   }
 
-  // 2. Partition into connected vs isolated items (based on explicit archive links)
-  const adjacency = new Map<string, Set<string>>();
-  for (const item of baseItems) adjacency.set(item.id, new Set());
+  const maxStrengthScore = Math.max(
+    1,
+    ...edges.map((e) => e.strengthScore)
+  );
   for (const edge of edges) {
-    if (edge.kind !== 'explicit') continue;
-    adjacency.get(edge.sourceId)?.add(edge.targetId);
-    adjacency.get(edge.targetId)?.add(edge.sourceId);
+    edge.strengthWeight = Number(
+      Math.min(1, edge.strengthScore / maxStrengthScore).toFixed(3)
+    );
+  }
+
+  // Compute weighted degree (connection frequency + tie strength) per node
+  const weightedDegreeMap = new Map<string, number>();
+  for (const item of baseItems) weightedDegreeMap.set(item.id, 0);
+  for (const edge of edges) {
+    const contrib = edge.kind === 'explicit' ? edge.strengthScore : edge.strengthScore * 0.3;
+    weightedDegreeMap.set(
+      edge.sourceId,
+      (weightedDegreeMap.get(edge.sourceId) ?? 0) + contrib
+    );
+    weightedDegreeMap.set(
+      edge.targetId,
+      (weightedDegreeMap.get(edge.targetId) ?? 0) + contrib
+    );
   }
 
   // Connected components BFS
@@ -772,19 +1268,43 @@ export function buildGlobalRelationGraph(
   });
 
   const hubThreshold = Math.max(2, Math.ceil(maxDegree * 0.65));
+  const maxWeightedDegree = Math.max(
+    1,
+    ...targetItems.map((it) => weightedDegreeMap.get(it.id) ?? 0)
+  );
 
   for (const item of targetItems) {
     const deg = degreeMap.get(item.id) ?? 0;
+    const tagDeg = tagDegreeMap.get(item.id) ?? 0;
+    const wDeg = Number((weightedDegreeMap.get(item.id) ?? 0).toFixed(2));
+    const intensity =
+      deg === 0 && tagDeg === 0
+        ? 0
+        : Number(Math.min(1, wDeg / maxWeightedDegree).toFixed(3));
+    const isHub = deg >= hubThreshold && deg > 0;
+    const intensityTier: NodeIntensityTier =
+      deg === 0
+        ? 0
+        : isHub && (intensity >= 0.78 || deg >= maxDegree)
+          ? 3
+          : deg >= 2 || intensity >= 0.45
+            ? 2
+            : 1;
     const pos = posById.get(item.id) ?? { x: CX, y: CY };
-    const radius = deg === 0 ? 15 : Math.min(26, 16 + deg * 2.5);
+    const radius =
+      deg === 0 ? 14.5 : Math.min(26, 15.5 + deg * 2.2 + intensity * 3);
     nodes.push({
       id: item.id,
       item,
       x: Math.round(pos.x),
       y: Math.round(pos.y),
       degree: deg,
-      radius,
-      isHub: deg >= hubThreshold && deg > 0,
+      tagDegree: tagDeg,
+      weightedDegree: wDeg,
+      intensity,
+      intensityTier,
+      radius: Number(radius.toFixed(1)),
+      isHub,
       isIsolated: deg === 0,
       clusterIndex: clusterById.get(item.id) ?? -1,
     });
@@ -797,7 +1317,12 @@ export function buildGlobalRelationGraph(
 
   const hubs = [...nodes]
     .filter((n) => n.degree > 0)
-    .sort((a, b) => b.degree - a.degree || a.item.accessionNo.localeCompare(b.item.accessionNo))
+    .sort(
+      (a, b) =>
+        b.weightedDegree - a.weightedDegree ||
+        b.degree - a.degree ||
+        a.item.accessionNo.localeCompare(b.item.accessionNo)
+    )
     .slice(0, 5);
 
   const isolatedNodes = nodes.filter((n) => n.isIsolated);
@@ -811,5 +1336,7 @@ export function buildGlobalRelationGraph(
     isolatedNodes,
     explicitEdgeCount: filteredEdges.filter((e) => e.kind === 'explicit').length,
     tagEdgeCount: filteredEdges.filter((e) => e.kind === 'tag').length,
+    maxStrengthScore,
+    maxWeightedDegree: Number(maxWeightedDegree.toFixed(2)),
   };
 }

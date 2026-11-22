@@ -4,7 +4,9 @@ import type { ArchiveItem } from '../types/archive';
 import {
   buildGlobalRelationGraph,
   describeRelationBetween,
+  getEdgeVisualStyle,
   getFocusedNodeConnections,
+  getNodeVisualStyle,
 } from './globalGraph';
 
 function makeItem(partial: Partial<ArchiveItem> & { id: string; title: string }): ArchiveItem {
@@ -217,4 +219,158 @@ test('describeRelationBetween handles voice actor phrasing and null focus gracef
   const graph = buildGlobalRelationGraph([film, noFace]);
   assert.equal(getFocusedNodeConnections(graph, null, [film, noFace]), null);
   assert.equal(getFocusedNodeConnections(graph, 'nonexistent', [film, noFace]), null);
+});
+
+test('buildGlobalRelationGraph computes distinct edge strength tiers and node intensity tiers', () => {
+  const items: ArchiveItem[] = [
+    // Strong triangle cluster: f1 <-> p1 shares 2 mutual neighbors (p2, c1) -> strength 3
+    makeItem({
+      id: 'f1',
+      accessionNo: 'CA-001',
+      category: 'film',
+      title: '花样年华',
+      relatedIds: ['p1', 'p2', 'c1'],
+      tags: ['港片美学', '王家卫宇宙'],
+    }),
+    makeItem({
+      id: 'p1',
+      accessionNo: 'CA-002',
+      category: 'person',
+      title: '梁朝伟',
+      relatedIds: ['f1', 'p2', 'c1'],
+      tags: ['港片美学'],
+    }),
+    makeItem({
+      id: 'p2',
+      accessionNo: 'CA-003',
+      category: 'person',
+      title: '王家卫',
+      relatedIds: ['f1', 'p1', 'f2'],
+      tags: ['王家卫宇宙'],
+    }),
+    makeItem({
+      id: 'c1',
+      accessionNo: 'CA-004',
+      category: 'character',
+      title: '周慕云',
+      relatedIds: ['f1', 'p1'],
+      tags: ['克制深情'],
+    }),
+    // 2-hop from f1 via p2, simple 1-to-1 explicit tie (0 mutual, 0 shared tags) -> strength 1
+    makeItem({
+      id: 'f2',
+      accessionNo: 'CA-005',
+      category: 'film',
+      title: '重庆森林',
+      relatedIds: ['p2'],
+      tags: ['都市孤独'],
+    }),
+    // Tag-only multi-tag node sharing 2 thematic tags with f1
+    makeItem({
+      id: 'f3',
+      accessionNo: 'CA-006',
+      category: 'film',
+      title: '阿飞正传',
+      relatedIds: [],
+      tags: ['港片美学', '王家卫宇宙'],
+    }),
+    // Purely isolated node
+    makeItem({
+      id: 'f4',
+      accessionNo: 'CA-007',
+      category: 'film',
+      title: '孤立条目',
+      relatedIds: [],
+      tags: ['默片'],
+    }),
+  ];
+
+  const graph = buildGlobalRelationGraph(items, { includeTagEdges: true });
+
+  const strongEdge = graph.edges.find(
+    (e) =>
+      e.kind === 'explicit' &&
+      ((e.sourceId === 'f1' && e.targetId === 'p1') ||
+        (e.sourceId === 'p1' && e.targetId === 'f1'))
+  );
+  const mediumEdge = graph.edges.find(
+    (e) =>
+      e.kind === 'explicit' &&
+      ((e.sourceId === 'f1' && e.targetId === 'c1') ||
+        (e.sourceId === 'c1' && e.targetId === 'f1'))
+  );
+  const lightEdge = graph.edges.find(
+    (e) =>
+      e.kind === 'explicit' &&
+      ((e.sourceId === 'p2' && e.targetId === 'f2') ||
+        (e.sourceId === 'f2' && e.targetId === 'p2'))
+  );
+  const multiTagEdge = graph.edges.find(
+    (e) =>
+      e.kind === 'tag' &&
+      ((e.sourceId === 'f1' && e.targetId === 'f3') ||
+        (e.sourceId === 'f3' && e.targetId === 'f1'))
+  );
+
+  assert.ok(strongEdge && mediumEdge && lightEdge && multiTagEdge);
+  assert.equal(strongEdge.strength, 3);
+  assert.equal(strongEdge.mutualCount, 2);
+  assert.equal(mediumEdge.strength, 2);
+  assert.equal(mediumEdge.mutualCount, 1);
+  assert.equal(lightEdge.strength, 1);
+  assert.equal(lightEdge.mutualCount, 0);
+  assert.equal(multiTagEdge.strength, 2);
+  assert.equal(multiTagEdge.sharedTagCount, 2);
+
+  // Node intensity tiers differentiate core hub vs peripheral vs isolated
+  const hubNode = graph.nodes.find((n) => n.id === 'f1')!;
+  const peripheralNode = graph.nodes.find((n) => n.id === 'f2')!;
+  const isolatedNode = graph.nodes.find((n) => n.id === 'f4')!;
+  assert.equal(hubNode.intensityTier, 3);
+  assert.equal(peripheralNode.intensityTier, 1);
+  assert.equal(isolatedNode.intensityTier, 0);
+  assert.equal(isolatedNode.intensity, 0);
+  assert.ok(hubNode.weightedDegree > peripheralNode.weightedDegree);
+
+  // Focus context discovers 2-hop neighbor (f2 via p2) and orders strongest direct relation first
+  const ctx = getFocusedNodeConnections(graph, 'f1', items)!;
+  assert.equal(ctx.directRelations[0]?.node.id, 'p1');
+  assert.equal(ctx.directRelations[0]?.strength, 3);
+  assert.ok(ctx.secondHopNeighborIds.has('f2'));
+  assert.equal(ctx.depthByNodeId.get('f1'), 0);
+  assert.equal(ctx.depthByNodeId.get('p2'), 1);
+  assert.equal(ctx.depthByNodeId.get('f2'), 2);
+  assert.ok(ctx.secondHopEdgeIds.has(lightEdge.id));
+});
+
+test('getEdgeVisualStyle and getNodeVisualStyle scale thickness and color depth monotonically', () => {
+  const s3 = getEdgeVisualStyle({ kind: 'explicit', strength: 3, strengthWeight: 1 }, 'idle');
+  const s2 = getEdgeVisualStyle({ kind: 'explicit', strength: 2, strengthWeight: 0.6 }, 'idle');
+  const s1 = getEdgeVisualStyle({ kind: 'explicit', strength: 1, strengthWeight: 0.3 }, 'idle');
+  const tag1 = getEdgeVisualStyle({ kind: 'tag', strength: 1, strengthWeight: 0.15 }, 'idle');
+
+  assert.ok(s3.strokeWidth > s2.strokeWidth);
+  assert.ok(s2.strokeWidth > s1.strokeWidth);
+  assert.ok(s1.strokeWidth > tag1.strokeWidth);
+  assert.ok(s3.strokeOpacity > s2.strokeOpacity);
+  assert.ok(s2.strokeOpacity > s1.strokeOpacity);
+  assert.ok(s3.haloWidth > 0);
+
+  const h3 = getEdgeVisualStyle({ kind: 'explicit', strength: 3, strengthWeight: 1 }, 'highlighted');
+  const h1 = getEdgeVisualStyle({ kind: 'explicit', strength: 1, strengthWeight: 0.3 }, 'highlighted');
+  assert.ok(h3.strokeWidth > h1.strokeWidth);
+  assert.ok(h3.haloWidth > h1.haloWidth);
+
+  for (const cat of ['film', 'person', 'character'] as const) {
+    const t0 = getNodeVisualStyle(cat, 0, 'idle');
+    const t1 = getNodeVisualStyle(cat, 1, 'idle');
+    const t2 = getNodeVisualStyle(cat, 2, 'idle');
+    const t3 = getNodeVisualStyle(cat, 3, 'idle');
+    // Every intensity tier has a distinct fill color depth
+    const fills = new Set([t0.fill, t1.fill, t2.fill, t3.fill]);
+    assert.equal(fills.size, 4);
+    assert.ok(t3.strokeWidth > t1.strokeWidth);
+    assert.ok(t3.auraOpacity > 0);
+    assert.equal(t0.auraOpacity, 0);
+  }
 });

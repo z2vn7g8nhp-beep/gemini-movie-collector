@@ -1,8 +1,13 @@
 import { useId, useMemo } from 'react';
 import { ArrowUpRight, Network } from 'lucide-react';
-import type { ArchiveCategory, ArchiveItem } from '../types/archive';
+import type { ArchiveItem } from '../types/archive';
 import { CATEGORY_LABELS } from '../utils/archive';
-import { buildRelationGraph, type GraphNode } from '../utils/relationGraph';
+import {
+  buildRelationGraph,
+  getDetailEdgeVisualStyle,
+  getDetailNodeVisualStyle,
+  type GraphNode,
+} from '../utils/relationGraph';
 
 interface DetailRelationGraphProps {
   item: ArchiveItem;
@@ -10,12 +15,6 @@ interface DetailRelationGraphProps {
   onSelectItem: (item: ArchiveItem) => void;
   onOpenGlobalMap?: () => void;
 }
-
-const CATEGORY_RING_COLOR: Record<ArchiveCategory, string> = {
-  film: '#D85745',
-  person: '#E4C37A',
-  character: '#88B89C',
-};
 
 function shortNodeLabel(title: string, maxLen = 7): string {
   const clean = title.replace(/／.*$/, '').trim();
@@ -27,6 +26,12 @@ function shortNodeLabel(title: string, maxLen = 7): string {
 function nodeMonogram(title: string): string {
   const clean = title.trim();
   return Array.from(clean)[0] || '影';
+}
+
+function getDetailNodeRadius(node: GraphNode): number {
+  if (node.hop === 0) return 23;
+  if (node.hop === 1) return node.strength === 3 ? 19 : 17;
+  return node.strength >= 2 ? 15.5 : 14;
 }
 
 export function DetailRelationGraph({
@@ -117,7 +122,7 @@ export function DetailRelationGraph({
             </radialGradient>
 
             {graph.nodes.map((node) => {
-              const r = node.hop === 0 ? 23 : node.hop === 1 ? 18 : 15;
+              const r = getDetailNodeRadius(node);
               return (
                 <clipPath
                   key={`clip-${node.item.id}`}
@@ -160,37 +165,14 @@ export function DetailRelationGraph({
             />
           )}
 
-          {/* Network Edges Encoded by Relation Strength */}
+          {/* Network Edges Encoded by Relation Strength & Depth */}
           <g>
             {graph.edges.map((edge) => {
               const src = nodeById.get(edge.sourceId);
               const dst = nodeById.get(edge.targetId);
               if (!src || !dst) return null;
 
-              const strokeColor =
-                edge.kind === 'direct'
-                  ? edge.strength === 3
-                    ? '#D85745'
-                    : '#D4AF6A'
-                  : edge.kind === 'bridge'
-                    ? '#C9A45C'
-                    : '#9E9587';
-
-              const strokeWidth =
-                edge.kind === 'direct'
-                  ? edge.strength === 3
-                    ? 2.4
-                    : 1.8
-                  : edge.kind === 'bridge'
-                    ? 1.5
-                    : 1.25;
-
-              const dashArray =
-                edge.kind === 'direct'
-                  ? undefined
-                  : edge.kind === 'bridge'
-                    ? '4 3'
-                    : '2 3';
+              const style = getDetailEdgeVisualStyle(edge);
 
               // Route bridge arcs cleanly away from the center node to prevent visual overlap
               const mx = (src.x + dst.x) / 2;
@@ -208,31 +190,47 @@ export function DetailRelationGraph({
                   )
                 : my;
 
+              const pathD = isBridgeArc
+                ? `M ${src.x} ${src.y} Q ${mx} ${ctrlY} ${dst.x} ${dst.y}`
+                : `M ${src.x} ${src.y} L ${dst.x} ${dst.y}`;
+
               return (
-                <path
+                <g
                   key={edge.id}
-                  d={
-                    isBridgeArc
-                      ? `M ${src.x} ${src.y} Q ${mx} ${ctrlY} ${dst.x} ${dst.y}`
-                      : `M ${src.x} ${src.y} L ${dst.x} ${dst.y}`
-                  }
-                  fill="none"
-                  stroke={strokeColor}
-                  strokeWidth={strokeWidth}
-                  strokeDasharray={dashArray}
-                  strokeOpacity={edge.kind === 'direct' ? 0.92 : 0.74}
-                  strokeLinecap="round"
-                />
+                  data-detail-edge-kind={edge.kind}
+                  data-detail-edge-strength={edge.strength}
+                  data-detail-edge-width={style.strokeWidth}
+                >
+                  {style.haloWidth > 0 && style.haloOpacity > 0 && (
+                    <path
+                      d={pathD}
+                      fill="none"
+                      stroke={style.stroke}
+                      strokeWidth={style.haloWidth}
+                      strokeOpacity={style.haloOpacity}
+                      strokeLinecap="round"
+                    />
+                  )}
+                  <path
+                    d={pathD}
+                    fill="none"
+                    stroke={style.stroke}
+                    strokeWidth={style.strokeWidth}
+                    strokeDasharray={style.dashArray}
+                    strokeOpacity={style.strokeOpacity}
+                    strokeLinecap="round"
+                  />
+                </g>
               );
             })}
           </g>
 
-          {/* Network Nodes */}
+          {/* Network Nodes (color depth & ring weight scaled by hop depth and strength) */}
           <g>
             {graph.nodes.map((node) => {
               const isCenter = node.hop === 0;
-              const r = isCenter ? 23 : node.hop === 1 ? 18 : 15;
-              const ringColor = CATEGORY_RING_COLOR[node.item.category];
+              const r = getDetailNodeRadius(node);
+              const nodeStyle = getDetailNodeVisualStyle(node);
               const label = shortNodeLabel(
                 node.item.title,
                 isCenter ? 9 : 8
@@ -242,6 +240,8 @@ export function DetailRelationGraph({
                 <g
                   key={node.item.id}
                   data-testid={`graph-node-${node.item.id}`}
+                  data-node-tier={isCenter ? 3 : node.intensityTier}
+                  data-node-strength={node.strength}
                   role={isCenter ? undefined : 'button'}
                   tabIndex={isCenter ? undefined : 0}
                   aria-label={
@@ -269,28 +269,38 @@ export function DetailRelationGraph({
                     />
                   )}
 
-                  {/* Center Focal Halo */}
-                  {isCenter && (
+                  {/* Center Focal Halo or Strong 1-Hop Aura */}
+                  {isCenter ? (
                     <circle
                       cx={node.x}
                       cy={node.y}
                       r={r + 5.5}
                       fill="none"
                       stroke="#E4C37A"
-                      strokeOpacity="0.4"
-                      strokeWidth="1.2"
+                      strokeOpacity="0.46"
+                      strokeWidth="1.3"
                       strokeDasharray="2.5 2.5"
                     />
-                  )}
+                  ) : nodeStyle.auraOpacity > 0 ? (
+                    <circle
+                      cx={node.x}
+                      cy={node.y}
+                      r={r + 4}
+                      fill="none"
+                      stroke={nodeStyle.auraColor}
+                      strokeOpacity={nodeStyle.auraOpacity}
+                      strokeWidth="1.2"
+                    />
+                  ) : null}
 
                   {/* Node Base Circle */}
                   <circle
                     cx={node.x}
                     cy={node.y}
                     r={r}
-                    fill="#26221D"
-                    stroke={ringColor}
-                    strokeWidth={isCenter ? 2.4 : node.hop === 1 ? 2 : 1.5}
+                    fill={nodeStyle.baseFill}
+                    stroke={nodeStyle.ringColor}
+                    strokeWidth={nodeStyle.ringWidth}
                   />
 
                   {/* Clipped Cover Image or Editorial Monogram */}
@@ -301,6 +311,7 @@ export function DetailRelationGraph({
                       y={node.y - r}
                       width={r * 2}
                       height={r * 2}
+                      opacity={nodeStyle.imageOpacity}
                       preserveAspectRatio="xMidYMid slice"
                       clipPath={`url(#node-clip-${uid}-${node.item.id})`}
                     />
@@ -309,7 +320,7 @@ export function DetailRelationGraph({
                       x={node.x}
                       y={node.y + 4.5}
                       textAnchor="middle"
-                      fill="#FAF7F0"
+                      fill={nodeStyle.labelColor}
                       fontSize={isCenter ? 13 : 11}
                       fontFamily="Songti SC, Noto Serif SC, Georgia, serif"
                     >
@@ -323,8 +334,8 @@ export function DetailRelationGraph({
                     cy={node.y}
                     r={r}
                     fill="none"
-                    stroke={ringColor}
-                    strokeWidth={isCenter ? 2.4 : node.hop === 1 ? 2 : 1.6}
+                    stroke={nodeStyle.ringColor}
+                    strokeWidth={nodeStyle.ringWidth}
                   />
 
                   {/* Crisp Label Under Node */}
@@ -332,9 +343,9 @@ export function DetailRelationGraph({
                     x={node.x}
                     y={node.y + r + 14}
                     textAnchor="middle"
-                    fill={isCenter ? '#FAF7F0' : '#E5DEC9'}
-                    fontSize={isCenter ? 10.5 : 9.8}
-                    fontWeight={isCenter ? 600 : 500}
+                    fill={nodeStyle.labelColor}
+                    fontSize={isCenter ? 10.5 : node.strength === 3 ? 10 : 9.5}
+                    fontWeight={isCenter || node.strength === 3 ? 600 : 500}
                     stroke="#161411"
                     strokeWidth="3.2"
                     paintOrder="stroke"
@@ -348,15 +359,19 @@ export function DetailRelationGraph({
           </g>
         </svg>
 
-        {/* Quiet Inline Legend */}
-        <div className="mt-1 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 px-2 pb-1 text-[11px] text-[#A59D90] md:text-[10px]">
+        {/* Quiet Inline Legend (strength thickness + depth tiers) */}
+        <div className="mt-1 flex flex-wrap items-center justify-center gap-x-3.5 gap-y-1 px-2 pb-1 text-[11px] text-[#A59D90] md:text-[10px]">
           <span className="inline-flex items-center gap-1.5">
-            <span className="inline-block h-[2px] w-3.5 bg-[#D85745]" aria-hidden="true" />
-            <span>直接关联</span>
+            <span className="inline-block h-[3px] w-4 rounded-full bg-[#E8634E]" aria-hidden="true" />
+            <span>强直连</span>
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-block h-[1.8px] w-3.5 rounded-full bg-[#D4AF6A]" aria-hidden="true" />
+            <span>直连</span>
           </span>
           <span className="inline-flex items-center gap-1.5">
             <span
-              className="inline-block h-0 w-3.5 border-t border-dashed border-[#C9A45C]"
+              className="inline-block h-0 w-3.5 border-t border-dashed border-[#CFA95E]"
               aria-hidden="true"
             />
             <span>二度延伸</span>
@@ -375,36 +390,41 @@ export function DetailRelationGraph({
       {neighborNodes.length > 0 ? (
         <div className="border-t border-white/10 px-3.5 py-3">
           <div className="h-scroll-rail no-scrollbar flex gap-2 pb-0.5">
-            {neighborNodes.map((node) => (
-              <button
-                key={`jump-${node.item.id}`}
-                type="button"
-                data-testid={`graph-jump-${node.item.id}`}
-                onClick={() => onSelectItem(node.item)}
-                className="inline-flex min-h-[44px] shrink-0 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.05] px-3 py-1.5 text-left transition-colors hover:border-[#C9A45C]/60 hover:bg-white/[0.1] active:scale-[0.98] cursor-pointer md:min-h-[40px]"
-              >
-                <div className="min-w-0">
-                  <p className="max-w-[146px] truncate text-[13px] font-medium text-[#FAF7F0] md:text-xs">
-                    {node.item.title}
-                  </p>
-                  <p className="text-[11px] text-[#A59D90] whitespace-nowrap md:text-[10px]">
-                    <span
-                      style={{
-                        color: CATEGORY_RING_COLOR[node.item.category],
-                      }}
-                    >
-                      {CATEGORY_LABELS[node.item.category]}
-                    </span>
-                    <span aria-hidden="true"> · </span>
-                    <span>{node.strengthLabel}</span>
-                  </p>
-                </div>
-                <ArrowUpRight
-                  className="h-3.5 w-3.5 shrink-0 text-[#D4AF6A]"
-                  aria-hidden="true"
-                />
-              </button>
-            ))}
+            {neighborNodes.map((node) => {
+              const nodeStyle = getDetailNodeVisualStyle(node);
+              return (
+                <button
+                  key={`jump-${node.item.id}`}
+                  type="button"
+                  data-testid={`graph-jump-${node.item.id}`}
+                  onClick={() => onSelectItem(node.item)}
+                  className={`inline-flex min-h-[44px] shrink-0 items-center gap-2 rounded-xl border px-3 py-1.5 text-left transition-colors active:scale-[0.98] cursor-pointer md:min-h-[40px] ${
+                    node.strength === 3
+                      ? 'border-[#E8634E]/35 bg-[#E8634E]/[0.07] hover:border-[#E8634E]/70 hover:bg-[#E8634E]/[0.12]'
+                      : node.strength === 2
+                        ? 'border-[#D4AF6A]/25 bg-white/[0.05] hover:border-[#D4AF6A]/60 hover:bg-white/[0.09]'
+                        : 'border-white/10 bg-white/[0.03] hover:border-white/25 hover:bg-white/[0.07]'
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <p className="max-w-[146px] truncate text-[13px] font-medium text-[#FAF7F0] md:text-xs">
+                      {node.item.title}
+                    </p>
+                    <p className="text-[11px] text-[#A59D90] whitespace-nowrap md:text-[10px]">
+                      <span style={{ color: nodeStyle.ringColor }}>
+                        {CATEGORY_LABELS[node.item.category]}
+                      </span>
+                      <span aria-hidden="true"> · </span>
+                      <span>{node.strengthLabel}</span>
+                    </p>
+                  </div>
+                  <ArrowUpRight
+                    className="h-3.5 w-3.5 shrink-0 text-[#D4AF6A]"
+                    aria-hidden="true"
+                  />
+                </button>
+              );
+            })}
           </div>
         </div>
       ) : (

@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { ArchiveItem } from '../types/archive';
-import { buildRelationGraph } from './relationGraph';
+import {
+  buildRelationGraph,
+  getDetailEdgeVisualStyle,
+  getDetailNodeVisualStyle,
+} from './relationGraph';
 
 function makeItem(overrides: Partial<ArchiveItem>): ArchiveItem {
   return {
@@ -128,4 +132,62 @@ test('buildRelationGraph handles solo items and keeps all node coordinates withi
     assert.ok(node.x >= 30 && node.x <= bigGraph.width - 30);
     assert.ok(node.y >= 24 && node.y <= bigGraph.height - 34);
   }
+});
+
+test('buildRelationGraph elevates multi-bridge 2-hop nodes and scales visual styles by strength', () => {
+  const center = makeItem({
+    id: 'center',
+    category: 'film',
+    title: '花样年华',
+    relatedIds: ['b1', 'b2'],
+  });
+  const b1 = makeItem({
+    id: 'b1',
+    category: 'person',
+    title: '王家卫',
+    relatedIds: ['center', 'deep'],
+  });
+  const b2 = makeItem({
+    id: 'b2',
+    category: 'person',
+    title: '梁朝伟',
+    relatedIds: ['center', 'deep'],
+  });
+  const deep = makeItem({
+    id: 'deep',
+    category: 'film',
+    title: '春光乍泄',
+    relatedIds: ['b1', 'b2'],
+  });
+
+  const graph = buildRelationGraph(center, [center, b1, b2, deep]);
+  const deepNode = graph.nodes.find((n) => n.item.id === 'deep');
+  assert.ok(deepNode);
+  assert.equal(deepNode.hop, 2);
+  assert.equal(deepNode.bridgeCount, 2);
+  assert.equal(deepNode.strength, 2);
+  assert.equal(deepNode.intensityTier, 2);
+
+  const eStrong = getDetailEdgeVisualStyle({ kind: 'direct', strength: 3, strengthWeight: 0.9 });
+  const eDirect = getDetailEdgeVisualStyle({ kind: 'direct', strength: 2, strengthWeight: 0.6 });
+  const eBridge = getDetailEdgeVisualStyle({ kind: 'bridge', strength: 1, strengthWeight: 0.3 });
+  assert.ok(eStrong.strokeWidth > eDirect.strokeWidth);
+  assert.ok(eDirect.strokeWidth > eBridge.strokeWidth);
+  assert.ok(eStrong.haloWidth > 0);
+
+  const nStrong = getDetailNodeVisualStyle({
+    item: b1,
+    hop: 1,
+    strength: 3,
+    intensityTier: 3,
+  });
+  const nWeak = getDetailNodeVisualStyle({
+    item: b1,
+    hop: 2,
+    strength: 1,
+    intensityTier: 1,
+  });
+  assert.notEqual(nStrong.ringColor, nWeak.ringColor);
+  assert.ok(nStrong.ringWidth > nWeak.ringWidth);
+  assert.ok(nStrong.imageOpacity > nWeak.imageOpacity);
 });

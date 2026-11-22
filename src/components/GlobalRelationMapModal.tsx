@@ -13,9 +13,13 @@ import type { ArchiveCategory, ArchiveItem } from '../types/archive';
 import { CATEGORY_LABELS } from '../utils/archive';
 import {
   buildGlobalRelationGraph,
+  getEdgeVisualStyle,
   getFocusedNodeConnections,
+  getNodeVisualStyle,
   type GlobalGraphEdge,
   type GlobalGraphNode,
+  type GraphNodeFocusState,
+  type NodeIntensityTier,
 } from '../utils/globalGraph';
 import { ArchivalImage } from './ArchivalImage';
 
@@ -26,10 +30,10 @@ interface GlobalRelationMapModalProps {
   onSelectItem: (item: ArchiveItem) => void;
 }
 
-const NODE_COLORS: Record<ArchiveCategory, { fill: string; stroke: string; dot: string }> = {
-  film: { fill: '#B43B2B', stroke: '#F5C4BC', dot: '#D85745' },
-  person: { fill: '#C9A45C', stroke: '#F7E7C0', dot: '#E4C37A' },
-  character: { fill: '#4E7A6A', stroke: '#C3E0D5', dot: '#7AB59E' },
+const CATEGORY_DOT_COLOR: Record<ArchiveCategory, string> = {
+  film: '#D85745',
+  person: '#E4C37A',
+  character: '#7AB59E',
 };
 
 const CAT_FILTERS: Array<{ id: 'all' | ArchiveCategory; label: string }> = [
@@ -98,9 +102,10 @@ export function GlobalRelationMapModal({
 
   const focusedNode = focusContext?.focusedNode ?? null;
 
-  // Partition edges so highlighted edges always render above dimmed ones
-  const { dimmedEdges, highlightedEdges } = useMemo(() => {
+  // Partition edges by depth & sort by strength ascending so stronger/thicker lines render on top
+  const { dimmedEdges, secondHopEdges, highlightedEdges } = useMemo(() => {
     const dimmed: GlobalGraphEdge[] = [];
+    const secondHop: GlobalGraphEdge[] = [];
     const highlighted: GlobalGraphEdge[] = [];
     for (const edge of graph.edges) {
       const isIncident =
@@ -108,19 +113,39 @@ export function GlobalRelationMapModal({
         (edge.sourceId === focusedId || edge.targetId === focusedId);
       if (isIncident) {
         highlighted.push(edge);
+      } else if (focusContext?.secondHopEdgeIds.has(edge.id)) {
+        secondHop.push(edge);
       } else {
         dimmed.push(edge);
       }
     }
-    return { dimmedEdges: dimmed, highlightedEdges: highlighted };
-  }, [graph.edges, focusedId]);
+    const byStrengthAsc = (a: GlobalGraphEdge, b: GlobalGraphEdge) =>
+      a.strength - b.strength || a.strengthScore - b.strengthScore;
+    dimmed.sort(byStrengthAsc);
+    secondHop.sort(byStrengthAsc);
+    highlighted.sort(byStrengthAsc);
+    return {
+      dimmedEdges: dimmed,
+      secondHopEdges: secondHop,
+      highlightedEdges: highlighted,
+    };
+  }, [graph.edges, focusedId, focusContext]);
 
-  // Sort nodes so dimmed render first, then tag neighbors, then direct neighbors, then focused node on top
+  // Sort nodes so lower-intensity/dimmed render first and hubs/focused nodes always sit cleanly on top
   const orderedNodes = useMemo(() => {
-    if (!focusContext) return graph.nodes;
+    if (!focusContext) {
+      return [...graph.nodes].sort(
+        (a, b) =>
+          a.intensityTier - b.intensityTier ||
+          a.weightedDegree - b.weightedDegree
+      );
+    }
     const rank = (node: GlobalGraphNode): number => {
-      if (node.id === focusContext.focusedNode.id) return 3;
-      if (focusContext.directNeighborIds.has(node.id)) return 2;
+      if (node.id === focusContext.focusedNode.id) return 5;
+      if (focusContext.directNeighborIds.has(node.id)) {
+        return 3 + (focusContext.directStrengthByNodeId.get(node.id) ?? 1) * 0.2;
+      }
+      if (focusContext.secondHopNeighborIds.has(node.id)) return 2;
       if (focusContext.tagNeighborIds.has(node.id)) return 1;
       return 0;
     };
@@ -348,34 +373,72 @@ export function GlobalRelationMapModal({
                   strokeDasharray="3 8"
                 />
 
-                {/* Background / Non-highlighted Edges */}
+                {/* Background / Panoramic Edges (thickness & luminance scaled by strength) */}
                 {dimmedEdges.map((edge) => {
                   const s = nodeById.get(edge.sourceId);
                   const t = nodeById.get(edge.targetId);
                   if (!s || !t) return null;
-                  const idle = !focusedId;
+                  const visualState = focusedId ? 'dimmed' : 'idle';
+                  const style = getEdgeVisualStyle(edge, visualState);
+                  return (
+                    <g
+                      key={edge.id}
+                      data-edge-id={edge.id}
+                      data-edge-highlighted="false"
+                      data-edge-kind={edge.kind}
+                      data-edge-strength={edge.strength}
+                      data-edge-width={style.strokeWidth}
+                    >
+                      {style.haloWidth > 0 && style.haloOpacity > 0 && (
+                        <line
+                          x1={s.x}
+                          y1={s.y}
+                          x2={t.x}
+                          y2={t.y}
+                          stroke={style.haloColor}
+                          strokeWidth={style.haloWidth}
+                          strokeOpacity={style.haloOpacity}
+                          strokeLinecap="round"
+                        />
+                      )}
+                      <line
+                        x1={s.x}
+                        y1={s.y}
+                        x2={t.x}
+                        y2={t.y}
+                        stroke={style.stroke}
+                        strokeWidth={style.strokeWidth}
+                        strokeOpacity={style.strokeOpacity}
+                        strokeDasharray={style.strokeDasharray}
+                        strokeLinecap="round"
+                      />
+                    </g>
+                  );
+                })}
+
+                {/* Second-Hop Depth Bridge Edges (softly illuminated depth=2 layer) */}
+                {secondHopEdges.map((edge) => {
+                  const s = nodeById.get(edge.sourceId);
+                  const t = nodeById.get(edge.targetId);
+                  if (!s || !t) return null;
+                  const style = getEdgeVisualStyle(edge, 'second-hop');
                   return (
                     <line
                       key={edge.id}
                       data-edge-id={edge.id}
-                      data-edge-highlighted="false"
+                      data-edge-highlighted="second-hop"
+                      data-edge-kind={edge.kind}
+                      data-edge-strength={edge.strength}
+                      data-edge-width={style.strokeWidth}
                       x1={s.x}
                       y1={s.y}
                       x2={t.x}
                       y2={t.y}
-                      stroke={
-                        edge.kind === 'explicit'
-                          ? idle
-                            ? 'rgba(212, 175, 106, 0.72)'
-                            : 'rgba(212, 175, 106, 0.14)'
-                          : idle
-                            ? 'rgba(207, 199, 185, 0.32)'
-                            : 'rgba(207, 199, 185, 0.08)'
-                      }
-                      strokeWidth={
-                        edge.kind === 'explicit' ? (idle ? 1.8 : 1) : 1
-                      }
-                      strokeDasharray={edge.kind === 'tag' ? '4 4' : undefined}
+                      stroke={style.stroke}
+                      strokeWidth={style.strokeWidth}
+                      strokeOpacity={style.strokeOpacity}
+                      strokeDasharray={style.strokeDasharray}
+                      strokeLinecap="round"
                     />
                   );
                 })}
@@ -385,23 +448,25 @@ export function GlobalRelationMapModal({
                   const s = nodeById.get(edge.sourceId);
                   const t = nodeById.get(edge.targetId);
                   if (!s || !t) return null;
-                  const isDirect = edge.kind === 'explicit';
+                  const style = getEdgeVisualStyle(edge, 'highlighted');
                   return (
                     <g
                       key={edge.id}
                       data-edge-id={edge.id}
                       data-edge-highlighted="true"
                       data-edge-kind={edge.kind}
+                      data-edge-strength={edge.strength}
+                      data-edge-width={style.strokeWidth}
                     >
-                      {isDirect && (
+                      {style.haloWidth > 0 && style.haloOpacity > 0 && (
                         <line
                           x1={s.x}
                           y1={s.y}
                           x2={t.x}
                           y2={t.y}
-                          stroke="#D4AF6A"
-                          strokeWidth={6}
-                          strokeOpacity={0.18}
+                          stroke={style.haloColor}
+                          strokeWidth={style.haloWidth}
+                          strokeOpacity={style.haloOpacity}
                           strokeLinecap="round"
                         />
                       )}
@@ -410,24 +475,23 @@ export function GlobalRelationMapModal({
                         y1={s.y}
                         x2={t.x}
                         y2={t.y}
-                        stroke={
-                          isDirect ? '#E8C97E' : 'rgba(207, 199, 185, 0.56)'
-                        }
-                        strokeWidth={isDirect ? 2.5 : 1.3}
-                        strokeDasharray={isDirect ? undefined : '4 4'}
+                        stroke={style.stroke}
+                        strokeWidth={style.strokeWidth}
+                        strokeOpacity={style.strokeOpacity}
+                        strokeDasharray={style.strokeDasharray}
                         strokeLinecap="round"
                       />
                     </g>
                   );
                 })}
 
-                {/* Concise Edge Relation Pills for Focused Node's Direct Connections */}
+                {/* Concise Edge Relation Labels for Focused Node's Direct Connections */}
                 {focusedNode &&
                   visibleDirectEdgeLabels.map((rel) => {
                     const dx = rel.node.x - focusedNode.x;
                     const dy = rel.node.y - focusedNode.y;
                     const dist = Math.hypot(dx, dy) || 1;
-                    // Place pill in the open visual segment between the two node circles,
+                    // Place label in the open visual segment between the two node circles,
                     // nudged away from whichever node sits higher so it never touches its bottom label
                     const startPad =
                       focusedNode.radius + (dy > 24 ? 22 : 10);
@@ -443,6 +507,7 @@ export function GlobalRelationMapModal({
                     const my = focusedNode.y + dy * tRatio;
                     const labelChars = Array.from(rel.shortLabel).length;
                     const pillW = Math.max(32, labelChars * 11 + 14);
+                    const isStrong = rel.strength === 3;
                     return (
                       <g
                         key={`pill-${rel.edgeId}`}
@@ -455,19 +520,21 @@ export function GlobalRelationMapModal({
                           width={pillW}
                           height={19}
                           rx={9.5}
-                          fill="#181511"
-                          fillOpacity={0.94}
-                          stroke="#D4AF6A"
-                          strokeOpacity={0.72}
-                          strokeWidth={1}
+                          fill={isStrong ? '#211B13' : '#181511'}
+                          fillOpacity={0.95}
+                          stroke={isStrong ? '#F2CF7E' : '#D4AF6A'}
+                          strokeOpacity={
+                            isStrong ? 0.92 : rel.strength === 2 ? 0.68 : 0.45
+                          }
+                          strokeWidth={isStrong ? 1.3 : 1}
                         />
                         <text
                           x={mx}
                           y={my + 3.5}
                           textAnchor="middle"
-                          fill="#F5DC9B"
+                          fill={isStrong ? '#FCE8B2' : '#E8D29D'}
                           fontSize={10}
-                          fontWeight={500}
+                          fontWeight={isStrong ? 600 : 500}
                         >
                           {rel.shortLabel}
                         </text>
@@ -475,36 +542,90 @@ export function GlobalRelationMapModal({
                     );
                   })}
 
-                {/* Nodes (Z-ordered so focused & direct neighbors always sit cleanly on top) */}
+                {/* Nodes (Z-ordered & color-depth graded by frequency and relation depth) */}
                 {orderedNodes.map((node) => {
-                  const colors = NODE_COLORS[node.item.category];
                   const isFocused = focusedId === node.id;
                   const isDirectNeighbor =
                     focusContext?.directNeighborIds.has(node.id) ?? false;
+                  const isSecondHopNeighbor =
+                    focusContext?.secondHopNeighborIds.has(node.id) ?? false;
                   const isTagNeighbor =
                     focusContext?.tagNeighborIds.has(node.id) ?? false;
                   const dimmed = Boolean(
-                    focusedId && !isFocused && !isDirectNeighbor && !isTagNeighbor
+                    focusedId &&
+                      !isFocused &&
+                      !isDirectNeighbor &&
+                      !isSecondHopNeighbor &&
+                      !isTagNeighbor
                   );
-                  const nodeState = !focusedId
+                  const nodeState: GraphNodeFocusState = !focusedId
                     ? 'idle'
                     : isFocused
                       ? 'focused'
                       : isDirectNeighbor
                         ? 'direct-neighbor'
-                        : isTagNeighbor
-                          ? 'tag-neighbor'
-                          : 'dimmed';
+                        : isSecondHopNeighbor
+                          ? 'second-hop'
+                          : isTagNeighbor
+                            ? 'tag-neighbor'
+                            : 'dimmed';
+
+                  const directStrength =
+                    focusContext?.directStrengthByNodeId.get(node.id);
+                  const tagStrength =
+                    focusContext?.tagStrengthByNodeId.get(node.id);
+
+                  const visualTier: NodeIntensityTier =
+                    nodeState === 'idle' || nodeState === 'dimmed'
+                      ? node.intensityTier
+                      : nodeState === 'focused'
+                        ? node.isIsolated
+                          ? 2
+                          : 3
+                        : nodeState === 'direct-neighbor'
+                          ? (directStrength ?? 2)
+                          : nodeState === 'second-hop'
+                            ? 1
+                            : (tagStrength ?? 1);
+
+                  const nodeStyle = getNodeVisualStyle(
+                    node.item.category,
+                    visualTier,
+                    nodeState
+                  );
+
                   const shortTitle =
                     node.item.title.length > 7
                       ? `${node.item.title.slice(0, 6)}…`
                       : node.item.title;
+
+                  const groupOpacity = dimmed
+                    ? 0.16
+                    : isSecondHopNeighbor
+                      ? 0.68
+                      : isTagNeighbor
+                        ? 0.6
+                        : 1;
+
+                  const labelFill =
+                    isFocused || isDirectNeighbor
+                      ? '#FAF7F0'
+                      : isSecondHopNeighbor
+                        ? '#CFC7B9'
+                        : visualTier >= 2
+                          ? '#EAE3D6'
+                          : visualTier === 1
+                            ? '#C9C0B1'
+                            : '#9B9285';
 
                   return (
                     <g
                       key={node.id}
                       data-node-id={node.id}
                       data-node-state={nodeState}
+                      data-node-tier={visualTier}
+                      data-node-intensity={node.intensity}
+                      data-node-fill={nodeStyle.fill}
                       role="button"
                       tabIndex={0}
                       aria-pressed={isFocused}
@@ -521,7 +642,7 @@ export function GlobalRelationMapModal({
                       }}
                       className="outline-none focus:outline-none"
                       style={{
-                        opacity: dimmed ? 0.18 : isTagNeighbor ? 0.62 : 1,
+                        opacity: groupOpacity,
                         cursor: 'pointer',
                       }}
                     >
@@ -533,30 +654,63 @@ export function GlobalRelationMapModal({
                         fill="transparent"
                       />
 
+                      {/* Subtle Intensity Aura Ring for High-Frequency Hubs / Strong Ties */}
+                      {nodeStyle.auraOpacity > 0 && !isFocused && (
+                        <circle
+                          cx={node.x}
+                          cy={node.y}
+                          r={node.radius + nodeStyle.auraRadiusOffset}
+                          fill="none"
+                          stroke={nodeStyle.auraStroke}
+                          strokeWidth={1.3}
+                          strokeOpacity={nodeStyle.auraOpacity}
+                        />
+                      )}
+
                       {/* Focused Node Halo */}
                       {isFocused && (
                         <circle
                           cx={node.x}
                           cy={node.y}
                           r={node.radius + 8.5}
-                          fill="rgba(245, 220, 155, 0.09)"
+                          fill="rgba(245, 220, 155, 0.1)"
                           stroke="#F5DC9B"
                           strokeWidth={2}
-                          strokeOpacity={0.9}
+                          strokeOpacity={0.92}
                         />
                       )}
 
-                      {/* Direct Neighbor Highlight Ring */}
+                      {/* Direct Neighbor Highlight Ring (solid for strong ties, dashed for lighter ties) */}
                       {isDirectNeighbor && (
                         <circle
                           cx={node.x}
                           cy={node.y}
-                          r={node.radius + 5.5}
-                          fill="rgba(212, 175, 106, 0.11)"
-                          stroke="#E4C37A"
-                          strokeWidth={1.6}
-                          strokeDasharray="3.5 2.5"
-                          strokeOpacity={0.92}
+                          r={node.radius + (directStrength === 3 ? 6 : 5)}
+                          fill={
+                            directStrength === 3
+                              ? 'rgba(240, 204, 122, 0.14)'
+                              : 'rgba(212, 175, 106, 0.08)'
+                          }
+                          stroke={
+                            directStrength === 3 ? '#F5D688' : '#D4AF6A'
+                          }
+                          strokeWidth={
+                            directStrength === 3
+                              ? 1.9
+                              : directStrength === 2
+                                ? 1.5
+                                : 1.15
+                          }
+                          strokeDasharray={
+                            directStrength === 3 ? undefined : '3.5 2.5'
+                          }
+                          strokeOpacity={
+                            directStrength === 3
+                              ? 0.94
+                              : directStrength === 2
+                                ? 0.78
+                                : 0.58
+                          }
                         />
                       )}
 
@@ -564,25 +718,17 @@ export function GlobalRelationMapModal({
                         cx={node.x}
                         cy={node.y}
                         r={node.radius}
-                        fill={colors.fill}
-                        stroke={
-                          isFocused
-                            ? '#FFFFFF'
-                            : isDirectNeighbor
-                              ? '#FAF7F0'
-                              : colors.stroke
-                        }
-                        strokeWidth={
-                          isFocused ? 2.6 : isDirectNeighbor ? 2 : 1.4
-                        }
+                        fill={nodeStyle.fill}
+                        stroke={nodeStyle.stroke}
+                        strokeWidth={nodeStyle.strokeWidth}
                       />
                       <text
                         x={node.x}
                         y={node.y + 4}
                         textAnchor="middle"
-                        fill="#FFFFFF"
-                        fontSize={11}
-                        fontWeight={600}
+                        fill={nodeStyle.textColor}
+                        fontSize={visualTier >= 3 ? 12 : 11}
+                        fontWeight={visualTier >= 2 ? 600 : 500}
                         className="pointer-events-none select-none"
                       >
                         {node.item.title.slice(0, 1)}
@@ -591,14 +737,16 @@ export function GlobalRelationMapModal({
                         x={node.x}
                         y={node.y + node.radius + 15}
                         textAnchor="middle"
-                        fill={
-                          isFocused || isDirectNeighbor
-                            ? '#FAF7F0'
-                            : '#D2C9BA'
+                        fill={labelFill}
+                        fontSize={
+                          isFocused ? 12.5 : visualTier === 3 ? 12.2 : 11.5
                         }
-                        fontSize={isFocused ? 12.5 : 12}
                         fontWeight={
-                          isFocused ? 600 : isDirectNeighbor ? 500 : 400
+                          isFocused || visualTier === 3
+                            ? 600
+                            : isDirectNeighbor || visualTier === 2
+                              ? 500
+                              : 400
                         }
                         stroke="#141210"
                         strokeWidth={3.2}
@@ -614,26 +762,39 @@ export function GlobalRelationMapModal({
             </svg>
           )}
 
-          {/* Legend Top-Left */}
-          <div className="pointer-events-none absolute left-3 top-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl bg-[#161411]/88 px-3 py-1.5 text-[11px] text-[#CFC7B9] backdrop-blur-xs">
+          {/* Legend Top-Left: Category + Relation Strength Visual Key */}
+          <div
+            data-testid="global-graph-legend"
+            className="pointer-events-none absolute left-3 top-3 flex max-w-[calc(100%-4.5rem)] flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-white/8 bg-[#161411]/90 px-3 py-1.5 text-[11px] text-[#CFC7B9] backdrop-blur-xs"
+          >
             <span className="inline-flex items-center gap-1">
-              <span className="h-2.5 w-2.5 rounded-full bg-[#B43B2B]" />
+              <span className="h-2.5 w-2.5 rounded-full bg-[#CA3C28]" />
               影视
             </span>
             <span className="inline-flex items-center gap-1">
-              <span className="h-2.5 w-2.5 rounded-full bg-[#C9A45C]" />
+              <span className="h-2.5 w-2.5 rounded-full bg-[#DBB768]" />
               影人
             </span>
             <span className="inline-flex items-center gap-1">
-              <span className="h-2.5 w-2.5 rounded-full bg-[#4E7A6A]" />
+              <span className="h-2.5 w-2.5 rounded-full bg-[#66AD95]" />
               角色
             </span>
-            {focusedId && (
-              <span className="inline-flex items-center gap-1.5 border-l border-white/15 pl-2.5 text-[#F5DC9B]">
-                <span className="inline-block h-[2px] w-3 bg-[#E8C97E]" />
-                直接关联
+            <span
+              className="inline-flex items-center gap-1.5 border-l border-white/15 pl-2.5 text-[#BDB5A8]"
+              aria-label="线宽与色深表示关联强度，由浅弱至深强"
+            >
+              <span>强度</span>
+              <span className="inline-flex items-center gap-1" aria-hidden="true">
+                <span className="inline-block h-[1.2px] w-2.5 rounded-full bg-[#AE9568]/70" />
+                <span className="inline-block h-[2.2px] w-3 rounded-full bg-[#D4AF6A]" />
+                <span className="inline-block h-[3.5px] w-3.5 rounded-full bg-[#F5D688]" />
               </span>
-            )}
+              <span className="inline-flex items-center gap-0.5" aria-hidden="true">
+                <span className="h-2 w-2 rounded-full bg-[#473D28]" />
+                <span className="h-2 w-2 rounded-full bg-[#A88642]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[#DBB768]" />
+              </span>
+            </span>
           </div>
 
           {/* Mobile Touch Zoom Controls Top-Right */}
@@ -683,12 +844,12 @@ export function GlobalRelationMapModal({
                   className="h-12 w-9 shrink-0 rounded-lg"
                 />
                 <div className="min-w-0">
-                  <div className="flex items-center gap-1.5 font-mono text-[11px] text-[#D4AF6A] tabular-nums">
+                  <div className="flex flex-wrap items-center gap-1.5 font-mono text-[11px] text-[#D4AF6A] tabular-nums">
                     <span
                       className="h-2 w-2 shrink-0 rounded-full"
                       style={{
                         backgroundColor:
-                          NODE_COLORS[focusedNode.item.category].dot,
+                          CATEGORY_DOT_COLOR[focusedNode.item.category],
                       }}
                     />
                     <span>{CATEGORY_LABELS[focusedNode.item.category]}</span>
@@ -698,6 +859,14 @@ export function GlobalRelationMapModal({
                         ? `直接关联 ${focusContext.directRelations.length} 项`
                         : '尚未建立直连'}
                     </span>
+                    {focusContext.secondHopNeighborIds.size > 0 && (
+                      <span className="whitespace-nowrap text-[#BDB5A8]">
+                        <span aria-hidden="true" className="mr-1.5 text-[#D4AF6A]">
+                          ·
+                        </span>
+                        二度延伸 {focusContext.secondHopNeighborIds.size} 项
+                      </span>
+                    )}
                   </div>
                   <p className="truncate font-editorial text-[15px] font-medium text-[#FAF7F0]">
                     {focusedNode.item.title}
@@ -746,7 +915,7 @@ export function GlobalRelationMapModal({
                         className="h-3 w-3 text-[#D4AF6A]"
                         aria-hidden="true"
                       />
-                      <span>直接关联说明</span>
+                      <span>直接关联说明（按关联强度排序）</span>
                     </span>
                     <span className="text-[10px] text-[#8C857B]">
                       点击条目可切换聚焦
@@ -759,28 +928,63 @@ export function GlobalRelationMapModal({
                         key={rel.edgeId}
                         type="button"
                         data-testid={`global-relation-card-${rel.node.id}`}
+                        data-relation-strength={rel.strength}
                         onClick={() => setFocusedId(rel.node.id)}
-                        className="flex w-[224px] shrink-0 flex-col gap-1 rounded-xl border border-[#D4AF6A]/25 bg-white/[0.04] px-3 py-2 text-left transition-colors hover:border-[#D4AF6A]/65 hover:bg-white/[0.09] cursor-pointer sm:w-auto"
+                        className={`flex w-[224px] shrink-0 flex-col gap-1 rounded-xl border px-3 py-2 text-left transition-colors cursor-pointer sm:w-auto ${
+                          rel.strength === 3
+                            ? 'border-[#E8C472]/55 bg-[#D4AF6A]/[0.09] hover:border-[#F5D688]/80 hover:bg-[#D4AF6A]/[0.15]'
+                            : rel.strength === 2
+                              ? 'border-[#D4AF6A]/28 bg-white/[0.04] hover:border-[#D4AF6A]/60 hover:bg-white/[0.09]'
+                              : 'border-white/12 bg-white/[0.025] hover:border-white/25 hover:bg-white/[0.06]'
+                        }`}
                       >
                         <div className="flex items-center justify-between gap-2">
                           <span className="flex min-w-0 items-center gap-1.5">
                             <span
                               className="h-2 w-2 shrink-0 rounded-full"
                               style={{
-                                backgroundColor:
-                                  NODE_COLORS[rel.node.item.category].dot,
+                                backgroundColor: getNodeVisualStyle(
+                                  rel.node.item.category,
+                                  rel.strength,
+                                  'direct-neighbor'
+                                ).dot,
                               }}
                             />
                             <span className="truncate text-xs font-medium text-[#FAF7F0]">
                               {rel.node.item.title}
                             </span>
                           </span>
-                          <span className="shrink-0 rounded-md border border-[#D4AF6A]/35 bg-[#D4AF6A]/15 px-1.5 py-0.5 text-[10px] font-medium text-[#F5DC9B] whitespace-nowrap">
-                            {rel.shortLabel}
+                          <span className="inline-flex shrink-0 items-center gap-1.5 text-[10px] font-medium text-[#F5DC9B] whitespace-nowrap">
+                            <span
+                              className="inline-flex items-end gap-[2px]"
+                              title={`关联强度：${rel.strengthLabel}`}
+                              aria-label={`关联强度：${rel.strengthLabel}`}
+                            >
+                              {[1, 2, 3].map((bar) => (
+                                <span
+                                  key={bar}
+                                  className={`w-[2.5px] rounded-full ${
+                                    bar === 1
+                                      ? 'h-[4px]'
+                                      : bar === 2
+                                        ? 'h-[7px]'
+                                        : 'h-[10px]'
+                                  } ${
+                                    bar <= rel.strength
+                                      ? rel.strength === 3
+                                        ? 'bg-[#F5D688]'
+                                        : 'bg-[#D4AF6A]'
+                                      : 'bg-white/18'
+                                  }`}
+                                />
+                              ))}
+                            </span>
+                            <span>{rel.shortLabel}</span>
                           </span>
                         </div>
                         <p className="truncate text-[11px] text-[#BDB5A8]">
                           {rel.description}
+                          {rel.mutualCount > 0 ? ` · ${rel.mutualCount}项共联` : ''}
                         </p>
                       </button>
                     ))}
