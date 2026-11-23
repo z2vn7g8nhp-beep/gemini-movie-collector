@@ -149,4 +149,26 @@ test('getArchiveCardVisualClasses applies golden outline glow for favorite cards
   });
   assert.equal(selectedFav.hasFavoriteGlow, false);
   assert.match(selectedFav.frameClassName, /ring-\[#B43B2B\]/);
+
+  // Cross-jump located state highlights the card in both grid and list views
+  const locatedGrid = getArchiveCardVisualClasses({
+    status: 'watched',
+    isMasterpiece: false,
+    isSelected: false,
+    isLocated: true,
+    isPressing: false,
+    viewMode: 'grid',
+  });
+  assert.match(locatedGrid.frameClassName, /archive-card-located/);
+
+  const locatedList = getArchiveCardVisualClasses({
+    status: 'favorite',
+    isMasterpiece: true,
+    isSelected: false,
+    isLocated: true,
+    isPressing: false,
+    viewMode: 'list',
+  });
+  assert.match(locatedList.frameClassName, /archive-card-located/);
+  assert.equal(locatedList.hasFavoriteGlow, true);
 });

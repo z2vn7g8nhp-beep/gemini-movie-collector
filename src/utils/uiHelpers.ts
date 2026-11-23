@@ -130,6 +130,7 @@ export interface ArchiveCardVisualInput {
   status: CollectionStatus;
   isMasterpiece: boolean;
   isSelected: boolean;
+  isLocated?: boolean;
   isPressing: boolean;
   viewMode: 'grid' | 'list';
 }
@@ -142,12 +143,13 @@ export interface ArchiveCardVisualResult {
 /**
  * Computes consistent archival card frame classes across both gallery grid and
  * list views, giving "favorite" (挚爱) items a subtle golden outline glow while
- * preserving batch-selection and long-press priority states.
+ * preserving batch-selection, cross-jump located selection, and long-press priority states.
  */
 export function getArchiveCardVisualClasses({
   status,
   isMasterpiece,
   isSelected,
+  isLocated = false,
   isPressing,
   viewMode,
 }: ArchiveCardVisualInput): ArchiveCardVisualResult {
@@ -159,6 +161,13 @@ export function getArchiveCardVisualClasses({
         frameClassName:
           'border-[#B43B2B] bg-[#FDF6F4] ring-2 ring-[#B43B2B]/70 dark:bg-[#2F1A17] dark:border-[#D95B48]',
         hasFavoriteGlow: false,
+      };
+    }
+    if (isLocated) {
+      return {
+        frameClassName:
+          'archive-card-located border-[#B43B2B] bg-[#FFF9F6] ring-2 ring-[#B43B2B]/65 dark:border-[#E4C37A] dark:bg-[#282119] dark:ring-[#E4C37A]/70',
+        hasFavoriteGlow: isFavorite,
       };
     }
     if (isPressing) {
@@ -194,6 +203,13 @@ export function getArchiveCardVisualClasses({
       frameClassName:
         'border-[#B43B2B] ring-2 ring-[#B43B2B]/80 dark:border-[#D95B48]',
       hasFavoriteGlow: false,
+    };
+  }
+  if (isLocated) {
+    return {
+      frameClassName:
+        'archive-card-located border-[#B43B2B] ring-2 ring-[#B43B2B]/75 dark:border-[#E4C37A] dark:ring-[#E4C37A]/75',
+      hasFavoriteGlow: isFavorite,
     };
   }
   if (isPressing) {

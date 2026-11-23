@@ -103,6 +103,10 @@ import {
   countActiveLibraryFilters,
   getAdjacentArchiveItem,
 } from './utils/uiHelpers';
+import {
+  buildCrossJumpLibraryState,
+  type CrossJumpLibraryState,
+} from './utils/drawerNavigation';
 import { buildQuickStatusNotice } from './utils/quickStatusMenu';
 import {
   DEFAULT_SHOWCASE_CONFIG,
@@ -253,6 +257,9 @@ export default function App() {
   // Batch curation state
   const [batchMode, setBatchMode] = useState(false);
   const [batchSelectedIds, setBatchSelectedIds] = useState<string[]>([]);
+  const [locatedItemId, setLocatedItemId] = useState<string | null>(null);
+  const [locatedJumpTick, setLocatedJumpTick] = useState(0);
+  const skipNextTabScrollTopRef = useRef(false);
 
   // Handoff state to Search / Create tabs
   const [pendingSearchQuery, setPendingSearchQuery] = useState('');
@@ -333,6 +340,10 @@ export default function App() {
   );
 
   useEffect(() => {
+    if (skipNextTabScrollTopRef.current) {
+      skipNextTabScrollTopRef.current = false;
+      return;
+    }
     window.scrollTo({ top: 0, behavior: 'auto' });
   }, [activeTab]);
 
@@ -715,6 +726,14 @@ export default function App() {
   const selectedItem = useMemo(
     () => displayItems.find((i) => i.id === selectedItemId) ?? null,
     [displayItems, selectedItemId]
+  );
+
+  const locatedItem = useMemo(
+    () =>
+      locatedItemId
+        ? filteredItems.find((i) => i.id === locatedItemId) ?? null
+        : null,
+    [filteredItems, locatedItemId]
   );
 
   const cardModalItem = useMemo(
@@ -1341,9 +1360,44 @@ export default function App() {
     setRegionFilter('');
     setRatingBucketFilter('all');
     setCompletenessFilter('all');
+    setLocatedItemId(null);
   };
 
-  const handleFilterByTag = (tag: string) => {
+  const applyCrossJumpState = (next: CrossJumpLibraryState) => {
+    setSelectedItemId(null);
+    if (activeTab !== 'library') {
+      skipNextTabScrollTopRef.current = true;
+    }
+    setBatchMode(false);
+    setBatchSelectedIds([]);
+    setActiveTab(next.activeTab);
+    setActiveCategory(next.activeCategory);
+    setStatusFilter(next.statusFilter);
+    setActiveAlbumId(next.activeAlbumId);
+    setActiveTag(next.activeTag);
+    setLibraryQuery(next.libraryQuery);
+    setDecadeFilter(next.decadeFilter);
+    setRegionFilter(next.regionFilter);
+    setRatingBucketFilter(next.ratingBucketFilter);
+    setCompletenessFilter(next.completenessFilter);
+    setLocatedItemId(next.locatedItemId);
+    setLocatedJumpTick((n) => n + 1);
+    setNotice(next.notice);
+  };
+
+  const handleFilterByTag = (tag: string, focusItemId?: string) => {
+    if (focusItemId) {
+      const targetItem = displayItems.find((it) => it.id === focusItemId);
+      const next = buildCrossJumpLibraryState({
+        kind: 'tag',
+        tag,
+        itemId: focusItemId,
+        itemTitle: targetItem?.title || '当前条目',
+      });
+      applyCrossJumpState(next);
+      return;
+    }
+
     setSelectedItemId(null);
     setActiveTab('library');
     setActiveCategory('all');
@@ -1355,6 +1409,43 @@ export default function App() {
     setRatingBucketFilter('all');
     setCompletenessFilter('all');
     setActiveTag(tag);
+    setLocatedItemId(null);
+  };
+
+  const handleJumpToAlbumFromDrawer = (
+    albumId: string,
+    focusItemId: string
+  ) => {
+    const targetAlbum = collector.albums.find((a) => a.id === albumId);
+    if (!targetAlbum) return;
+    const targetItem = displayItems.find((it) => it.id === focusItemId);
+    const next = buildCrossJumpLibraryState({
+      kind: 'album',
+      albumId,
+      albumName: targetAlbum.name,
+      itemId: focusItemId,
+      itemTitle: targetItem?.title || '当前条目',
+    });
+    applyCrossJumpState(next);
+  };
+
+  const handleAddItemToAlbumFromDrawer = async (
+    albumId: string,
+    itemId: string
+  ) => {
+    const targetAlbum = collector.albums.find((a) => a.id === albumId);
+    if (!targetAlbum) return;
+    const { albums: nextAlbums, addedCount } = applyBatchAddToAlbum(
+      collector.albums,
+      albumId,
+      [itemId]
+    );
+    await persistCollector({ ...collector, albums: nextAlbums });
+    setNotice(
+      addedCount > 0
+        ? `已收入收藏夹「${targetAlbum.name}」`
+        : `已在收藏夹「${targetAlbum.name}」中`
+    );
   };
 
   const activeAdvancedFilterCount = useMemo(() => {
@@ -1482,6 +1573,7 @@ export default function App() {
               onSelectAlbum={(albumId) => {
                 setActiveAlbumId(albumId);
                 if (albumId) setActiveTag('');
+                setLocatedItemId(null);
               }}
               onCreateAlbum={handleCreateAlbum}
               onDeleteAlbum={handleDeleteAlbum}
@@ -1953,9 +2045,9 @@ export default function App() {
                   {activeAlbum && (
                     <div
                       data-testid="active-album-banner"
-                      className="flex flex-1 min-w-[240px] items-center justify-between gap-2 rounded-xl border border-[#C9A45C] bg-[#FFFDF9] px-3.5 py-2 dark:border-[#C9A45C]/65 dark:bg-[#221E18]"
+                      className="flex flex-1 min-w-[240px] flex-wrap items-center justify-between gap-2 rounded-xl border border-[#C9A45C] bg-[#FFFDF9] px-3.5 py-2 dark:border-[#C9A45C]/65 dark:bg-[#221E18]"
                     >
-                      <div className="flex min-w-0 items-center gap-1.5 text-[13px] text-[#1A1816] md:text-xs dark:text-[#F3EFE6]">
+                      <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-[13px] text-[#1A1816] md:text-xs dark:text-[#F3EFE6]">
                         <BookOpen
                           className="h-4 w-4 shrink-0 text-[#A67C37] dark:text-[#E4C37A]"
                           aria-hidden="true"
@@ -1964,25 +2056,47 @@ export default function App() {
                         <span className="truncate font-medium">
                           「{activeAlbum.name}」
                         </span>
+                        {locatedItem && (
+                          <span
+                            data-testid="banner-located-indicator"
+                            className="inline-flex items-center rounded-lg bg-[#FDF0ED] px-2 py-0.5 text-[11px] font-medium text-[#B43B2B] dark:bg-[#3A2B18] dark:text-[#F2D68A]"
+                          >
+                            已选中「{locatedItem.title}」
+                          </span>
+                        )}
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setActiveAlbumId('')}
-                        aria-label="清除图鉴筛选"
-                        className="inline-flex min-h-[36px] shrink-0 items-center gap-1 rounded-lg px-2.5 text-[13px] font-medium text-[#625C54] hover:bg-[#F3EFE8] hover:text-[#1A1816] cursor-pointer md:text-xs dark:text-[#B8AFA2] dark:hover:bg-[#312B24] dark:hover:text-[#F3EFE6]"
-                      >
-                        <X className="h-3.5 w-3.5" aria-hidden="true" />
-                        <span>清除</span>
-                      </button>
+                      <div className="flex shrink-0 items-center gap-1">
+                        {locatedItem && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedItemId(locatedItem.id)}
+                            className="inline-flex min-h-[36px] shrink-0 items-center rounded-lg px-2.5 text-[13px] font-medium text-[#B43B2B] hover:bg-[#F9EAE6] cursor-pointer md:text-xs dark:text-[#E4C37A] dark:hover:bg-[#31291D]"
+                          >
+                            查看详情
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveAlbumId('');
+                            setLocatedItemId(null);
+                          }}
+                          aria-label="清除图鉴筛选"
+                          className="inline-flex min-h-[36px] shrink-0 items-center gap-1 rounded-lg px-2.5 text-[13px] font-medium text-[#625C54] hover:bg-[#F3EFE8] hover:text-[#1A1816] cursor-pointer md:text-xs dark:text-[#B8AFA2] dark:hover:bg-[#312B24] dark:hover:text-[#F3EFE6]"
+                        >
+                          <X className="h-3.5 w-3.5" aria-hidden="true" />
+                          <span>清除</span>
+                        </button>
+                      </div>
                     </div>
                   )}
 
                   {activeTag && (
                     <div
                       data-testid="active-tag-banner"
-                      className="flex flex-1 min-w-[240px] items-center justify-between gap-2 rounded-xl border border-[#DCD6CB] bg-white px-3.5 py-2 dark:border-[#3A342D] dark:bg-[#1D1A17]"
+                      className="flex flex-1 min-w-[240px] flex-wrap items-center justify-between gap-2 rounded-xl border border-[#DCD6CB] bg-white px-3.5 py-2 dark:border-[#3A342D] dark:bg-[#1D1A17]"
                     >
-                      <div className="flex min-w-0 items-center gap-1.5 text-[13px] text-[#1A1816] md:text-xs dark:text-[#F3EFE6]">
+                      <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-[13px] text-[#1A1816] md:text-xs dark:text-[#F3EFE6]">
                         <Tag
                           className="h-4 w-4 shrink-0 text-[#B43B2B] dark:text-[#EB7865]"
                           aria-hidden="true"
@@ -1991,16 +2105,38 @@ export default function App() {
                         <span className="truncate font-medium">
                           「{activeTag}」
                         </span>
+                        {locatedItem && (
+                          <span
+                            data-testid="banner-located-indicator"
+                            className="inline-flex items-center rounded-lg bg-[#FDF0ED] px-2 py-0.5 text-[11px] font-medium text-[#B43B2B] dark:bg-[#3A2B18] dark:text-[#F2D68A]"
+                          >
+                            已选中「{locatedItem.title}」
+                          </span>
+                        )}
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setActiveTag('')}
-                        aria-label="清除标签筛选"
-                        className="inline-flex min-h-[36px] shrink-0 items-center gap-1 rounded-lg px-2.5 text-[13px] font-medium text-[#625C54] hover:bg-[#F3EFE8] hover:text-[#1A1816] cursor-pointer md:text-xs dark:text-[#B8AFA2] dark:hover:bg-[#312B24] dark:hover:text-[#F3EFE6]"
-                      >
-                        <X className="h-3.5 w-3.5" aria-hidden="true" />
-                        <span>清除</span>
-                      </button>
+                      <div className="flex shrink-0 items-center gap-1">
+                        {locatedItem && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedItemId(locatedItem.id)}
+                            className="inline-flex min-h-[36px] shrink-0 items-center rounded-lg px-2.5 text-[13px] font-medium text-[#B43B2B] hover:bg-[#F9EAE6] cursor-pointer md:text-xs dark:text-[#E4C37A] dark:hover:bg-[#31291D]"
+                          >
+                            查看详情
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveTag('');
+                            setLocatedItemId(null);
+                          }}
+                          aria-label="清除标签筛选"
+                          className="inline-flex min-h-[36px] shrink-0 items-center gap-1 rounded-lg px-2.5 text-[13px] font-medium text-[#625C54] hover:bg-[#F3EFE8] hover:text-[#1A1816] cursor-pointer md:text-xs dark:text-[#B8AFA2] dark:hover:bg-[#312B24] dark:hover:text-[#F3EFE6]"
+                        >
+                          <X className="h-3.5 w-3.5" aria-hidden="true" />
+                          <span>清除</span>
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -2016,8 +2152,15 @@ export default function App() {
               viewMode={viewMode}
               batchMode={batchMode}
               selectedIds={batchSelectedIds}
+              locatedItemId={locatedItemId}
+              locatedJumpTick={locatedJumpTick}
               onToggleBatchSelect={handleToggleBatchSelect}
-              onSelectItem={(item) => setSelectedItemId(item.id)}
+              onSelectItem={(item) => {
+                if (locatedItemId && item.id !== locatedItemId) {
+                  setLocatedItemId(null);
+                }
+                setSelectedItemId(item.id);
+              }}
               onQuickUpdateStatus={handleQuickUpdateStatus}
               onOpenCardModal={(item) => setCardModalItemId(item.id)}
               onJumpToSearch={jumpToSearch}
@@ -2156,12 +2299,15 @@ export default function App() {
       <DetailDrawer
         item={selectedItem}
         allItems={items}
+        albums={collector.albums}
         positionLabel={drawerPositionLabel}
         onPrevItem={prevDrawerItem ? () => setSelectedItemId(prevDrawerItem.id) : undefined}
         onNextItem={nextDrawerItem ? () => setSelectedItemId(nextDrawerItem.id) : undefined}
         onClose={() => setSelectedItemId(null)}
         onSelectRelated={(rel) => setSelectedItemId(rel.id)}
         onFilterByTag={handleFilterByTag}
+        onJumpToAlbum={handleJumpToAlbumFromDrawer}
+        onAddToAlbum={handleAddItemToAlbumFromDrawer}
         onOpenCardModal={(it) => {
           setSelectedItemId(null);
           setCardModalItemId(it.id);

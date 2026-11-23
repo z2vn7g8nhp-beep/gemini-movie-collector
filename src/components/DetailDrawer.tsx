@@ -28,6 +28,7 @@ import type {
   ArchiveItem,
   CharacterProfile,
   CollectionStatus,
+  CollectorAlbum,
   OnlineSearchResult,
 } from '../types/archive';
 import {
@@ -60,6 +61,7 @@ import {
 import { ArchivalImage } from './ArchivalImage';
 import { CharacterDossierSection } from './CharacterDossierSection';
 import { CoverPickerModal } from './CoverPickerModal';
+import { DetailCrossJumpBar } from './DetailCrossJumpBar';
 import { DetailMedalShowcase } from './DetailMedalShowcase';
 import { DetailRelationGraph } from './DetailRelationGraph';
 import { DetailTagManager } from './DetailTagManager';
@@ -89,12 +91,15 @@ function retainKnownLists(next: OnlineRelationsResponse, previous: OnlineRelatio
 interface DetailDrawerProps {
   item: ArchiveItem | null;
   allItems: ArchiveItem[];
+  albums?: CollectorAlbum[];
   positionLabel?: string;
   onPrevItem?: () => void;
   onNextItem?: () => void;
   onClose: () => void;
   onSelectRelated: (item: ArchiveItem) => void;
-  onFilterByTag: (tag: string) => void;
+  onFilterByTag: (tag: string, focusItemId?: string) => void;
+  onJumpToAlbum?: (albumId: string, focusItemId: string) => void;
+  onAddToAlbum?: (albumId: string, itemId: string) => Promise<void>;
   onOpenCardModal?: (item: ArchiveItem) => void;
   isPinnedToShowcase?: boolean;
   onTogglePinShowcase?: (item: ArchiveItem) => void;
@@ -149,12 +154,15 @@ export function DetailDrawer(props: DetailDrawerProps) {
 function DetailDrawerShell({
   item: savedItem,
   allItems,
+  albums = [],
   positionLabel,
   onPrevItem,
   onNextItem,
   onClose,
   onSelectRelated: onSelectRelatedProp,
   onFilterByTag,
+  onJumpToAlbum,
+  onAddToAlbum,
   onOpenCardModal,
   isPinnedToShowcase = false,
   onTogglePinShowcase,
@@ -1023,11 +1031,23 @@ function DetailDrawerShell({
             </div>
           </div>
 
+          {/* Quick Cross-Jump Strip: Click Album Name or Tag to Jump & Auto-Select */}
+          <DetailCrossJumpBar
+            item={item}
+            allItems={allItems}
+            albums={albums}
+            onJumpToAlbum={(albumId, focusItemId) =>
+              onJumpToAlbum?.(albumId, focusItemId)
+            }
+            onJumpToTag={(tag, focusItemId) => onFilterByTag(tag, focusItemId)}
+            onAddToAlbum={onAddToAlbum}
+          />
+
           {/* Prominent Dynamic Cinema Medal Showcase */}
           <DetailMedalShowcase
             item={item}
             allItems={allItems}
-            onFilterByTag={onFilterByTag}
+            onFilterByTag={(tag) => onFilterByTag(tag, item.id)}
             onJumpToMedalHall={onJumpToMedalHall}
           />
 

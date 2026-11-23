@@ -18,7 +18,7 @@ interface DetailTagManagerProps {
   item: ArchiveItem;
   allItems: ArchiveItem[];
   onUpdateTags: (nextTags: string[]) => Promise<void>;
-  onFilterByTag: (tag: string) => void;
+  onFilterByTag: (tag: string, focusItemId?: string) => void;
   onSelectRelated: (target: ArchiveItem) => void;
 }
 
@@ -355,12 +355,12 @@ export function DetailTagManager({
             </p>
             <button
               type="button"
-              onClick={() => onFilterByTag(activeInspectTag)}
-              aria-label={`在馆藏中筛选标签「${activeInspectTag}」`}
+              onClick={() => onFilterByTag(activeInspectTag, item.id)}
+              aria-label={`跳转到标签「${activeInspectTag}」图鉴列表并选中「${item.title}」`}
               className="inline-flex min-h-[40px] shrink-0 items-center gap-1.5 rounded-xl bg-[#B43B2B] px-3 text-xs font-medium text-white whitespace-nowrap cursor-pointer active:scale-[0.97] transition-transform hover:bg-[#932D20]"
             >
               <Filter className="h-3.5 w-3.5" aria-hidden="true" />
-              <span>在藏馆筛选</span>
+              <span>跳转并选中</span>
               <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
             </button>
           </div>
@@ -432,7 +432,7 @@ export function DetailTagManager({
           {sameTagItems.length > 6 && (
             <button
               type="button"
-              onClick={() => onFilterByTag(activeInspectTag)}
+              onClick={() => onFilterByTag(activeInspectTag, item.id)}
               className="mt-2 min-h-[40px] w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] text-xs font-medium text-[#3D3832] cursor-pointer dark:border-[#3A342D] dark:bg-[#24201C] dark:text-[#E5DED2]"
             >
               查看全部 {sameTagItems.length} 项同标签藏品

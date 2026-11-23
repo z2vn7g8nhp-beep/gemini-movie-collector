@@ -28,6 +28,8 @@ interface ArchiveGridProps {
   viewMode?: ArchiveViewMode;
   batchMode?: boolean;
   selectedIds?: string[];
+  locatedItemId?: string | null;
+  locatedJumpTick?: number;
   onToggleBatchSelect?: (id: string) => void;
   onSelectItem: (item: ArchiveItem) => void;
   onQuickUpdateStatus?: (item: ArchiveItem, status: CollectionStatus) => void;
@@ -51,6 +53,8 @@ export function ArchiveGrid({
   viewMode = 'grid',
   batchMode = false,
   selectedIds = [],
+  locatedItemId = null,
+  locatedJumpTick = 0,
   onToggleBatchSelect,
   onSelectItem,
   onQuickUpdateStatus,
@@ -63,6 +67,7 @@ export function ArchiveGrid({
   const [quickMenu, setQuickMenu] = useState<QuickMenuState | null>(null);
   const [pressingItemId, setPressingItemId] = useState<string | null>(null);
 
+  const cardButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const longPressTimerRef = useRef<number | null>(null);
   const suppressClearTimerRef = useRef<number | null>(null);
   const suppressClickItemIdRef = useRef<string | null>(null);
@@ -72,6 +77,33 @@ export function ArchiveGrid({
     x: number;
     y: number;
   } | null>(null);
+
+  // Smoothly scroll to and focus the auto-selected item after jumping from DetailDrawer
+  useEffect(() => {
+    if (!locatedItemId || locatedJumpTick <= 0) return;
+    const rafId = window.requestAnimationFrame(() => {
+      const targetBtn = cardButtonRefs.current.get(locatedItemId);
+      if (!targetBtn) return;
+      targetBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      try {
+        targetBtn.focus({ preventScroll: true });
+      } catch {
+        // Ignore focus errors in restricted environments
+      }
+    });
+    return () => window.cancelAnimationFrame(rafId);
+  }, [locatedItemId, locatedJumpTick, viewMode]);
+
+  const setCardButtonRef = useCallback(
+    (itemId: string, node: HTMLButtonElement | null) => {
+      if (node) {
+        cardButtonRefs.current.set(itemId, node);
+      } else {
+        cardButtonRefs.current.delete(itemId);
+      }
+    },
+    []
+  );
 
   const cancelLongPress = useCallback(() => {
     if (longPressTimerRef.current !== null) {
@@ -361,11 +393,13 @@ export function ArchiveGrid({
             const excerpt = item.quote || item.notes || item.summary;
 
             const isSelected = batchMode && selectedIdSet.has(item.id);
+            const isLocated = !batchMode && locatedItemId === item.id;
             const isPressing = pressingItemId === item.id;
             const cardVisual = getArchiveCardVisualClasses({
               status: item.status,
               isMasterpiece,
               isSelected,
+              isLocated,
               isPressing,
               viewMode: 'list',
             });
@@ -374,12 +408,16 @@ export function ArchiveGrid({
               <article
                 key={item.id}
                 data-favorite-glow={cardVisual.hasFavoriteGlow ? 'true' : undefined}
+                data-located={isLocated ? 'true' : undefined}
                 className={`group relative flex items-center gap-3.5 rounded-2xl border px-3.5 py-3 transition-all sm:px-5 sm:py-3.5 ${cardVisual.frameClassName}`}
               >
                 <button
+                  ref={(node) => setCardButtonRef(item.id, node)}
                   type="button"
                   data-testid={`archive-card-${item.id}`}
                   data-status={item.status}
+                  data-located={isLocated ? 'true' : undefined}
+                  aria-current={isLocated ? 'true' : undefined}
                   onClick={(e) => handleCardClick(item, e)}
                   onPointerDown={(e) => handleCardPointerDown(item, e)}
                   onPointerMove={handleCardPointerMove}
@@ -392,7 +430,7 @@ export function ArchiveGrid({
                   aria-label={
                     batchMode
                       ? `${isSelected ? '取消选择' : '选择'}「${item.title}」`
-                      : `查看${CATEGORY_LABELS[item.category]}「${item.title}」详情`
+                      : `${isLocated ? '当前已选中 · ' : ''}查看${CATEGORY_LABELS[item.category]}「${item.title}」详情`
                   }
                   className="flex min-w-0 flex-1 items-center gap-3.5 text-left select-none [-webkit-touch-callout:none] cursor-pointer"
                 >
@@ -443,6 +481,14 @@ export function ArchiveGrid({
                           <span aria-hidden="true">·</span>
                           <span className="font-medium text-[#8E6523] dark:text-[#E4C37A]">典藏</span>
                         </>
+                      )}
+                      {isLocated && (
+                        <span
+                          data-testid={`located-badge-${item.id}`}
+                          className="ml-0.5 inline-flex items-center rounded-md bg-[#B43B2B] px-1.5 py-0.5 font-sans text-[10px] font-medium text-white dark:bg-[#E4C37A] dark:text-[#141210]"
+                        >
+                          已选中
+                        </span>
                       )}
                     </div>
 
@@ -537,11 +583,13 @@ export function ArchiveGrid({
           const statusLabel = getStatusLabel(item.status, item.category);
 
           const isSelected = batchMode && selectedIdSet.has(item.id);
+          const isLocated = !batchMode && locatedItemId === item.id;
           const isPressing = pressingItemId === item.id;
           const cardVisual = getArchiveCardVisualClasses({
             status: item.status,
             isMasterpiece,
             isSelected,
+            isLocated,
             isPressing,
             viewMode: 'grid',
           });
@@ -550,12 +598,16 @@ export function ArchiveGrid({
             <article key={item.id} className="group relative flex min-w-0 flex-col">
               <div
                 data-favorite-glow={cardVisual.hasFavoriteGlow ? 'true' : undefined}
+                data-located={isLocated ? 'true' : undefined}
                 className={`gallery-card gallery-card-interactive relative flex flex-1 flex-col overflow-hidden border ${cardVisual.frameClassName}`}
               >
                 <button
+                  ref={(node) => setCardButtonRef(item.id, node)}
                   type="button"
                   data-testid={`archive-card-${item.id}`}
                   data-status={item.status}
+                  data-located={isLocated ? 'true' : undefined}
+                  aria-current={isLocated ? 'true' : undefined}
                   onClick={(e) => handleCardClick(item, e)}
                   onPointerDown={(e) => handleCardPointerDown(item, e)}
                   onPointerMove={handleCardPointerMove}
@@ -568,7 +620,7 @@ export function ArchiveGrid({
                   aria-label={
                     batchMode
                       ? `${isSelected ? '取消选择' : '选择'}「${item.title}」`
-                      : `查看${CATEGORY_LABELS[item.category]}「${item.title}」详情`
+                      : `${isLocated ? '当前已选中 · ' : ''}查看${CATEGORY_LABELS[item.category]}「${item.title}」详情`
                   }
                   className="flex flex-1 flex-col text-left select-none [-webkit-touch-callout:none] cursor-pointer active:scale-[0.99]"
                 >
@@ -595,14 +647,24 @@ export function ArchiveGrid({
                           <Check className="h-4 w-4" />
                         </span>
                       ) : (
-                        isMasterpiece && (
-                          <span
-                            aria-label="典藏级档案"
-                            className="pointer-events-none absolute right-2 top-2 rounded-lg border border-[#E6C57A]/75 bg-[#1B1814]/85 px-2 py-0.5 font-editorial text-[11px] tracking-[0.14em] text-[#F2D68A] backdrop-blur-[2px]"
-                          >
-                            典藏
-                          </span>
-                        )
+                        <>
+                          {isMasterpiece && (
+                            <span
+                              aria-label="典藏级档案"
+                              className="pointer-events-none absolute right-2 top-2 rounded-lg border border-[#E6C57A]/75 bg-[#1B1814]/85 px-2 py-0.5 font-editorial text-[11px] tracking-[0.14em] text-[#F2D68A] backdrop-blur-[2px]"
+                            >
+                              典藏
+                            </span>
+                          )}
+                          {isLocated && (
+                            <span
+                              data-testid={`located-badge-${item.id}`}
+                              className="pointer-events-none absolute bottom-2 left-2 rounded-lg bg-[#B43B2B] px-2 py-0.5 text-[11px] font-medium tracking-[0.06em] text-white shadow-sm dark:bg-[#E4C37A] dark:text-[#141210]"
+                            >
+                              已选中
+                            </span>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
