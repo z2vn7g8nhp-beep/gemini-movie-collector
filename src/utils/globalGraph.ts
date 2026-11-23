@@ -2260,3 +2260,159 @@ export function buildGlobalRelationGraph(
     maxWeightedDegree: Number(maxWeightedDegree.toFixed(2)),
   };
 }
+
+export type CategoryVisibilityMap = Record<ArchiveCategory, boolean>;
+
+export const ALL_CATEGORIES_VISIBLE: CategoryVisibilityMap = {
+  film: true,
+  person: true,
+  character: true,
+};
+
+/**
+ * Returns the canvas category visibility state corresponding to a top-bar category filter.
+ */
+export function createCategoryVisibilityForFilter(
+  filter: 'all' | ArchiveCategory
+): CategoryVisibilityMap {
+  if (filter === 'all') {
+    return { ...ALL_CATEGORIES_VISIBLE };
+  }
+  return {
+    film: filter === 'film',
+    person: filter === 'person',
+    character: filter === 'character',
+  };
+}
+
+/**
+ * Toggles a single category's visibility on the canvas.
+ * If the modal is currently narrowed to a single-category top-bar filter and the user
+ * toggles a different category on, promotes the filter to `'all'` so multi-category
+ * combinations (e.g., film + person without character) work seamlessly.
+ */
+export function toggleCategoryVisibilityState(
+  currentFilter: 'all' | ArchiveCategory,
+  currentVisibility: CategoryVisibilityMap,
+  target: ArchiveCategory
+): {
+  nextFilter: 'all' | ArchiveCategory;
+  nextVisibility: CategoryVisibilityMap;
+} {
+  if (currentFilter !== 'all' && target !== currentFilter) {
+    return {
+      nextFilter: 'all',
+      nextVisibility: {
+        ...currentVisibility,
+        [target]: true,
+      },
+    };
+  }
+  return {
+    nextFilter: currentFilter,
+    nextVisibility: {
+      ...currentVisibility,
+      [target]: !currentVisibility[target],
+    },
+  };
+}
+
+/**
+ * Counts nodes per ArchiveCategory in a graph node list.
+ */
+export function countNodesByCategory(
+  nodes: Array<Pick<GlobalGraphNode, 'item'>>
+): Record<ArchiveCategory, number> {
+  const counts: Record<ArchiveCategory, number> = {
+    film: 0,
+    person: 0,
+    character: 0,
+  };
+  for (const node of nodes) {
+    counts[node.item.category] += 1;
+  }
+  return counts;
+}
+
+/**
+ * Filters a built GlobalGraphModel by category visibility without recomputing node
+ * coordinates, keeping layout positions stable while hiding excluded nodes,
+ * dangling edges, and collapsed clusters.
+ */
+export function filterGraphByVisibleCategories(
+  graph: GlobalGraphModel,
+  visibleCategories: CategoryVisibilityMap
+): GlobalGraphModel {
+  if (
+    visibleCategories.film &&
+    visibleCategories.person &&
+    visibleCategories.character
+  ) {
+    return graph;
+  }
+
+  const visibleNodes = graph.nodes.filter(
+    (node) => visibleCategories[node.item.category]
+  );
+  const visibleNodeIds = new Set(visibleNodes.map((n) => n.id));
+  const visibleEdges = graph.edges.filter(
+    (edge) => visibleNodeIds.has(edge.sourceId) && visibleNodeIds.has(edge.targetId)
+  );
+
+  const visibleNodeById = new Map(visibleNodes.map((n) => [n.id, n]));
+  const visibleClusters: GraphCluster[] = [];
+  for (const cluster of graph.clusters) {
+    const remainingIds = cluster.nodeIds.filter((id) => visibleNodeIds.has(id));
+    if (remainingIds.length < 2) continue;
+    const memberSet = new Set(remainingIds);
+    const memberNodes = remainingIds
+      .map((id) => visibleNodeById.get(id))
+      .filter((n): n is GlobalGraphNode => Boolean(n));
+    const hub = memberNodes[0];
+    if (!hub) continue;
+    const edgeCount = visibleEdges.filter(
+      (e) =>
+        isFilmographyEdge(e) &&
+        memberSet.has(e.sourceId) &&
+        memberSet.has(e.targetId)
+    ).length;
+    const avgX = memberNodes.reduce((sum, n) => sum + n.x, 0) / memberNodes.length;
+    const avgY = memberNodes.reduce((sum, n) => sum + n.y, 0) / memberNodes.length;
+    const maxDist = Math.max(
+      48,
+      ...memberNodes.map((n) => Math.hypot(n.x - avgX, n.y - avgY) + n.radius + 20)
+    );
+    visibleClusters.push({
+      index: cluster.index,
+      hubId: hub.id,
+      title: hub.item.title,
+      nodeIds: remainingIds,
+      edgeCount,
+      centerX: Math.round(avgX),
+      centerY: Math.round(avgY),
+      radius: Math.round(Math.min(240, maxDist)),
+    });
+  }
+
+  const visibleHubs = graph.hubs.filter((hub) => visibleNodeIds.has(hub.id));
+  const visibleIsolated = graph.isolatedNodes.filter((n) =>
+    visibleNodeIds.has(n.id)
+  );
+  const visibleAutoPairs = graph.unlinkedAutoPairs.filter(
+    ([a, b]) => visibleNodeIds.has(a) && visibleNodeIds.has(b)
+  );
+
+  return {
+    ...graph,
+    nodes: visibleNodes,
+    edges: visibleEdges,
+    hubs: visibleHubs,
+    isolatedNodes: visibleIsolated,
+    clusters: visibleClusters,
+    explicitEdgeCount: visibleEdges.filter((e) => e.kind === 'explicit').length,
+    inferredEdgeCount: visibleEdges.filter((e) => e.kind === 'inferred').length,
+    tagEdgeCount: visibleEdges.filter((e) => e.kind === 'tag').length,
+    unlinkedAutoPairs: visibleAutoPairs,
+  };
+}
+

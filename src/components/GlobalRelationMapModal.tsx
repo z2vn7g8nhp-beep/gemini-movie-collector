@@ -5,6 +5,8 @@ import {
   Check,
   ChevronRight,
   Compass,
+  Eye,
+  EyeOff,
   Link2,
   RotateCcw,
   Search,
@@ -22,16 +24,22 @@ import {
   type InferredFilmographyEdge,
 } from '../utils/filmographyInference';
 import {
+  ALL_CATEGORIES_VISIBLE,
   buildGlobalRelationGraph,
   computeCurvedEdgeGeometry,
   computeEdgeCurveOffsets,
   computeFocusCamera,
   computeSmartEdgeLabelPoint,
+  countNodesByCategory,
+  createCategoryVisibilityForFilter,
+  filterGraphByVisibleCategories,
   findShortestGraphPath,
   getEdgeVisualStyle,
   getFocusedNodeConnections,
   getNodeVisualStyle,
   searchGraphNodes,
+  toggleCategoryVisibilityState,
+  type CategoryVisibilityMap,
   type GlobalGraphEdge,
   type GlobalGraphNode,
   type GraphNodeFocusState,
@@ -63,6 +71,16 @@ const CAT_FILTERS: Array<{ id: 'all' | ArchiveCategory; label: string }> = [
   { id: 'character', label: '角色' },
 ];
 
+const CANVAS_CATEGORY_TOGGLES: Array<{
+  id: ArchiveCategory;
+  label: string;
+  dotColor: string;
+}> = [
+  { id: 'film', label: '影视', dotColor: '#CA3C28' },
+  { id: 'person', label: '影人', dotColor: '#DBB768' },
+  { id: 'character', label: '角色', dotColor: '#66AD95' },
+];
+
 export function GlobalRelationMapModal({
   open,
   allItems,
@@ -75,6 +93,8 @@ export function GlobalRelationMapModal({
   const uid = useId().replace(/:/g, '');
 
   const [category, setCategory] = useState<'all' | ArchiveCategory>('all');
+  const [visibleCategories, setVisibleCategories] =
+    useState<CategoryVisibilityMap>(() => ({ ...ALL_CATEGORIES_VISIBLE }));
   const [includeInferredEdges, setIncludeInferredEdges] = useState(true);
   const [includeTagEdges, setIncludeTagEdges] = useState(true);
   const [isolatedOnly, setIsolatedOnly] = useState(false);
@@ -183,7 +203,7 @@ export function GlobalRelationMapModal({
     };
   }, [open, includeInferredEdges, allItems]);
 
-  const graph = useMemo(
+  const baseGraph = useMemo(
     () =>
       buildGlobalRelationGraph(allItems, {
         category,
@@ -194,6 +214,37 @@ export function GlobalRelationMapModal({
       }),
     [allItems, category, includeInferredEdges, creditInferredEdges, includeTagEdges, isolatedOnly]
   );
+
+  const graph = useMemo(
+    () => filterGraphByVisibleCategories(baseGraph, visibleCategories),
+    [baseGraph, visibleCategories]
+  );
+
+  const availableCategoryCounts = useMemo(() => {
+    if (category === 'all') {
+      return countNodesByCategory(baseGraph.nodes);
+    }
+    const counts: Record<ArchiveCategory, number> = {
+      film: 0,
+      person: 0,
+      character: 0,
+    };
+    for (const item of allItems) {
+      counts[item.category] += 1;
+    }
+    counts[category] = baseGraph.nodes.length;
+    return counts;
+  }, [category, baseGraph.nodes, allItems]);
+
+  const hiddenNodeCount = Math.max(0, baseGraph.nodes.length - graph.nodes.length);
+  const hasHiddenCategory =
+    !visibleCategories.film ||
+    !visibleCategories.person ||
+    !visibleCategories.character;
+  const allCategoriesHidden =
+    !visibleCategories.film &&
+    !visibleCategories.person &&
+    !visibleCategories.character;
 
   const nodeById = useMemo(
     () => new Map(graph.nodes.map((n) => [n.id, n])),
@@ -247,6 +298,14 @@ export function GlobalRelationMapModal({
     [historyIndex, nodeById, graph, scale]
   );
 
+  // Reset canvas category visibility when modal opens fresh
+  useEffect(() => {
+    if (open) {
+      setVisibleCategories(createCategoryVisibilityForFilter(category));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
   // Initialize focus & viewport when modal opens or major filters change
   useEffect(() => {
     if (!open) return;
@@ -292,20 +351,35 @@ export function GlobalRelationMapModal({
     return () => window.removeEventListener('keydown', handleKey);
   }, [open, onClose, searchOpen, pathPicking, pathTargetId]);
 
+  const effectiveFocusedId =
+    focusedId && nodeById.has(focusedId) ? focusedId : null;
+  const effectivePathTargetId =
+    effectiveFocusedId && pathTargetId && nodeById.has(pathTargetId)
+      ? pathTargetId
+      : null;
+
   const focusContext = useMemo(
-    () => getFocusedNodeConnections(graph, focusedId, allItems),
-    [graph, focusedId, allItems]
+    () => getFocusedNodeConnections(graph, effectiveFocusedId, allItems),
+    [graph, effectiveFocusedId, allItems]
   );
 
   const focusedNode = focusContext?.focusedNode ?? null;
-  const pathTargetNode = pathTargetId ? (nodeById.get(pathTargetId) ?? null) : null;
+  const pathTargetNode = effectivePathTargetId
+    ? (nodeById.get(effectivePathTargetId) ?? null)
+    : null;
 
   const activePath = useMemo(() => {
-    if (!focusedId || !pathTargetId) return null;
-    return findShortestGraphPath(graph, focusedId, pathTargetId, allItems, {
-      allowTagFallback: includeTagEdges,
-    });
-  }, [graph, focusedId, pathTargetId, allItems, includeTagEdges]);
+    if (!effectiveFocusedId || !effectivePathTargetId) return null;
+    return findShortestGraphPath(
+      graph,
+      effectiveFocusedId,
+      effectivePathTargetId,
+      allItems,
+      {
+        allowTagFallback: includeTagEdges,
+      }
+    );
+  }, [graph, effectiveFocusedId, effectivePathTargetId, allItems, includeTagEdges]);
 
   const pathNodeIndexMap = useMemo(() => {
     const map = new Map<string, number>();
@@ -333,7 +407,7 @@ export function GlobalRelationMapModal({
     const pathOnly: GlobalGraphEdge[] = [];
 
     for (const edge of graph.edges) {
-      if (pathTargetId) {
+      if (effectivePathTargetId) {
         if (pathEdgeIdSet.has(edge.id)) {
           pathOnly.push(edge);
         } else {
@@ -343,8 +417,8 @@ export function GlobalRelationMapModal({
       }
 
       const isIncident =
-        Boolean(focusedId) &&
-        (edge.sourceId === focusedId || edge.targetId === focusedId);
+        Boolean(effectiveFocusedId) &&
+        (edge.sourceId === effectiveFocusedId || edge.targetId === effectiveFocusedId);
       if (isIncident) {
         highlighted.push(edge);
       } else if (focusContext?.secondHopEdgeIds.has(edge.id)) {
@@ -366,14 +440,22 @@ export function GlobalRelationMapModal({
       highlightedEdges: highlighted,
       pathEdges: pathOnly,
     };
-  }, [graph.edges, focusedId, focusContext, pathTargetId, pathEdgeIdSet]);
+  }, [graph.edges, effectiveFocusedId, focusContext, effectivePathTargetId, pathEdgeIdSet]);
 
   // Sort nodes so hubs, focused, direct neighbors, and active path nodes always render cleanly on top
   const orderedNodes = useMemo(() => {
-    if (pathTargetId) {
+    if (effectivePathTargetId) {
       return [...graph.nodes].sort((a, b) => {
-        const pA = pathNodeIndexMap.has(a.id) ? 10 : a.id === focusedId || a.id === pathTargetId ? 8 : 0;
-        const pB = pathNodeIndexMap.has(b.id) ? 10 : b.id === focusedId || b.id === pathTargetId ? 8 : 0;
+        const pA = pathNodeIndexMap.has(a.id)
+          ? 10
+          : a.id === effectiveFocusedId || a.id === effectivePathTargetId
+            ? 8
+            : 0;
+        const pB = pathNodeIndexMap.has(b.id)
+          ? 10
+          : b.id === effectiveFocusedId || b.id === effectivePathTargetId
+            ? 8
+            : 0;
         return pA - pB || a.intensityTier - b.intensityTier;
       });
     }
@@ -394,13 +476,19 @@ export function GlobalRelationMapModal({
       return 0;
     };
     return [...graph.nodes].sort((a, b) => rank(a) - rank(b));
-  }, [graph.nodes, focusContext, pathTargetId, pathNodeIndexMap, focusedId]);
+  }, [
+    graph.nodes,
+    focusContext,
+    effectivePathTargetId,
+    pathNodeIndexMap,
+    effectiveFocusedId,
+  ]);
 
   // Limit on-canvas direct edge labels to keep dense hubs crisp and collision-free
   const visibleDirectEdgeLabels = useMemo(() => {
-    if (pathTargetId || !focusContext) return [];
+    if (effectivePathTargetId || !focusContext) return [];
     return focusContext.directRelations.slice(0, 8);
-  }, [focusContext, pathTargetId]);
+  }, [focusContext, effectivePathTargetId]);
 
   if (!open) return null;
 
@@ -433,13 +521,35 @@ export function GlobalRelationMapModal({
     });
   };
 
+  const handleSelectTopCategory = (catId: 'all' | ArchiveCategory) => {
+    setCategory(catId);
+    setVisibleCategories(createCategoryVisibilityForFilter(catId));
+  };
+
+  const handleToggleCanvasCategory = (target: ArchiveCategory) => {
+    const { nextFilter, nextVisibility } = toggleCategoryVisibilityState(
+      category,
+      visibleCategories,
+      target
+    );
+    setVisibleCategories(nextVisibility);
+    if (nextFilter !== category) {
+      setCategory(nextFilter);
+    }
+  };
+
+  const handleShowAllCategories = () => {
+    setCategory('all');
+    setVisibleCategories({ ...ALL_CATEGORIES_VISIBLE });
+  };
+
   const handlePointerUp = () => {
     if (dragRef.current.active && !dragRef.current.moved) {
       if (pathPicking) {
         setPathPicking(false);
-      } else if (pathTargetId) {
+      } else if (effectivePathTargetId) {
         setPathTargetId(null);
-      } else if (focusedId) {
+      } else if (effectiveFocusedId) {
         setFocusedId(null);
       }
     }
@@ -459,7 +569,7 @@ export function GlobalRelationMapModal({
   };
 
   const handleNodeClick = (node: GlobalGraphNode) => {
-    if (pathPicking && focusedId && node.id !== focusedId) {
+    if (pathPicking && effectiveFocusedId && node.id !== effectiveFocusedId) {
       setPathTargetId(node.id);
       setPathPicking(false);
       return;
@@ -538,6 +648,12 @@ export function GlobalRelationMapModal({
             </h2>
             <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 font-mono text-[11px] text-[#A59D90] tabular-nums">
               <span>{graph.nodes.length} 节点</span>
+              {hiddenNodeCount > 0 && (
+                <>
+                  <span aria-hidden="true">·</span>
+                  <span className="text-[#D4AF6A]">已隐藏 {hiddenNodeCount}</span>
+                </>
+              )}
               <span aria-hidden="true">·</span>
               <span>{graph.explicitEdgeCount} 直连</span>
               {graph.inferredEdgeCount > 0 && (
@@ -667,7 +783,7 @@ export function GlobalRelationMapModal({
                   key={cat.id}
                   type="button"
                   aria-pressed={category === cat.id}
-                  onClick={() => setCategory(cat.id)}
+                  onClick={() => handleSelectTopCategory(cat.id)}
                   className={`min-h-[34px] rounded-lg px-2.5 text-xs font-medium whitespace-nowrap cursor-pointer ${
                     category === cat.id
                       ? 'bg-[#FAF7F0] text-[#1A1816]'
@@ -849,7 +965,7 @@ export function GlobalRelationMapModal({
                   type="button"
                   onClick={() => navigateToNode(hub.id, { recenter: true })}
                   className={`inline-flex min-h-[30px] shrink-0 items-center gap-1 rounded-lg border px-2.5 text-xs whitespace-nowrap cursor-pointer ${
-                    focusedId === hub.id
+                    effectiveFocusedId === hub.id
                       ? 'border-[#D4AF6A] bg-[#D4AF6A]/20 text-[#FAF7F0]'
                       : 'border-white/10 bg-white/5 text-[#CFC7B9] hover:border-white/25'
                   }`}
@@ -936,19 +1052,45 @@ export function GlobalRelationMapModal({
         {/* Interactive Pan / Zoom Constellation Canvas */}
         <div className="relative min-h-[260px] flex-1 overflow-hidden bg-[radial-gradient(circle_at_center,#221F1B_0%,#141210_100%)]">
           {graph.nodes.length === 0 ? (
-            <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-              <Link2 className="h-8 w-8 text-[#8C857B]" aria-hidden="true" />
-              <p className="mt-3 font-editorial text-base text-[#FAF7F0]">
-                {isolatedOnly ? '太棒了，所有藏品都已建立关联' : '暂无可展示的藏品节点'}
-              </p>
-              {isolatedOnly && (
-                <button
-                  type="button"
-                  onClick={() => setIsolatedOnly(false)}
-                  className="mt-4 min-h-[40px] rounded-xl bg-[#FAF7F0] px-4 text-xs font-medium text-[#1A1816] cursor-pointer"
-                >
-                  查看全馆星图
-                </button>
+            <div
+              data-testid="global-graph-empty-state"
+              className="flex h-full flex-col items-center justify-center px-6 pt-12 text-center"
+            >
+              {allCategoriesHidden || baseGraph.nodes.length > 0 ? (
+                <>
+                  <EyeOff className="h-8 w-8 text-[#A59D90]" aria-hidden="true" />
+                  <p className="mt-3 font-editorial text-base text-[#FAF7F0]">
+                    已隐藏当前画布中的分类节点
+                  </p>
+                  <p className="mt-1 text-xs text-[#9E9587]">
+                    可点击左上角分类开关逐项恢复，或一键显示全部节点
+                  </p>
+                  <button
+                    type="button"
+                    data-testid="canvas-show-all-categories-btn"
+                    onClick={handleShowAllCategories}
+                    className="mt-4 inline-flex min-h-[40px] items-center gap-1.5 rounded-xl bg-[#FAF7F0] px-4 text-xs font-medium text-[#1A1816] whitespace-nowrap hover:bg-white cursor-pointer"
+                  >
+                    <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span>显示全部分类</span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link2 className="h-8 w-8 text-[#8C857B]" aria-hidden="true" />
+                  <p className="mt-3 font-editorial text-base text-[#FAF7F0]">
+                    {isolatedOnly ? '太棒了，所有藏品都已建立关联' : '暂无可展示的藏品节点'}
+                  </p>
+                  {isolatedOnly && (
+                    <button
+                      type="button"
+                      onClick={() => setIsolatedOnly(false)}
+                      className="mt-4 min-h-[40px] rounded-xl bg-[#FAF7F0] px-4 text-xs font-medium text-[#1A1816] cursor-pointer"
+                    >
+                      查看全馆星图
+                    </button>
+                  )}
+                </>
               )}
             </div>
           ) : (
@@ -1039,7 +1181,8 @@ export function GlobalRelationMapModal({
                   const s = nodeById.get(edge.sourceId);
                   const t = nodeById.get(edge.targetId);
                   if (!s || !t) return null;
-                  const visualState = focusedId || pathTargetId ? 'dimmed' : 'idle';
+                  const visualState =
+                    effectiveFocusedId || effectivePathTargetId ? 'dimmed' : 'idle';
                   const style = getEdgeVisualStyle(edge, visualState);
                   const geom = computeCurvedEdgeGeometry(
                     s,
@@ -1294,37 +1437,38 @@ export function GlobalRelationMapModal({
 
                 {/* Constellation Nodes with Archival Thumbnails, Strength Grading & Path Step Numbers */}
                 {orderedNodes.map((node) => {
-                  const isFocused = focusedId === node.id;
+                  const isFocused = effectiveFocusedId === node.id;
                   const pathStepNum = pathNodeIndexMap.get(node.id);
                   const isPathNode = Boolean(pathStepNum);
                   const isPathEndpoint =
-                    Boolean(pathTargetId) &&
-                    (node.id === focusedId || node.id === pathTargetId);
+                    Boolean(effectivePathTargetId) &&
+                    (node.id === effectiveFocusedId ||
+                      node.id === effectivePathTargetId);
                   const isDirectNeighbor =
-                    !pathTargetId &&
+                    !effectivePathTargetId &&
                     (focusContext?.directNeighborIds.has(node.id) ?? false);
                   const isSecondHopNeighbor =
-                    !pathTargetId &&
+                    !effectivePathTargetId &&
                     (focusContext?.secondHopNeighborIds.has(node.id) ?? false);
                   const isTagNeighbor =
-                    !pathTargetId &&
+                    !effectivePathTargetId &&
                     (focusContext?.tagNeighborIds.has(node.id) ?? false);
 
-                  const dimmed = pathTargetId
+                  const dimmed = effectivePathTargetId
                     ? !isPathNode && !isPathEndpoint
                     : Boolean(
-                        focusedId &&
+                        effectiveFocusedId &&
                           !isFocused &&
                           !isDirectNeighbor &&
                           !isSecondHopNeighbor &&
                           !isTagNeighbor
                       );
 
-                  const nodeState: GraphNodeFocusState = pathTargetId
+                  const nodeState: GraphNodeFocusState = effectivePathTargetId
                     ? isPathNode || isPathEndpoint
                       ? 'path-node'
                       : 'dimmed'
-                    : !focusedId
+                    : !effectiveFocusedId
                       ? 'idle'
                       : isFocused
                         ? 'focused'
@@ -1391,6 +1535,7 @@ export function GlobalRelationMapModal({
                     <g
                       key={node.id}
                       data-node-id={node.id}
+                      data-node-category={node.item.category}
                       data-node-state={nodeState}
                       data-node-tier={visualTier}
                       data-node-intensity={node.intensity}
@@ -1448,7 +1593,7 @@ export function GlobalRelationMapModal({
                           cy={node.y}
                           r={node.radius + 8.5}
                           fill="rgba(245, 220, 155, 0.1)"
-                          stroke={pathTargetId ? '#F4896B' : '#F5DC9B'}
+                          stroke={effectivePathTargetId ? '#F4896B' : '#F5DC9B'}
                           strokeWidth={2}
                           strokeOpacity={0.92}
                         />
@@ -1590,38 +1735,101 @@ export function GlobalRelationMapModal({
             </svg>
           )}
 
-          {/* Legend Top-Left: Categories + Edge Kinds */}
-          <div
-            data-testid="global-graph-legend"
-            className="pointer-events-none absolute left-3 top-3 flex max-w-[calc(100%-4.5rem)] flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-white/8 bg-[#161411]/90 px-3 py-1.5 text-[11px] text-[#CFC7B9] backdrop-blur-xs"
-          >
-            <span className="inline-flex items-center gap-1">
-              <span className="h-2.5 w-2.5 rounded-full bg-[#CA3C28]" />
-              影视
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <span className="h-2.5 w-2.5 rounded-full bg-[#DBB768]" />
-              影人
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <span className="h-2.5 w-2.5 rounded-full bg-[#66AD95]" />
-              角色
-            </span>
-            <span className="inline-flex items-center gap-2 border-l border-white/15 pl-2.5 text-[#BDB5A8]">
-              <span className="inline-flex items-center gap-1">
-                <span className="inline-block h-[2.5px] w-3.5 rounded-full bg-[#E4C37A]" />
-                直连
+          {/* Top-Left Interactive On-Canvas Category Visibility Toggles + Edge Legend */}
+          {allItems.length > 0 && (
+            <div
+              data-testid="global-graph-legend"
+              className="pointer-events-auto absolute left-3 top-3 z-10 flex max-w-[calc(100%-4.5rem)] flex-wrap items-center gap-x-2 gap-y-1.5 rounded-xl border border-white/12 bg-[#161411]/92 px-2 py-1.5 text-[11px] text-[#CFC7B9] shadow-lg backdrop-blur-xs sm:px-2.5"
+            >
+              <div
+                role="group"
+                aria-label="画布分类显隐开关"
+                data-testid="canvas-category-visibility"
+                className="flex flex-wrap items-center gap-1"
+              >
+                {CANVAS_CATEGORY_TOGGLES.map((cat) => {
+                  const isVisible = visibleCategories[cat.id];
+                  const count = availableCategoryCounts[cat.id];
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      data-testid={`canvas-toggle-${cat.id}`}
+                      aria-pressed={isVisible}
+                      aria-label={
+                        isVisible
+                          ? `隐藏${cat.label}节点（当前 ${count} 项）`
+                          : `显示${cat.label}节点（共 ${count} 项）`
+                      }
+                      onClick={() => handleToggleCanvasCategory(cat.id)}
+                      className={`inline-flex min-h-[30px] shrink-0 items-center gap-1.5 rounded-lg border px-2 text-[11px] font-medium whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF6A] cursor-pointer sm:min-h-[28px] ${
+                        isVisible
+                          ? 'border-white/18 bg-white/[0.1] text-[#FAF7F0] hover:bg-white/[0.16]'
+                          : 'border-white/8 bg-transparent text-[#8C857B] hover:border-white/18 hover:text-[#CFC7B9]'
+                      }`}
+                    >
+                      {isVisible ? (
+                        <span
+                          aria-hidden="true"
+                          className="h-2.5 w-2.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: cat.dotColor }}
+                        />
+                      ) : (
+                        <EyeOff
+                          className="h-3 w-3 shrink-0 text-[#8C857B]"
+                          aria-hidden="true"
+                        />
+                      )}
+                      <span
+                        className={
+                          isVisible
+                            ? ''
+                            : 'line-through decoration-[#8C857B]/70'
+                        }
+                      >
+                        {cat.label}
+                      </span>
+                      <span
+                        className={`font-mono text-[10px] tabular-nums ${
+                          isVisible ? 'text-[#BDB5A8]' : 'text-[#736C62]'
+                        }`}
+                      >
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+
+                {hasHiddenCategory && (
+                  <button
+                    type="button"
+                    data-testid="canvas-visibility-reset"
+                    onClick={handleShowAllCategories}
+                    aria-label="显示全部分类节点"
+                    className="inline-flex min-h-[30px] shrink-0 items-center gap-1 rounded-lg border border-[#D4AF6A]/40 bg-[#D4AF6A]/14 px-2 text-[11px] font-medium text-[#F5DC9B] whitespace-nowrap transition-colors hover:bg-[#D4AF6A]/24 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF6A] cursor-pointer sm:min-h-[28px]"
+                  >
+                    <Eye className="h-3 w-3 shrink-0" aria-hidden="true" />
+                    <span>全显</span>
+                  </button>
+                )}
+              </div>
+
+              <span className="pointer-events-none hidden items-center gap-2 border-l border-white/15 pl-2.5 text-[#BDB5A8] sm:inline-flex">
+                <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                  <span className="inline-block h-[2.5px] w-3.5 rounded-full bg-[#E4C37A]" />
+                  直连
+                </span>
+                <span className="inline-flex items-center gap-1 text-[#9EE0C9] whitespace-nowrap">
+                  <span className="inline-block h-0 w-3.5 border-t-2 border-dashed border-[#7CC6AE]" />
+                  自动发现
+                </span>
+                <span className="hidden items-center gap-1 whitespace-nowrap md:inline-flex">
+                  <span className="inline-block h-0 w-3.5 border-t border-dotted border-[#CFC7B9]" />
+                  共签
+                </span>
               </span>
-              <span className="inline-flex items-center gap-1 text-[#9EE0C9]">
-                <span className="inline-block h-0 w-3.5 border-t-2 border-dashed border-[#7CC6AE]" />
-                自动发现
-              </span>
-              <span className="hidden items-center gap-1 sm:inline-flex">
-                <span className="inline-block h-0 w-3.5 border-t border-dotted border-[#CFC7B9]" />
-                共签
-              </span>
-            </span>
-          </div>
+            </div>
+          )}
 
           {/* Touch & Mouse Zoom Controls Top-Right */}
           <div className="absolute right-3 top-3 flex flex-col gap-1.5">
@@ -1681,9 +1889,9 @@ export function GlobalRelationMapModal({
             setPathPicking(false);
           }}
           onSwapPathEnds={() => {
-            if (!focusedId || !pathTargetId) return;
-            const prevStart = focusedId;
-            setFocusedId(pathTargetId);
+            if (!effectiveFocusedId || !effectivePathTargetId) return;
+            const prevStart = effectiveFocusedId;
+            setFocusedId(effectivePathTargetId);
             setPathTargetId(prevStart);
           }}
           onClearPath={() => {

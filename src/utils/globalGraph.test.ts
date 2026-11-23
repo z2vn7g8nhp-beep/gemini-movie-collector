@@ -2,17 +2,22 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { ArchiveItem } from '../types/archive';
 import {
+  ALL_CATEGORIES_VISIBLE,
   buildGlobalRelationGraph,
   computeCurvedEdgeGeometry,
   computeEdgeCurveOffsets,
   computeFocusCamera,
   computeSmartEdgeLabelPoint,
+  countNodesByCategory,
+  createCategoryVisibilityForFilter,
   describeRelationBetween,
+  filterGraphByVisibleCategories,
   findShortestGraphPath,
   getEdgeVisualStyle,
   getFocusedNodeConnections,
   getNodeVisualStyle,
   searchGraphNodes,
+  toggleCategoryVisibilityState,
 } from './globalGraph';
 
 function makeItem(partial: Partial<ArchiveItem> & { id: string; title: string }): ArchiveItem {
@@ -549,4 +554,143 @@ test('buildGlobalRelationGraph with includeInferredEdges discovers multi-cluster
   );
   assert.ok(pathStyle.haloWidth > 0);
 });
+
+test('filterGraphByVisibleCategories hides excluded categories and dangling edges while preserving layout coordinates', () => {
+  const items: ArchiveItem[] = [
+    makeItem({
+      id: 'f1',
+      accessionNo: 'CA-001',
+      category: 'film',
+      title: '花样年华',
+      relatedIds: ['p1', 'c1'],
+    }),
+    makeItem({
+      id: 'p1',
+      accessionNo: 'CA-002',
+      category: 'person',
+      title: '梁朝伟',
+      relatedIds: ['f1', 'c1'],
+    }),
+    makeItem({
+      id: 'c1',
+      accessionNo: 'CA-003',
+      category: 'character',
+      title: '周慕云',
+      relatedIds: ['f1', 'p1'],
+    }),
+    makeItem({
+      id: 'f2',
+      accessionNo: 'CA-004',
+      category: 'film',
+      title: '千与千寻',
+      relatedIds: ['c2'],
+    }),
+    makeItem({
+      id: 'c2',
+      accessionNo: 'CA-005',
+      category: 'character',
+      title: '无脸男',
+      relatedIds: ['f2'],
+    }),
+  ];
+
+  const fullGraph = buildGlobalRelationGraph(items, { includeTagEdges: false });
+  assert.deepEqual(countNodesByCategory(fullGraph.nodes), {
+    film: 2,
+    person: 1,
+    character: 2,
+  });
+
+  // Fast path when all visible returns identical reference
+  assert.equal(
+    filterGraphByVisibleCategories(fullGraph, ALL_CATEGORIES_VISIBLE),
+    fullGraph
+  );
+
+  // Hide character nodes: film + person remain at exact coordinates, no dangling edges
+  const origF1 = fullGraph.nodes.find((n) => n.id === 'f1')!;
+  const origP1 = fullGraph.nodes.find((n) => n.id === 'p1')!;
+  const noChars = filterGraphByVisibleCategories(fullGraph, {
+    film: true,
+    person: true,
+    character: false,
+  });
+
+  assert.deepEqual(
+    noChars.nodes.map((n) => n.id).sort(),
+    ['f1', 'f2', 'p1']
+  );
+  // Exact positions preserved without layout jump
+  const keptF1 = noChars.nodes.find((n) => n.id === 'f1')!;
+  const keptP1 = noChars.nodes.find((n) => n.id === 'p1')!;
+  assert.equal(keptF1.x, origF1.x);
+  assert.equal(keptF1.y, origF1.y);
+  assert.equal(keptP1.x, origP1.x);
+  assert.equal(keptP1.y, origP1.y);
+
+  // Only f1 <-> p1 explicit edge remains; edges to c1 and c2 are removed
+  assert.equal(noChars.edges.length, 1);
+  assert.equal(noChars.explicitEdgeCount, 1);
+  assert.ok(
+    noChars.edges.every(
+      (e) =>
+        noChars.nodes.some((n) => n.id === e.sourceId) &&
+        noChars.nodes.some((n) => n.id === e.targetId)
+    )
+  );
+  // Cluster 2 (f2 + c2) drops below 2 visible nodes and is collapsed out
+  assert.equal(noChars.clusters.length, 1);
+  assert.deepEqual(noChars.clusters[0].nodeIds.sort(), ['f1', 'p1']);
+  // Hidden focused node gracefully returns null in getFocusedNodeConnections
+  assert.equal(getFocusedNodeConnections(noChars, 'c1', items), null);
+  assert.ok(getFocusedNodeConnections(noChars, 'f1', items));
+
+  // Hide all three categories -> empty visible graph
+  const allHidden = filterGraphByVisibleCategories(fullGraph, {
+    film: false,
+    person: false,
+    character: false,
+  });
+  assert.equal(allHidden.nodes.length, 0);
+  assert.equal(allHidden.edges.length, 0);
+  assert.equal(allHidden.clusters.length, 0);
+  assert.equal(allHidden.hubs.length, 0);
+});
+
+test('toggleCategoryVisibilityState toggles cleanly in all mode and promotes single-category filter', () => {
+  const allVis = createCategoryVisibilityForFilter('all');
+  assert.deepEqual(allVis, { film: true, person: true, character: true });
+
+  // Toggle character off in all mode
+  const step1 = toggleCategoryVisibilityState('all', allVis, 'character');
+  assert.equal(step1.nextFilter, 'all');
+  assert.deepEqual(step1.nextVisibility, {
+    film: true,
+    person: true,
+    character: false,
+  });
+
+  // Single-category top-bar filter synced visibility
+  const filmOnlyVis = createCategoryVisibilityForFilter('film');
+  assert.deepEqual(filmOnlyVis, { film: true, person: false, character: false });
+
+  // Toggling person on from film-only promotes filter to 'all' and keeps both film + person visible
+  const promoted = toggleCategoryVisibilityState('film', filmOnlyVis, 'person');
+  assert.equal(promoted.nextFilter, 'all');
+  assert.deepEqual(promoted.nextVisibility, {
+    film: true,
+    person: true,
+    character: false,
+  });
+
+  // Toggling film off while in film-only mode hides film without changing filter
+  const hiddenFilm = toggleCategoryVisibilityState('film', filmOnlyVis, 'film');
+  assert.equal(hiddenFilm.nextFilter, 'film');
+  assert.deepEqual(hiddenFilm.nextVisibility, {
+    film: false,
+    person: false,
+    character: false,
+  });
+});
+
 
