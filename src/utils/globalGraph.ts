@@ -1,17 +1,31 @@
 import type { ArchiveCategory, ArchiveItem } from '../types/archive';
 import { getRelatedItems } from './archive';
+import {
+  buildCategoryBridgeEdges,
+  discoverMetadataFilmographyLinks,
+  mergeInferredFilmographyEdges,
+  type FilmographyRoleType,
+  type InferredFilmographyEdge,
+} from './filmographyInference';
 import { isThematicTag } from './medals';
 
 export type RelationStrengthTier = 1 | 2 | 3;
 export type NodeIntensityTier = 0 | 1 | 2 | 3;
 
-export type GraphEdgeVisualState = 'idle' | 'highlighted' | 'second-hop' | 'dimmed';
+export type GraphEdgeKind = 'explicit' | 'inferred' | 'tag';
+export type GraphEdgeVisualState =
+  | 'idle'
+  | 'highlighted'
+  | 'second-hop'
+  | 'path'
+  | 'dimmed';
 export type GraphNodeFocusState =
   | 'idle'
   | 'focused'
   | 'direct-neighbor'
   | 'second-hop'
   | 'tag-neighbor'
+  | 'path-node'
   | 'dimmed';
 
 export interface EdgeVisualStyle {
@@ -41,6 +55,8 @@ export interface GlobalGraphNode {
   x: number;
   y: number;
   degree: number;
+  explicitDegree: number;
+  inferredDegree: number;
   tagDegree: number;
   weightedDegree: number;
   intensity: number;
@@ -55,8 +71,14 @@ export interface GlobalGraphEdge {
   id: string;
   sourceId: string;
   targetId: string;
-  kind: 'explicit' | 'tag';
+  kind: GraphEdgeKind;
   label?: string;
+  roleType?: FilmographyRoleType;
+  roleCharacterName?: string;
+  bridgeTitle?: string;
+  evidence?: string;
+  inferenceSource?: InferredFilmographyEdge['source'];
+  isPersistable?: boolean;
   strength: RelationStrengthTier;
   strengthScore: number;
   strengthWeight: number;
@@ -67,6 +89,17 @@ export interface GlobalGraphEdge {
   isBidirectional: boolean;
 }
 
+export interface GraphCluster {
+  index: number;
+  hubId: string;
+  title: string;
+  nodeIds: string[];
+  edgeCount: number;
+  centerX: number;
+  centerY: number;
+  radius: number;
+}
+
 export interface GlobalGraphModel {
   width: number;
   height: number;
@@ -74,8 +107,11 @@ export interface GlobalGraphModel {
   edges: GlobalGraphEdge[];
   hubs: GlobalGraphNode[];
   isolatedNodes: GlobalGraphNode[];
+  clusters: GraphCluster[];
   explicitEdgeCount: number;
+  inferredEdgeCount: number;
   tagEdgeCount: number;
+  unlinkedAutoPairs: Array<[string, string]>;
   maxStrengthScore: number;
   maxWeightedDegree: number;
 }
@@ -83,9 +119,11 @@ export interface GlobalGraphModel {
 export interface DirectRelationDetail {
   edgeId: string;
   node: GlobalGraphNode;
-  kind: 'explicit' | 'tag';
+  kind: GraphEdgeKind;
   shortLabel: string;
   description: string;
+  evidence?: string;
+  isPersistable?: boolean;
   sharedTags: string[];
   strength: RelationStrengthTier;
   strengthScore: number;
@@ -94,9 +132,18 @@ export interface DirectRelationDetail {
   mutualCount: number;
 }
 
+export interface SecondHopRelationDetail {
+  node: GlobalGraphNode;
+  viaNodes: GlobalGraphNode[];
+  viaEdgeIds: string[];
+  bridgeSummary: string;
+  strength: RelationStrengthTier;
+}
+
 export interface FocusedNodeRelationContext {
   focusedNode: GlobalGraphNode;
   directRelations: DirectRelationDetail[];
+  secondHopRelations: SecondHopRelationDetail[];
   tagRelations: DirectRelationDetail[];
   directNeighborIds: Set<string>;
   secondHopNeighborIds: Set<string>;
@@ -108,10 +155,34 @@ export interface FocusedNodeRelationContext {
   tagStrengthByNodeId: Map<string, RelationStrengthTier>;
 }
 
-const CANVAS_W = 720;
-const CANVAS_H = 560;
-const CX = CANVAS_W / 2;
-const CY = CANVAS_H / 2;
+export interface GraphPathStep {
+  fromNode: GlobalGraphNode;
+  toNode: GlobalGraphNode;
+  edge: GlobalGraphEdge;
+  shortLabel: string;
+  description: string;
+}
+
+export interface GraphPathResult {
+  startId: string;
+  endId: string;
+  nodeIds: string[];
+  edgeIds: string[];
+  steps: GraphPathStep[];
+  hopCount: number;
+  usesTagBridge: boolean;
+}
+
+export interface CurvedEdgeGeometry {
+  pathD: string;
+  ctrlX: number;
+  ctrlY: number;
+  midX: number;
+  midY: number;
+}
+
+const DEFAULT_CANVAS_W = 860;
+const DEFAULT_CANVAS_H = 520;
 
 function pairKey(a: string, b: string): string {
   return a < b ? `${a}::${b}` : `${b}::${a}`;
@@ -236,15 +307,28 @@ const NODE_TIER_PALETTE: Record<
 };
 
 /**
- * Maps an edge's relation strength and current interaction state to stroke thickness,
- * color richness, opacity, and subtle glow halo parameters.
+ * Maps an edge's relation kind, strength, and interaction state to stroke thickness,
+ * color richness, dash cadence, opacity, and subtle glow halo parameters.
  */
 export function getEdgeVisualStyle(
   edge: Pick<GlobalGraphEdge, 'kind' | 'strength' | 'strengthWeight'>,
   state: GraphEdgeVisualState
 ): EdgeVisualStyle {
   const isExplicit = edge.kind === 'explicit';
+  const isInferred = edge.kind === 'inferred';
   const weightBonus = Math.max(0, Math.min(1, edge.strengthWeight)) * 0.45;
+
+  if (state === 'path') {
+    return {
+      stroke: '#F4896B',
+      strokeWidth: 3.8,
+      strokeOpacity: 0.98,
+      strokeDasharray: isInferred ? '7 3' : edge.kind === 'tag' ? '3 3' : undefined,
+      haloWidth: 10.5,
+      haloOpacity: 0.3,
+      haloColor: '#E8634E',
+    };
+  }
 
   if (state === 'highlighted') {
     if (isExplicit) {
@@ -277,6 +361,41 @@ export function getEdgeVisualStyle(
         haloColor: '#B89D68',
       };
     }
+
+    if (isInferred) {
+      if (edge.strength === 3) {
+        return {
+          stroke: '#96DBC3',
+          strokeWidth: +(3.1 + weightBonus * 0.6).toFixed(2),
+          strokeOpacity: 0.95,
+          strokeDasharray: '7 3',
+          haloWidth: 8.0,
+          haloOpacity: 0.2,
+          haloColor: '#6EBFA5',
+        };
+      }
+      if (edge.strength === 2) {
+        return {
+          stroke: '#7CC6AE',
+          strokeWidth: +(2.2 + weightBonus * 0.4).toFixed(2),
+          strokeOpacity: 0.88,
+          strokeDasharray: '6 3',
+          haloWidth: 5.2,
+          haloOpacity: 0.13,
+          haloColor: '#5DA88F',
+        };
+      }
+      return {
+        stroke: '#6AA893',
+        strokeWidth: 1.65,
+        strokeOpacity: 0.76,
+        strokeDasharray: '5 3',
+        haloWidth: 0,
+        haloOpacity: 0,
+        haloColor: 'transparent',
+      };
+    }
+
     // Tag edge highlighted
     if (edge.strength >= 2) {
       return {
@@ -301,18 +420,24 @@ export function getEdgeVisualStyle(
   }
 
   if (state === 'second-hop') {
-    const baseW = isExplicit
-      ? edge.strength === 3
-        ? 1.9
-        : edge.strength === 2
-          ? 1.45
-          : 1.1
-      : 1.0;
+    const baseW =
+      isExplicit || isInferred
+        ? edge.strength === 3
+          ? 1.9
+          : edge.strength === 2
+            ? 1.45
+            : 1.1
+        : 1.0;
     return {
-      stroke: isExplicit ? '#D4AF6A' : '#CFC7B9',
+      stroke: isExplicit ? '#D4AF6A' : isInferred ? '#7CC6AE' : '#CFC7B9',
       strokeWidth: baseW,
-      strokeOpacity: isExplicit ? (edge.strength === 3 ? 0.44 : 0.32) : 0.2,
-      strokeDasharray: isExplicit ? '5 3' : '2 4',
+      strokeOpacity:
+        isExplicit || isInferred
+          ? edge.strength === 3
+            ? 0.44
+            : 0.32
+          : 0.2,
+      strokeDasharray: isExplicit ? '5 3' : isInferred ? '4 3' : '2 4',
       haloWidth: 0,
       haloOpacity: 0,
       haloColor: 'transparent',
@@ -320,18 +445,25 @@ export function getEdgeVisualStyle(
   }
 
   if (state === 'dimmed') {
-    const baseW = isExplicit
-      ? edge.strength === 3
-        ? 1.55
-        : edge.strength === 2
-          ? 1.1
-          : 0.85
-      : 0.85;
+    const baseW =
+      isExplicit || isInferred
+        ? edge.strength === 3
+          ? 1.55
+          : edge.strength === 2
+            ? 1.1
+            : 0.85
+        : 0.85;
     return {
-      stroke: isExplicit ? '#D4AF6A' : '#CFC7B9',
+      stroke: isExplicit ? '#D4AF6A' : isInferred ? '#6EBFA5' : '#CFC7B9',
       strokeWidth: baseW,
-      strokeOpacity: isExplicit ? (edge.strength === 3 ? 0.2 : 0.12) : 0.07,
-      strokeDasharray: isExplicit ? undefined : '3 4',
+      strokeOpacity: isExplicit
+        ? edge.strength === 3
+          ? 0.2
+          : 0.12
+        : isInferred
+          ? 0.14
+          : 0.07,
+      strokeDasharray: isExplicit ? undefined : isInferred ? '5 3' : '3 4',
       haloWidth: 0,
       haloOpacity: 0,
       haloColor: 'transparent',
@@ -364,6 +496,40 @@ export function getEdgeVisualStyle(
       stroke: '#AE9568',
       strokeWidth: 1.25,
       strokeOpacity: 0.48,
+      haloWidth: 0,
+      haloOpacity: 0,
+      haloColor: 'transparent',
+    };
+  }
+
+  if (isInferred) {
+    if (edge.strength === 3) {
+      return {
+        stroke: '#86D1B8',
+        strokeWidth: +(2.55 + weightBonus * 0.5).toFixed(2),
+        strokeOpacity: 0.84,
+        strokeDasharray: '6 3',
+        haloWidth: 5.8,
+        haloOpacity: 0.12,
+        haloColor: '#6EBFA5',
+      };
+    }
+    if (edge.strength === 2) {
+      return {
+        stroke: '#72BBA3',
+        strokeWidth: +(1.85 + weightBonus * 0.35).toFixed(2),
+        strokeOpacity: 0.68,
+        strokeDasharray: '6 3',
+        haloWidth: 0,
+        haloOpacity: 0,
+        haloColor: 'transparent',
+      };
+    }
+    return {
+      stroke: '#5E9E89',
+      strokeWidth: 1.35,
+      strokeOpacity: 0.52,
+      strokeDasharray: '5 3.5',
       haloWidth: 0,
       haloOpacity: 0,
       haloColor: 'transparent',
@@ -405,39 +571,45 @@ export function getNodeVisualStyle(
   const palette = NODE_TIER_PALETTE[category][tier];
   const isFocused = focusState === 'focused';
   const isDirect = focusState === 'direct-neighbor';
+  const isPathNode = focusState === 'path-node';
   const showAura =
     (focusState === 'idle' && tier === 3) ||
-    (isDirect && tier === 3);
+    (isDirect && tier === 3) ||
+    isPathNode;
 
   return {
     fill: palette.fill,
     stroke: isFocused
       ? '#FFFFFF'
-      : isDirect
-        ? tier === 3
-          ? '#FFF4D4'
-          : '#FAF7F0'
-        : palette.stroke,
+      : isPathNode
+        ? '#F9B49F'
+        : isDirect
+          ? tier === 3
+            ? '#FFF4D4'
+            : '#FAF7F0'
+          : palette.stroke,
     textColor: palette.textColor,
     dot: palette.dot,
     strokeWidth: isFocused
       ? 2.7
-      : isDirect
-        ? tier === 3
-          ? 2.3
-          : tier === 2
-            ? 1.9
-            : 1.5
-        : tier === 3
-          ? 2.0
-          : tier === 2
-            ? 1.6
-            : tier === 1
-              ? 1.3
-              : 1.0,
+      : isPathNode
+        ? 2.5
+        : isDirect
+          ? tier === 3
+            ? 2.3
+            : tier === 2
+              ? 1.9
+              : 1.5
+          : tier === 3
+            ? 2.0
+            : tier === 2
+              ? 1.6
+              : tier === 1
+                ? 1.3
+                : 1.0,
     auraRadiusOffset: showAura ? 5 : 0,
-    auraStroke: palette.auraStroke,
-    auraOpacity: showAura ? (isDirect ? 0.45 : 0.34) : 0,
+    auraStroke: isPathNode ? '#F4896B' : palette.auraStroke,
+    auraOpacity: showAura ? (isPathNode ? 0.52 : isDirect ? 0.45 : 0.34) : 0,
   };
 }
 
@@ -499,7 +671,9 @@ function findPortrayedCharacterInFilm(
     const matchesFilm =
       cand.relatedIds.includes(film.id) ||
       film.relatedIds.includes(cand.id) ||
-      normalizedIncludes(cand.relatedWorkTitle, film.title);
+      normalizedIncludes(cand.relatedWorkTitle, film.title) ||
+      (Boolean(film.originalTitle) &&
+        normalizedIncludes(cand.relatedWorkTitle, film.originalTitle));
     return matchesFilm;
   });
 }
@@ -512,6 +686,13 @@ function formatPortrayedPhrase(portrayedBy: string): string {
   return `${clean}饰演`;
 }
 
+export interface InferredDescribeMeta {
+  roleType?: FilmographyRoleType;
+  roleCharacterName?: string;
+  bridgeTitle?: string;
+  evidence?: string;
+}
+
 /**
  * Generates a concise, direction-aware label and brief explanation describing
  * why `from` is related to `to` inside the collection knowledge graph.
@@ -520,8 +701,9 @@ export function describeRelationBetween(
   from: ArchiveItem,
   to: ArchiveItem,
   allItems: ArchiveItem[],
-  kind: 'explicit' | 'tag' = 'explicit',
-  tagLabel?: string
+  kind: GraphEdgeKind = 'explicit',
+  tagLabel?: string,
+  inferredMeta?: InferredDescribeMeta
 ): { shortLabel: string; description: string; sharedTags: string[] } {
   const sharedTags = getSharedThematicTags(from, to);
 
@@ -534,12 +716,78 @@ export function describeRelationBetween(
     };
   }
 
+  // Enrich with specific credit/inferred metadata when available
+  if (inferredMeta?.roleType === 'writes') {
+    if (from.category === 'film' && to.category === 'person') {
+      return {
+        shortLabel: '编剧',
+        description: `本片编剧${from.year ? `（${from.year}）` : ''}`,
+        sharedTags,
+      };
+    }
+    if (from.category === 'person' && to.category === 'film') {
+      return {
+        shortLabel: '编剧',
+        description: `担任《${to.title}》编剧${to.year ? `（${to.year}）` : ''}`,
+        sharedTags,
+      };
+    }
+  }
+
+  if (inferredMeta?.roleCharacterName) {
+    if (from.category === 'film' && to.category === 'person') {
+      return {
+        shortLabel: '主演',
+        description: `参演本片 · 饰演角色「${inferredMeta.roleCharacterName}」`,
+        sharedTags,
+      };
+    }
+    if (from.category === 'person' && to.category === 'film') {
+      return {
+        shortLabel: '主演',
+        description: `参演作品 · 饰演「${inferredMeta.roleCharacterName}」${to.year ? `（${to.year}）` : ''}`,
+        sharedTags,
+      };
+    }
+  }
+
+  if (inferredMeta?.roleType === 'co_stars' && from.category === 'person' && to.category === 'person') {
+    return {
+      shortLabel: '合作',
+      description: inferredMeta.bridgeTitle
+        ? `合作作品：《${inferredMeta.bridgeTitle}》`
+        : inferredMeta.evidence || '共同参演 / 合作影人',
+      sharedTags,
+    };
+  }
+
+  if (inferredMeta?.roleType === 'same_creator' && from.category === 'film' && to.category === 'film') {
+    return {
+      shortLabel: '同主创',
+      description: inferredMeta.bridgeTitle
+        ? `共联主创「${inferredMeta.bridgeTitle}」${to.year ? ` · ${to.year}` : ''}`
+        : inferredMeta.evidence || '同主创作品脉络',
+      sharedTags,
+    };
+  }
+
+  if (inferredMeta?.roleType === 'co_work' && from.category === 'character' && to.category === 'character') {
+    return {
+      shortLabel: '同部作品',
+      description: inferredMeta.bridgeTitle
+        ? `同出自《${inferredMeta.bridgeTitle}》`
+        : inferredMeta.evidence || '同部作品角色',
+      sharedTags,
+    };
+  }
+
   // 1. Film -> Person
   if (from.category === 'film' && to.category === 'person') {
     const sub = to.subtitle || '';
     const isDirector =
-      /导演|编导|监督/.test(sub) &&
-      (normalizedIncludes(from.subtitle, to.title) || !/演员|主演/.test(sub));
+      inferredMeta?.roleType === 'directs' ||
+      (/导演|编导|监督/.test(sub) &&
+        (normalizedIncludes(from.subtitle, to.title) || !/演员|主演/.test(sub)));
     if (isDirector) {
       return {
         shortLabel: '导演',
@@ -582,8 +830,9 @@ export function describeRelationBetween(
   if (from.category === 'person' && to.category === 'film') {
     const sub = from.subtitle || '';
     const isDirector =
-      /导演|编导|监督/.test(sub) &&
-      (normalizedIncludes(to.subtitle, from.title) || !/演员|主演/.test(sub));
+      inferredMeta?.roleType === 'directs' ||
+      (/导演|编导|监督/.test(sub) &&
+        (normalizedIncludes(to.subtitle, from.title) || !/演员|主演/.test(sub)));
     if (isDirector) {
       return {
         shortLabel: '执导',
@@ -654,11 +903,13 @@ export function describeRelationBetween(
   // 5. Character -> Person
   if (from.category === 'character' && to.category === 'person') {
     const isPortrayer =
+      inferredMeta?.roleType === 'portrays' ||
       normalizedIncludes(from.portrayedBy, to.title) ||
       (Boolean(to.originalTitle) &&
         normalizedIncludes(from.portrayedBy, to.originalTitle));
     if (isPortrayer) {
-      const work = extractFirstWorkTitle(from.relatedWorkTitle);
+      const work =
+        extractFirstWorkTitle(from.relatedWorkTitle) || inferredMeta?.bridgeTitle || '';
       return {
         shortLabel: '饰演者',
         description: `由${to.title}饰演${work ? ` · 《${work}》` : ''}`,
@@ -684,11 +935,13 @@ export function describeRelationBetween(
   // 6. Person -> Character
   if (from.category === 'person' && to.category === 'character') {
     const isPortrayer =
+      inferredMeta?.roleType === 'portrays' ||
       normalizedIncludes(to.portrayedBy, from.title) ||
       (Boolean(from.originalTitle) &&
         normalizedIncludes(to.portrayedBy, from.originalTitle));
     if (isPortrayer) {
-      const work = extractFirstWorkTitle(to.relatedWorkTitle);
+      const work =
+        extractFirstWorkTitle(to.relatedWorkTitle) || inferredMeta?.bridgeTitle || '';
       return {
         shortLabel: '饰演',
         description: work ? `在《${work}》中饰演该角色` : '饰演该经典角色',
@@ -791,9 +1044,13 @@ const CATEGORY_ORDER: Record<ArchiveCategory, number> = {
   character: 2,
 };
 
+function isFilmographyEdge(edge: GlobalGraphEdge): boolean {
+  return edge.kind === 'explicit' || edge.kind === 'inferred';
+}
+
 /**
- * Computes the highlighted neighborhood and human-readable relation explanations
- * for a clicked/focused node in the global relation constellation.
+ * Computes the highlighted neighborhood, 2-hop filmography bridges, and
+ * human-readable relation explanations for a focused node.
  */
 export function getFocusedNodeConnections(
   graph: GlobalGraphModel,
@@ -830,7 +1087,15 @@ export function getFocusedNodeConnections(
       neighborNode.item,
       contextItems,
       edge.kind,
-      edge.label
+      edge.label,
+      edge.kind === 'inferred'
+        ? {
+            roleType: edge.roleType,
+            roleCharacterName: edge.roleCharacterName,
+            bridgeTitle: edge.bridgeTitle,
+            evidence: edge.evidence,
+          }
+        : undefined
     );
 
     const detail: DirectRelationDetail = {
@@ -839,6 +1104,8 @@ export function getFocusedNodeConnections(
       kind: edge.kind,
       shortLabel: info.shortLabel,
       description: info.description,
+      evidence: edge.evidence,
+      isPersistable: edge.isPersistable,
       sharedTags: info.sharedTags,
       strength: edge.strength,
       strengthScore: edge.strengthScore,
@@ -849,7 +1116,7 @@ export function getFocusedNodeConnections(
 
     edgeDetailById.set(edge.id, detail);
 
-    if (edge.kind === 'explicit') {
+    if (isFilmographyEdge(edge)) {
       directNeighborIds.add(neighborId);
       depthByNodeId.set(neighborId, 1);
       directStrengthByNodeId.set(neighborId, edge.strength);
@@ -861,31 +1128,95 @@ export function getFocusedNodeConnections(
     }
   }
 
-  // Discover 2-hop extended neighbors via explicit edges from 1-hop direct neighbors
+  // Discover 2-hop extended neighbors via explicit + inferred edges from 1-hop direct neighbors
+  const secondHopBridgeMap = new Map<
+    string,
+    { viaNodeIds: Set<string>; viaEdgeIds: Set<string>; maxStrength: RelationStrengthTier }
+  >();
+
   for (const edge of graph.edges) {
-    if (edge.kind !== 'explicit') continue;
+    if (!isFilmographyEdge(edge)) continue;
     const srcIsDirect = directNeighborIds.has(edge.sourceId);
     const dstIsDirect = directNeighborIds.has(edge.targetId);
+
+    let bridgeId: string | null = null;
+    let secondId: string | null = null;
+
     if (srcIsDirect && edge.targetId !== focusedId && !directNeighborIds.has(edge.targetId)) {
-      secondHopNeighborIds.add(edge.targetId);
-      secondHopEdgeIds.add(edge.id);
-      if (!depthByNodeId.has(edge.targetId)) {
-        depthByNodeId.set(edge.targetId, 2);
-      }
+      bridgeId = edge.sourceId;
+      secondId = edge.targetId;
     } else if (
       dstIsDirect &&
       edge.sourceId !== focusedId &&
       !directNeighborIds.has(edge.sourceId)
     ) {
-      secondHopNeighborIds.add(edge.sourceId);
-      secondHopEdgeIds.add(edge.id);
-      if (!depthByNodeId.has(edge.sourceId)) {
-        depthByNodeId.set(edge.sourceId, 2);
-      }
+      bridgeId = edge.targetId;
+      secondId = edge.sourceId;
     }
+
+    if (!bridgeId || !secondId) continue;
+
+    secondHopNeighborIds.add(secondId);
+    secondHopEdgeIds.add(edge.id);
+    if (!depthByNodeId.has(secondId)) {
+      depthByNodeId.set(secondId, 2);
+    }
+
+    const bucket = secondHopBridgeMap.get(secondId) ?? {
+      viaNodeIds: new Set<string>(),
+      viaEdgeIds: new Set<string>(),
+      maxStrength: 1 as RelationStrengthTier,
+    };
+    bucket.viaNodeIds.add(bridgeId);
+    bucket.viaEdgeIds.add(edge.id);
+    if (edge.strength > bucket.maxStrength) {
+      bucket.maxStrength = edge.strength;
+    }
+    secondHopBridgeMap.set(secondId, bucket);
   }
 
+  const secondHopRelations: SecondHopRelationDetail[] = [];
+  for (const [secondId, meta] of secondHopBridgeMap.entries()) {
+    const node = nodeById.get(secondId);
+    if (!node) continue;
+    const viaNodes = Array.from(meta.viaNodeIds)
+      .map((id) => nodeById.get(id))
+      .filter((n): n is GlobalGraphNode => Boolean(n))
+      .sort((a, b) => b.degree - a.degree);
+
+    const firstVia = viaNodes[0];
+    const formattedFirst =
+      firstVia?.item.category === 'film'
+        ? `《${firstVia.item.title}》`
+        : `「${firstVia?.item.title || ''}」`;
+    const bridgeSummary =
+      viaNodes.length > 1
+        ? `经由 ${formattedFirst} 等 ${viaNodes.length} 项延伸`
+        : `经由 ${formattedFirst} 延伸`;
+
+    secondHopRelations.push({
+      node,
+      viaNodes,
+      viaEdgeIds: Array.from(meta.viaEdgeIds),
+      bridgeSummary,
+      strength: viaNodes.length >= 2 ? 3 : meta.maxStrength,
+    });
+  }
+
+  secondHopRelations.sort((a, b) => {
+    if (b.viaNodes.length !== a.viaNodes.length) {
+      return b.viaNodes.length - a.viaNodes.length;
+    }
+    if (b.strength !== a.strength) return b.strength - a.strength;
+    if (b.node.degree !== a.node.degree) return b.node.degree - a.node.degree;
+    return a.node.item.accessionNo.localeCompare(b.node.item.accessionNo);
+  });
+
   const sortRelations = (a: DirectRelationDetail, b: DirectRelationDetail) => {
+    if (a.kind !== b.kind) {
+      if (a.kind === 'explicit') return -1;
+      if (b.kind === 'explicit') return 1;
+    }
     if (b.strength !== a.strength) return b.strength - a.strength;
     if (b.strengthScore !== a.strengthScore) return b.strengthScore - a.strengthScore;
     const catDiff =
@@ -901,6 +1232,7 @@ export function getFocusedNodeConnections(
   return {
     focusedNode,
     directRelations,
+    secondHopRelations,
     tagRelations,
     directNeighborIds,
     secondHopNeighborIds,
@@ -914,19 +1246,338 @@ export function getFocusedNodeConnections(
 }
 
 /**
- * Builds a deterministic, collision-free constellation layout of the entire archive
- * (or a category-filtered slice) optimized for mobile pan/zoom inspection.
+ * Finds the shortest filmography path between two nodes via BFS.
+ * Prefers explicit + auto-discovered filmography edges; optionally falls back to tag chords.
+ */
+export function findShortestGraphPath(
+  graph: GlobalGraphModel,
+  startId: string,
+  endId: string,
+  allItems?: ArchiveItem[],
+  options: { allowTagFallback?: boolean } = {}
+): GraphPathResult | null {
+  if (!startId || !endId || startId === endId) return null;
+  const nodeById = new Map(graph.nodes.map((n) => [n.id, n]));
+  if (!nodeById.has(startId) || !nodeById.has(endId)) return null;
+
+  const contextItems =
+    allItems && allItems.length > 0 ? allItems : graph.nodes.map((n) => n.item);
+
+  const runBfs = (includeTags: boolean): { nodeIds: string[]; edges: GlobalGraphEdge[] } | null => {
+    const adj = new Map<string, Array<{ nextId: string; edge: GlobalGraphEdge }>>();
+    for (const node of graph.nodes) adj.set(node.id, []);
+    for (const edge of graph.edges) {
+      if (!includeTags && edge.kind === 'tag') continue;
+      adj.get(edge.sourceId)?.push({ nextId: edge.targetId, edge });
+      adj.get(edge.targetId)?.push({ nextId: edge.sourceId, edge });
+    }
+    // Prefer stronger / explicit edges first at equal hop distance
+    for (const list of adj.values()) {
+      list.sort((a, b) => {
+        const kindRank = (k: GraphEdgeKind) => (k === 'explicit' ? 2 : k === 'inferred' ? 1 : 0);
+        if (kindRank(b.edge.kind) !== kindRank(a.edge.kind)) {
+          return kindRank(b.edge.kind) - kindRank(a.edge.kind);
+        }
+        return b.edge.strengthScore - a.edge.strengthScore;
+      });
+    }
+
+    const visited = new Set<string>([startId]);
+    const prev = new Map<string, { parentId: string; edge: GlobalGraphEdge }>();
+    const queue: string[] = [startId];
+
+    while (queue.length > 0) {
+      const curr = queue.shift()!;
+      if (curr === endId) break;
+      for (const { nextId, edge } of adj.get(curr) ?? []) {
+        if (visited.has(nextId)) continue;
+        visited.add(nextId);
+        prev.set(nextId, { parentId: curr, edge });
+        queue.push(nextId);
+      }
+    }
+
+    if (!visited.has(endId)) return null;
+
+    const nodeIds: string[] = [];
+    const edges: GlobalGraphEdge[] = [];
+    let cursor = endId;
+    while (cursor !== startId) {
+      nodeIds.push(cursor);
+      const link = prev.get(cursor);
+      if (!link) return null;
+      edges.push(link.edge);
+      cursor = link.parentId;
+    }
+    nodeIds.push(startId);
+    nodeIds.reverse();
+    edges.reverse();
+    return { nodeIds, edges };
+  };
+
+  let raw = runBfs(false);
+  let usesTagBridge = false;
+  if (!raw && (options.allowTagFallback ?? true)) {
+    raw = runBfs(true);
+    if (raw) {
+      usesTagBridge = raw.edges.some((e) => e.kind === 'tag');
+    }
+  }
+  if (!raw) return null;
+
+  const steps: GraphPathStep[] = [];
+  for (let i = 0; i < raw.edges.length; i += 1) {
+    const fromNode = nodeById.get(raw.nodeIds[i])!;
+    const toNode = nodeById.get(raw.nodeIds[i + 1])!;
+    const edge = raw.edges[i];
+    const desc = describeRelationBetween(
+      fromNode.item,
+      toNode.item,
+      contextItems,
+      edge.kind,
+      edge.label,
+      edge.kind === 'inferred'
+        ? {
+            roleType: edge.roleType,
+            roleCharacterName: edge.roleCharacterName,
+            bridgeTitle: edge.bridgeTitle,
+            evidence: edge.evidence,
+          }
+        : undefined
+    );
+    steps.push({
+      fromNode,
+      toNode,
+      edge,
+      shortLabel: desc.shortLabel,
+      description: desc.description,
+    });
+  }
+
+  return {
+    startId,
+    endId,
+    nodeIds: raw.nodeIds,
+    edgeIds: raw.edges.map((e) => e.id),
+    steps,
+    hopCount: steps.length,
+    usesTagBridge,
+  };
+}
+
+/**
+ * Computes a gentle quadratic Bezier path between two nodes and returns its
+ * exact curve midpoint `B(0.5)` for clean relation pill placement.
+ */
+export function computeCurvedEdgeGeometry(
+  s: { x: number; y: number },
+  t: { x: number; y: number },
+  curveOffset = 0
+): CurvedEdgeGeometry {
+  const dx = t.x - s.x;
+  const dy = t.y - s.y;
+  const dist = Math.hypot(dx, dy) || 1;
+  const nx = -dy / dist;
+  const ny = dx / dist;
+  const ctrlX = (s.x + t.x) / 2 + nx * curveOffset;
+  const ctrlY = (s.y + t.y) / 2 + ny * curveOffset;
+  // Exact quadratic Bezier point at t = 0.5
+  const midX = 0.25 * s.x + 0.5 * ctrlX + 0.25 * t.x;
+  const midY = 0.25 * s.y + 0.5 * ctrlY + 0.25 * t.y;
+  const pathD =
+    Math.abs(curveOffset) < 1
+      ? `M ${s.x} ${s.y} L ${t.x} ${t.y}`
+      : `M ${s.x} ${s.y} Q ${ctrlX.toFixed(1)} ${ctrlY.toFixed(1)} ${t.x} ${t.y}`;
+  return { pathD, ctrlX, ctrlY, midX, midY };
+}
+
+/**
+ * Evaluates a point along the quadratic Bezier edge and picks the cleanest t in [0.36, 0.64]
+ * that stays clear of both endpoints' circles and their bottom title labels.
+ */
+export function computeSmartEdgeLabelPoint(
+  s: Pick<GlobalGraphNode, 'x' | 'y' | 'radius'>,
+  t: Pick<GlobalGraphNode, 'x' | 'y' | 'radius'>,
+  curveOffset: number,
+  obstacles: Array<Pick<GlobalGraphNode, 'x' | 'y' | 'radius'>> = []
+): { x: number; y: number } {
+  const geom = computeCurvedEdgeGeometry(s, t, curveOffset);
+  const candidates = [0.5, 0.58, 0.42, 0.64, 0.36];
+
+  const evalBezier = (u: number) => {
+    const inv = 1 - u;
+    return {
+      x: inv * inv * s.x + 2 * inv * u * geom.ctrlX + u * u * t.x,
+      y: inv * inv * s.y + 2 * inv * u * geom.ctrlY + u * u * t.y,
+    };
+  };
+
+  let bestPt = { x: geom.midX, y: geom.midY };
+  let bestPenalty = Infinity;
+
+  const checkList = obstacles.length > 0 ? obstacles : [s, t];
+
+  for (const u of candidates) {
+    const pt = evalBezier(u);
+    let penalty = Math.abs(u - 0.5) * 14;
+    for (const node of checkList) {
+      // Penalize proximity to node circle
+      const distCircle = Math.hypot(pt.x - node.x, pt.y - node.y);
+      const safeCircle = node.radius + 20;
+      if (distCircle < safeCircle) {
+        penalty += (safeCircle - distCircle) * 4;
+      }
+      // Penalize proximity to node's bottom text label box (centered at y + radius + 15)
+      const labelY = node.y + node.radius + 15;
+      const dxLabel = Math.abs(pt.x - node.x);
+      const dyLabel = Math.abs(pt.y - labelY);
+      if (dxLabel < 44 && dyLabel < 18) {
+        penalty += (44 - dxLabel) * 1.5 + (18 - dyLabel) * 5;
+      }
+    }
+    if (penalty < bestPenalty) {
+      bestPenalty = penalty;
+      bestPt = pt;
+    }
+  }
+
+  return bestPt;
+}
+
+/**
+ * Assigns subtle deterministic perpendicular curve offsets to edges that pass
+ * close to unrelated intermediate nodes, preventing messy straight-line collisions.
+ */
+export function computeEdgeCurveOffsets(
+  nodes: GlobalGraphNode[],
+  edges: GlobalGraphEdge[]
+): Map<string, number> {
+  const nodeById = new Map(nodes.map((n) => [n.id, n]));
+  const offsets = new Map<string, number>();
+
+  for (const edge of edges) {
+    const s = nodeById.get(edge.sourceId);
+    const t = nodeById.get(edge.targetId);
+    if (!s || !t) continue;
+    const dx = t.x - s.x;
+    const dy = t.y - s.y;
+    const lenSq = dx * dx + dy * dy;
+    const dist = Math.sqrt(lenSq) || 1;
+
+    let closestPerp = Infinity;
+    let pushSign = 1;
+
+    for (const other of nodes) {
+      if (other.id === s.id || other.id === t.id) continue;
+      const proj = ((other.x - s.x) * dx + (other.y - s.y) * dy) / (lenSq || 1);
+      if (proj <= 0.14 || proj >= 0.86) continue;
+      const px = s.x + proj * dx;
+      const py = s.y + proj * dy;
+      const perpDist = Math.hypot(other.x - px, other.y - py);
+      if (perpDist < other.radius + 22 && perpDist < closestPerp) {
+        closestPerp = perpDist;
+        // Cross product determines which side of s->t the obstacle sits on; curve away from it
+        const cross = dx * (other.y - s.y) - dy * (other.x - s.x);
+        pushSign = cross >= 0 ? -1 : 1;
+      }
+    }
+
+    if (closestPerp < Infinity) {
+      const magnitude = Math.min(54, Math.max(24, dist * 0.16));
+      offsets.set(edge.id, pushSign * magnitude);
+    } else if (edge.kind === 'tag') {
+      offsets.set(edge.id, Math.min(28, dist * 0.08));
+    } else if (edge.kind === 'inferred') {
+      offsets.set(edge.id, Math.min(18, dist * 0.05));
+    } else {
+      offsets.set(edge.id, 0);
+    }
+  }
+
+  return offsets;
+}
+
+/**
+ * Computes clamped pan coordinates that center a target node smoothly inside
+ * the SVG constellation viewport at the given zoom scale.
+ */
+export function computeFocusCamera(
+  node: Pick<GlobalGraphNode, 'x' | 'y'>,
+  graph: Pick<GlobalGraphModel, 'width' | 'height'>,
+  scale = 1
+): { x: number; y: number } {
+  const cx = graph.width / 2;
+  const cy = graph.height / 2;
+  const rawX = (cx - node.x) * scale;
+  const rawY = (cy - node.y) * scale;
+  const maxPanX = Math.max(280, Math.round(graph.width * 0.55 * scale));
+  const maxPanY = Math.max(240, Math.round(graph.height * 0.55 * scale));
+  return {
+    x: Math.round(Math.max(-maxPanX, Math.min(maxPanX, rawX))),
+    y: Math.round(Math.max(-maxPanY, Math.min(maxPanY, rawY))),
+  };
+}
+
+/**
+ * Ranks graph nodes matching a bilingual quick-search query inside the modal.
+ */
+export function searchGraphNodes(
+  graph: GlobalGraphModel,
+  query: string,
+  limit = 8
+): GlobalGraphNode[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+
+  const scored: Array<{ node: GlobalGraphNode; score: number }> = [];
+  for (const node of graph.nodes) {
+    const it = node.item;
+    const title = it.title.toLowerCase();
+    const orig = (it.originalTitle || '').toLowerCase();
+    const sub = (it.subtitle || '').toLowerCase();
+    const work = (it.relatedWorkTitle || '').toLowerCase();
+    const actor = (it.portrayedBy || '').toLowerCase();
+    const year = (it.year || '').toLowerCase();
+    const tags = it.tags.join(' ').toLowerCase();
+
+    let score = 0;
+    if (title === q || orig === q) score = 100;
+    else if (title.startsWith(q) || orig.startsWith(q)) score = 85;
+    else if (title.includes(q) || orig.includes(q)) score = 70;
+    else if (work.includes(q) || actor.includes(q)) score = 50;
+    else if (sub.includes(q) || tags.includes(q) || year === q) score = 35;
+
+    if (score > 0) {
+      scored.push({ node, score: score + Math.min(12, node.degree * 2) });
+    }
+  }
+
+  return scored
+    .sort((a, b) => b.score - a.score || b.node.weightedDegree - a.node.weightedDegree)
+    .slice(0, limit)
+    .map((s) => s.node);
+}
+
+export interface BuildGlobalGraphOptions {
+  category?: 'all' | ArchiveCategory;
+  includeTagEdges?: boolean;
+  includeInferredEdges?: boolean;
+  externalInferredEdges?: InferredFilmographyEdge[];
+  isolatedOnly?: boolean;
+}
+
+/**
+ * Builds a deterministic, collision-free, cluster-aware constellation layout of
+ * the archive with optional automatic filmography relationship discovery and
+ * single-category bridge projection.
  */
 export function buildGlobalRelationGraph(
   allItems: ArchiveItem[],
-  options: {
-    category?: 'all' | ArchiveCategory;
-    includeTagEdges?: boolean;
-    isolatedOnly?: boolean;
-  } = {}
+  options: BuildGlobalGraphOptions = {}
 ): GlobalGraphModel {
   const category = options.category ?? 'all';
   const includeTagEdges = options.includeTagEdges ?? false;
+  const includeInferredEdges = options.includeInferredEdges ?? false;
   const isolatedOnly = options.isolatedOnly ?? false;
 
   const baseItems =
@@ -936,28 +1587,58 @@ export function buildGlobalRelationGraph(
 
   const visibleIdSet = new Set(baseItems.map((it) => it.id));
 
-  // 1. Collect explicit edges within visible items
+  // Scale canvas room gracefully for larger interconnected collections
+  const canvasW =
+    baseItems.length > 22 ? 1040 : baseItems.length > 12 ? 940 : DEFAULT_CANVAS_W;
+  const canvasH =
+    baseItems.length > 22 ? 620 : baseItems.length > 12 ? 560 : DEFAULT_CANVAS_H;
+  const CX = canvasW / 2;
+  const CY = canvasH / 2;
+
   const itemById = new Map(baseItems.map((it) => [it.id, it]));
   const rawExplicitPairs: Array<{ sourceId: string; targetId: string; key: string }> = [];
+  const rawInferredPairs: Array<{
+    sourceId: string;
+    targetId: string;
+    key: string;
+    meta: InferredFilmographyEdge;
+  }> = [];
+
   const seenEdges = new Set<string>();
+  const explicitDegreeMap = new Map<string, number>();
+  const inferredDegreeMap = new Map<string, number>();
   const degreeMap = new Map<string, number>();
   const tagDegreeMap = new Map<string, number>();
   const adjacency = new Map<string, Set<string>>();
 
   for (const item of baseItems) {
+    explicitDegreeMap.set(item.id, 0);
+    inferredDegreeMap.set(item.id, 0);
     degreeMap.set(item.id, 0);
     tagDegreeMap.set(item.id, 0);
     adjacency.set(item.id, new Set());
   }
 
+  // 1. Collect explicit edges within visible items
   for (const item of baseItems) {
-    const related = getRelatedItems(item, baseItems);
-    for (const rel of related) {
+    const candidates = includeInferredEdges
+      ? // When auto-discovery is enabled, keep true saved relatedIds as explicit so
+        // auto-discovered filmography links stand out clearly and can be persisted!
+        baseItems.filter(
+          (other) =>
+            other.id !== item.id &&
+            (item.relatedIds.includes(other.id) || other.relatedIds.includes(item.id))
+        )
+      : getRelatedItems(item, baseItems);
+
+    for (const rel of candidates) {
       if (!visibleIdSet.has(rel.id) || rel.id === item.id) continue;
       const key = pairKey(item.id, rel.id);
       if (seenEdges.has(key)) continue;
       seenEdges.add(key);
       rawExplicitPairs.push({ sourceId: item.id, targetId: rel.id, key });
+      explicitDegreeMap.set(item.id, (explicitDegreeMap.get(item.id) ?? 0) + 1);
+      explicitDegreeMap.set(rel.id, (explicitDegreeMap.get(rel.id) ?? 0) + 1);
       degreeMap.set(item.id, (degreeMap.get(item.id) ?? 0) + 1);
       degreeMap.set(rel.id, (degreeMap.get(rel.id) ?? 0) + 1);
       adjacency.get(item.id)?.add(rel.id);
@@ -965,8 +1646,77 @@ export function buildGlobalRelationGraph(
     }
   }
 
-  // Score explicit edges based on mutual neighbors (cluster depth/frequency),
-  // shared thematic tags, and bidirectionality
+  // 2. Collect auto-discovered filmography edges (metadata + credits + category bridges)
+  const unlinkedAutoPairs: Array<[string, string]> = [];
+  if (includeInferredEdges) {
+    const autoMetadata = discoverMetadataFilmographyLinks(allItems);
+    const mergedInferred = mergeInferredFilmographyEdges(
+      autoMetadata,
+      options.externalInferredEdges ?? []
+    );
+
+    // Build full cross-category filmography pair list for single-category bridge projection
+    const allFilmographyPairs: Array<{ sourceId: string; targetId: string }> = [];
+    const seenFull = new Set<string>();
+    for (const it of allItems) {
+      for (const rid of it.relatedIds) {
+        if (rid === it.id) continue;
+        const k = pairKey(it.id, rid);
+        if (!seenFull.has(k)) {
+          seenFull.add(k);
+          allFilmographyPairs.push({ sourceId: it.id, targetId: rid });
+        }
+      }
+    }
+    for (const inf of mergedInferred) {
+      const k = pairKey(inf.sourceId, inf.targetId);
+      if (!seenFull.has(k)) {
+        seenFull.add(k);
+        allFilmographyPairs.push({ sourceId: inf.sourceId, targetId: inf.targetId });
+      }
+    }
+
+    const categoryBridges =
+      category !== 'all'
+        ? buildCategoryBridgeEdges(allItems, category, allFilmographyPairs)
+        : [];
+
+    const finalInferred = mergeInferredFilmographyEdges(
+      mergedInferred,
+      categoryBridges
+    );
+
+    for (const inf of finalInferred) {
+      if (!visibleIdSet.has(inf.sourceId) || !visibleIdSet.has(inf.targetId)) continue;
+      if (inf.sourceId === inf.targetId) continue;
+      const key = pairKey(inf.sourceId, inf.targetId);
+      if (seenEdges.has(key)) continue;
+      seenEdges.add(key);
+      rawInferredPairs.push({
+        sourceId: inf.sourceId,
+        targetId: inf.targetId,
+        key,
+        meta: inf,
+      });
+      if (inf.source !== 'category-bridge') {
+        unlinkedAutoPairs.push([inf.sourceId, inf.targetId]);
+      }
+      inferredDegreeMap.set(
+        inf.sourceId,
+        (inferredDegreeMap.get(inf.sourceId) ?? 0) + 1
+      );
+      inferredDegreeMap.set(
+        inf.targetId,
+        (inferredDegreeMap.get(inf.targetId) ?? 0) + 1
+      );
+      degreeMap.set(inf.sourceId, (degreeMap.get(inf.sourceId) ?? 0) + 1);
+      degreeMap.set(inf.targetId, (degreeMap.get(inf.targetId) ?? 0) + 1);
+      adjacency.get(inf.sourceId)?.add(inf.targetId);
+      adjacency.get(inf.targetId)?.add(inf.sourceId);
+    }
+  }
+
+  // Score explicit edges based on mutual neighbors, shared thematic tags, and bidirectionality
   const edges: GlobalGraphEdge[] = [];
   for (const pair of rawExplicitPairs) {
     const itemA = itemById.get(pair.sourceId)!;
@@ -1009,7 +1759,7 @@ export function buildGlobalRelationGraph(
       kind: 'explicit',
       strength,
       strengthScore,
-      strengthWeight: 0, // normalized below
+      strengthWeight: 0,
       strengthLabel,
       mutualCount,
       sharedTagCount,
@@ -1018,9 +1768,68 @@ export function buildGlobalRelationGraph(
     });
   }
 
-  // Optional subtle tag chords (capped to keep constellation legible, prioritizing richer tag overlaps)
+  // Score auto-discovered filmography edges
+  for (const pair of rawInferredPairs) {
+    const itemA = itemById.get(pair.sourceId)!;
+    const itemB = itemById.get(pair.targetId)!;
+    const adjA = adjacency.get(pair.sourceId) ?? new Set<string>();
+    const adjB = adjacency.get(pair.targetId) ?? new Set<string>();
+    let mutualCount = 0;
+    for (const neighborId of adjA) {
+      if (neighborId !== pair.targetId && adjB.has(neighborId)) {
+        mutualCount += 1;
+      }
+    }
+    const sharedTags = getSharedThematicTags(itemA, itemB);
+    const sharedTagCount = sharedTags.length;
+    const confBonus = pair.meta.confidence === 'high' ? 1.5 : 0.5;
+    const strengthScore =
+      1.75 +
+      confBonus +
+      Math.min(5, mutualCount * 1.6) +
+      Math.min(2.5, sharedTagCount * 1.0);
+
+    const strength: RelationStrengthTier =
+      pair.meta.confidence === 'high' && (mutualCount >= 1 || pair.meta.source === 'credits')
+        ? 3
+        : pair.meta.confidence === 'high' || mutualCount >= 1 || sharedTagCount >= 1
+          ? 2
+          : 1;
+
+    const strengthLabel =
+      pair.meta.source === 'category-bridge'
+        ? '跨类桥接'
+        : pair.meta.source === 'credits'
+          ? '片单考据'
+          : strength >= 2
+            ? '自动发现'
+            : '脉络推断';
+
+    edges.push({
+      id: `inf-${pair.key}`,
+      sourceId: pair.sourceId,
+      targetId: pair.targetId,
+      kind: 'inferred',
+      roleType: pair.meta.roleType,
+      roleCharacterName: pair.meta.roleCharacterName,
+      bridgeTitle: pair.meta.bridgeTitle,
+      evidence: pair.meta.evidence,
+      inferenceSource: pair.meta.source,
+      isPersistable: pair.meta.source !== 'category-bridge',
+      strength,
+      strengthScore,
+      strengthWeight: 0,
+      strengthLabel,
+      mutualCount,
+      sharedTagCount,
+      sharedTags,
+      isBidirectional: false,
+    });
+  }
+
+  // Optional subtle tag chords (capped to keep constellation legible)
   let tagEdgeCount = 0;
-  if (includeTagEdges && baseItems.length <= 45) {
+  if (includeTagEdges && baseItems.length <= 50) {
     const tagCandidates: Array<{
       a: ArchiveItem;
       b: ArchiveItem;
@@ -1068,21 +1877,23 @@ export function buildGlobalRelationGraph(
     }
   }
 
-  const maxStrengthScore = Math.max(
-    1,
-    ...edges.map((e) => e.strengthScore)
-  );
+  const maxStrengthScore = Math.max(1, ...edges.map((e) => e.strengthScore));
   for (const edge of edges) {
     edge.strengthWeight = Number(
       Math.min(1, edge.strengthScore / maxStrengthScore).toFixed(3)
     );
   }
 
-  // Compute weighted degree (connection frequency + tie strength) per node
+  // Compute weighted degree per node
   const weightedDegreeMap = new Map<string, number>();
   for (const item of baseItems) weightedDegreeMap.set(item.id, 0);
   for (const edge of edges) {
-    const contrib = edge.kind === 'explicit' ? edge.strengthScore : edge.strengthScore * 0.3;
+    const contrib =
+      edge.kind === 'explicit'
+        ? edge.strengthScore
+        : edge.kind === 'inferred'
+          ? edge.strengthScore * 0.85
+          : edge.strengthScore * 0.3;
     weightedDegreeMap.set(
       edge.sourceId,
       (weightedDegreeMap.get(edge.sourceId) ?? 0) + contrib
@@ -1093,8 +1904,9 @@ export function buildGlobalRelationGraph(
     );
   }
 
-  // Connected components BFS
+  // Connected components BFS across filmography edges (explicit + inferred)
   const clusterById = new Map<string, number>();
+  const clusterMembers = new Map<number, string[]>();
   let clusterCounter = 0;
   for (const item of baseItems) {
     if (clusterById.has(item.id)) continue;
@@ -1104,9 +1916,11 @@ export function buildGlobalRelationGraph(
       continue;
     }
     const queue = [item.id];
+    const members: string[] = [];
     clusterById.set(item.id, clusterCounter);
     while (queue.length > 0) {
       const curr = queue.shift()!;
+      members.push(curr);
       for (const nxt of adjacency.get(curr) ?? []) {
         if (!clusterById.has(nxt)) {
           clusterById.set(nxt, clusterCounter);
@@ -1114,6 +1928,7 @@ export function buildGlobalRelationGraph(
         }
       }
     }
+    clusterMembers.set(clusterCounter, members);
     clusterCounter += 1;
   }
 
@@ -1145,54 +1960,103 @@ export function buildGlobalRelationGraph(
     ...connectedItems.map((it) => degreeMap.get(it.id) ?? 0)
   );
 
-  // Place connected items in concentric rings (hubs in center, spokes around them)
+  // Cluster-aware initial placement + deterministic spring relaxation
   if (connectedItems.length === 1) {
     const it = connectedItems[0];
     posById.set(it.id, { x: CX, y: CY });
   } else if (connectedItems.length > 1) {
-    const coreCount = Math.min(connectedItems.length, connectedItems.length <= 6 ? 1 : 3);
-    const coreItems = connectedItems.slice(0, coreCount);
-    const midItems = connectedItems.slice(coreCount);
+    const activeClusterIds = Array.from(
+      new Set(connectedItems.map((it) => clusterById.get(it.id) ?? 0))
+    ).sort((a, b) => {
+      const lenDiff = (clusterMembers.get(b)?.length ?? 0) - (clusterMembers.get(a)?.length ?? 0);
+      return lenDiff !== 0 ? lenDiff : a - b;
+    });
 
-    coreItems.forEach((it, idx) => {
-      if (coreItems.length === 1) {
-        posById.set(it.id, { x: CX, y: CY });
-      } else {
-        const angle = -Math.PI / 2 + (idx * Math.PI * 2) / coreItems.length;
+    if (activeClusterIds.length === 1) {
+      // Single unified network: concentric rings with top hubs in center
+      const coreCount = Math.min(connectedItems.length, connectedItems.length <= 6 ? 1 : 3);
+      const coreItems = connectedItems.slice(0, coreCount);
+      const midItems = connectedItems.slice(coreCount);
+
+      coreItems.forEach((it, idx) => {
+        if (coreItems.length === 1) {
+          posById.set(it.id, { x: CX, y: CY });
+        } else {
+          const angle = -Math.PI / 2 + (idx * Math.PI * 2) / coreItems.length;
+          posById.set(it.id, {
+            x: CX + Math.cos(angle) * 84,
+            y: CY + Math.sin(angle) * 66,
+          });
+        }
+      });
+
+      const ring1Max = Math.min(midItems.length, 10);
+      const ring1 = midItems.slice(0, ring1Max);
+      const ring2 = midItems.slice(ring1Max);
+
+      ring1.forEach((it, idx) => {
+        const angle = -Math.PI * 0.78 + (idx * Math.PI * 2) / Math.max(1, ring1.length);
         posById.set(it.id, {
-          x: CX + Math.cos(angle) * 78,
-          y: CY + Math.sin(angle) * 62,
+          x: CX + Math.cos(angle) * (canvasW * 0.27),
+          y: CY + Math.sin(angle) * (canvasH * 0.27),
         });
-      }
-    });
-
-    const ring1Max = Math.min(midItems.length, 10);
-    const ring1 = midItems.slice(0, ring1Max);
-    const ring2 = midItems.slice(ring1Max);
-
-    ring1.forEach((it, idx) => {
-      const angle = -Math.PI * 0.78 + (idx * Math.PI * 2) / Math.max(1, ring1.length);
-      posById.set(it.id, {
-        x: CX + Math.cos(angle) * 196,
-        y: CY + Math.sin(angle) * 154,
       });
-    });
 
-    ring2.forEach((it, idx) => {
-      const angle = -Math.PI * 0.45 + (idx * Math.PI * 2) / Math.max(1, ring2.length);
-      posById.set(it.id, {
-        x: CX + Math.cos(angle) * 260,
-        y: CY + Math.sin(angle) * 204,
+      ring2.forEach((it, idx) => {
+        const angle = -Math.PI * 0.45 + (idx * Math.PI * 2) / Math.max(1, ring2.length);
+        posById.set(it.id, {
+          x: CX + Math.cos(angle) * (canvasW * 0.37),
+          y: CY + Math.sin(angle) * (canvasH * 0.36),
+        });
       });
-    });
+    } else {
+      // Multiple distinct filmography clusters: place each cluster around its own well-separated sector centroid
+      activeClusterIds.forEach((cIdx, posIdx) => {
+        const members = connectedItems
+          .filter((it) => clusterById.get(it.id) === cIdx)
+          .sort(
+            (a, b) =>
+              (weightedDegreeMap.get(b.id) ?? 0) - (weightedDegreeMap.get(a.id) ?? 0)
+          );
+        const sectorAngle =
+          activeClusterIds.length === 2
+            ? posIdx === 0
+              ? Math.PI
+              : 0
+            : -Math.PI * 0.75 + (posIdx * Math.PI * 2) / activeClusterIds.length;
+        const spreadX = activeClusterIds.length === 2 ? canvasW * 0.27 : canvasW * 0.28;
+        const spreadY = activeClusterIds.length === 2 ? 0 : canvasH * 0.23;
+        const clusterCx = CX + Math.cos(sectorAngle) * spreadX;
+        const clusterCy = CY + Math.sin(sectorAngle) * spreadY;
 
-    // Run deterministic lightweight spring relaxation for connected nodes (18 steps)
+        members.forEach((it, mIdx) => {
+          if (mIdx === 0) {
+            posById.set(it.id, { x: clusterCx, y: clusterCy });
+          } else {
+            const subAngle =
+              sectorAngle +
+              -Math.PI * 0.5 +
+              ((mIdx - 1) * Math.PI * 2) / Math.max(1, members.length - 1);
+            const r = members.length <= 4 ? 98 : 118;
+            posById.set(it.id, {
+              x: clusterCx + Math.cos(subAngle) * r,
+              y: clusterCy + Math.sin(subAngle) * (r * 0.84),
+            });
+          }
+        });
+      });
+    }
+
+    // Run deterministic spring relaxation (24 steps)
     const connectedIds = connectedItems.map((it) => it.id);
-    for (let step = 0; step < 18; step += 1) {
+    const minGap = connectedIds.length > 16 ? 124 : 144;
+    const idealEdgeLen = connectedIds.length > 16 ? 148 : 162;
+
+    for (let step = 0; step < 24; step += 1) {
       const disp = new Map<string, { dx: number; dy: number }>();
       for (const id of connectedIds) disp.set(id, { dx: 0, dy: 0 });
 
-      // Repulsion between all pairs
+      // Repulsion between all connected node pairs (extra separation across different clusters)
       for (let i = 0; i < connectedIds.length; i += 1) {
         for (let j = i + 1; j < connectedIds.length; j += 1) {
           const idA = connectedIds[i];
@@ -1202,9 +2066,10 @@ export function buildGlobalRelationGraph(
           let vx = pA.x - pB.x;
           let vy = pA.y - pB.y;
           const dist = Math.hypot(vx, vy) || 1;
-          const minGap = 138;
-          if (dist < minGap) {
-            const push = ((minGap - dist) / minGap) * 16;
+          const sameCluster = clusterById.get(idA) === clusterById.get(idB);
+          const pairMinGap = sameCluster ? minGap : minGap + 88;
+          if (dist < pairMinGap) {
+            const push = ((pairMinGap - dist) / pairMinGap) * (sameCluster ? 15 : 22);
             vx = (vx / dist) * push;
             vy = (vy / dist) * push;
             disp.get(idA)!.dx += vx;
@@ -1215,18 +2080,17 @@ export function buildGlobalRelationGraph(
         }
       }
 
-      // Attraction along explicit edges
+      // Attraction along filmography edges (explicit + inferred)
       for (const e of edges) {
-        if (e.kind !== 'explicit') continue;
+        if (!isFilmographyEdge(e)) continue;
         const pA = posById.get(e.sourceId);
         const pB = posById.get(e.targetId);
         if (!pA || !pB) continue;
         const vx = pB.x - pA.x;
         const vy = pB.y - pA.y;
         const dist = Math.hypot(vx, vy) || 1;
-        const ideal = 160;
-        if (dist > ideal) {
-          const pull = ((dist - ideal) / dist) * 0.12;
+        if (dist > idealEdgeLen) {
+          const pull = ((dist - idealEdgeLen) / dist) * (e.kind === 'explicit' ? 0.13 : 0.1);
           disp.get(e.sourceId)!.dx += vx * pull;
           disp.get(e.sourceId)!.dy += vy * pull;
           disp.get(e.targetId)!.dx -= vx * pull;
@@ -1234,13 +2098,13 @@ export function buildGlobalRelationGraph(
         }
       }
 
-      // Gentle pull toward center & clamp inside safe bounds
+      // Gentle pull toward center (weaker when multiple clusters exist so they stay well-separated)
+      const gravity = activeClusterIds.length > 1 ? 0.005 : 0.014;
       for (const id of connectedIds) {
         const p = posById.get(id)!;
         const d = disp.get(id)!;
-        const gravity = 0.015;
-        p.x = Math.max(76, Math.min(CANVAS_W - 76, p.x + d.dx + (CX - p.x) * gravity));
-        p.y = Math.max(72, Math.min(CANVAS_H - 80, p.y + d.dy + (CY - p.y) * gravity));
+        p.x = Math.max(76, Math.min(canvasW - 76, p.x + d.dx + (CX - p.x) * gravity));
+        p.y = Math.max(78, Math.min(canvasH - 76, p.y + d.dy + (CY - p.y) * gravity));
       }
     }
   }
@@ -1252,17 +2116,18 @@ export function buildGlobalRelationGraph(
       const rows = Math.ceil(isolatedItems.length / cols);
       const col = idx % cols;
       const row = Math.floor(idx / cols);
-      const cellW = (CANVAS_W - 140) / Math.max(1, cols);
-      const cellH = (CANVAS_H - 140) / Math.max(1, rows);
+      const cellW = (canvasW - 140) / Math.max(1, cols);
+      const cellH = (canvasH - 140) / Math.max(1, rows);
       posById.set(it.id, {
         x: 70 + cellW * (col + 0.5),
         y: 70 + cellH * (row + 0.5),
       });
     } else {
-      const angle = Math.PI * 0.12 + (idx * Math.PI * 2) / Math.max(1, isolatedItems.length);
+      const angle =
+        Math.PI * 0.14 + (idx * Math.PI * 2) / Math.max(1, isolatedItems.length);
       posById.set(it.id, {
-        x: Math.max(54, Math.min(CANVAS_W - 54, CX + Math.cos(angle) * 296)),
-        y: Math.max(54, Math.min(CANVAS_H - 62, CY + Math.sin(angle) * 224)),
+        x: Math.max(54, Math.min(canvasW - 54, CX + Math.cos(angle) * (canvasW * 0.41))),
+        y: Math.max(54, Math.min(canvasH - 62, CY + Math.sin(angle) * (canvasH * 0.4))),
       });
     }
   });
@@ -1275,6 +2140,8 @@ export function buildGlobalRelationGraph(
 
   for (const item of targetItems) {
     const deg = degreeMap.get(item.id) ?? 0;
+    const expDeg = explicitDegreeMap.get(item.id) ?? 0;
+    const infDeg = inferredDegreeMap.get(item.id) ?? 0;
     const tagDeg = tagDegreeMap.get(item.id) ?? 0;
     const wDeg = Number((weightedDegreeMap.get(item.id) ?? 0).toFixed(2));
     const intensity =
@@ -1292,13 +2159,15 @@ export function buildGlobalRelationGraph(
             : 1;
     const pos = posById.get(item.id) ?? { x: CX, y: CY };
     const radius =
-      deg === 0 ? 14.5 : Math.min(26, 15.5 + deg * 2.2 + intensity * 3);
+      deg === 0 ? 14.5 : Math.min(26, 15.5 + deg * 2.1 + intensity * 3);
     nodes.push({
       id: item.id,
       item,
       x: Math.round(pos.x),
       y: Math.round(pos.y),
       degree: deg,
+      explicitDegree: expDeg,
+      inferredDegree: infDeg,
       tagDegree: tagDeg,
       weightedDegree: wDeg,
       intensity,
@@ -1315,6 +2184,54 @@ export function buildGlobalRelationGraph(
     (e) => nodeIdSet.has(e.sourceId) && nodeIdSet.has(e.targetId)
   );
 
+  // Build cluster summaries for navigation & subtle visual grouping
+  const nodesByCluster = new Map<number, GlobalGraphNode[]>();
+  for (const node of nodes) {
+    if (node.clusterIndex < 0) continue;
+    if (!nodesByCluster.has(node.clusterIndex)) {
+      nodesByCluster.set(node.clusterIndex, []);
+    }
+    nodesByCluster.get(node.clusterIndex)!.push(node);
+  }
+
+  const clusters: GraphCluster[] = [];
+  for (const [cIdx, cNodes] of nodesByCluster.entries()) {
+    if (cNodes.length < 2) continue;
+    const sorted = [...cNodes].sort(
+      (a, b) =>
+        b.weightedDegree - a.weightedDegree ||
+        b.degree - a.degree ||
+        a.item.accessionNo.localeCompare(b.item.accessionNo)
+    );
+    const hub = sorted[0];
+    const memberSet = new Set(cNodes.map((n) => n.id));
+    const edgeCount = filteredEdges.filter(
+      (e) => isFilmographyEdge(e) && memberSet.has(e.sourceId) && memberSet.has(e.targetId)
+    ).length;
+
+    const avgX = cNodes.reduce((sum, n) => sum + n.x, 0) / cNodes.length;
+    const avgY = cNodes.reduce((sum, n) => sum + n.y, 0) / cNodes.length;
+    const maxDist = Math.max(
+      48,
+      ...cNodes.map((n) => Math.hypot(n.x - avgX, n.y - avgY) + n.radius + 20)
+    );
+
+    clusters.push({
+      index: cIdx,
+      hubId: hub.id,
+      title: hub.item.title,
+      nodeIds: sorted.map((n) => n.id),
+      edgeCount,
+      centerX: Math.round(avgX),
+      centerY: Math.round(avgY),
+      radius: Math.round(Math.min(240, maxDist)),
+    });
+  }
+
+  clusters.sort(
+    (a, b) => b.nodeIds.length - a.nodeIds.length || b.edgeCount - a.edgeCount
+  );
+
   const hubs = [...nodes]
     .filter((n) => n.degree > 0)
     .sort(
@@ -1323,19 +2240,22 @@ export function buildGlobalRelationGraph(
         b.degree - a.degree ||
         a.item.accessionNo.localeCompare(b.item.accessionNo)
     )
-    .slice(0, 5);
+    .slice(0, 6);
 
   const isolatedNodes = nodes.filter((n) => n.isIsolated);
 
   return {
-    width: CANVAS_W,
-    height: CANVAS_H,
+    width: canvasW,
+    height: canvasH,
     nodes,
     edges: filteredEdges,
     hubs,
     isolatedNodes,
+    clusters,
     explicitEdgeCount: filteredEdges.filter((e) => e.kind === 'explicit').length,
+    inferredEdgeCount: filteredEdges.filter((e) => e.kind === 'inferred').length,
     tagEdgeCount: filteredEdges.filter((e) => e.kind === 'tag').length,
+    unlinkedAutoPairs,
     maxStrengthScore,
     maxWeightedDegree: Number(maxWeightedDegree.toFixed(2)),
   };

@@ -62,6 +62,7 @@ import {
   findRecommendedUnlinkedItems,
   type LinkRecommendation,
 } from './utils/smartLink';
+import { computeBatchLinkItems } from './utils/filmographyInference';
 import {
   computeCheckInStreak,
   computeCollectorStamps,
@@ -287,6 +288,7 @@ export default function App() {
   }>({ open: false });
   const [quotesWallOpen, setQuotesWallOpen] = useState(false);
   const [globalMapOpen, setGlobalMapOpen] = useState(false);
+  const [globalMapInitialId, setGlobalMapInitialId] = useState<string | null>(null);
   const [showcaseCustomizerOpen, setShowcaseCustomizerOpen] = useState(false);
   const [showcaseCustomizerTab, setShowcaseCustomizerTab] = useState<
     'primary' | 'secondary'
@@ -1130,6 +1132,13 @@ export default function App() {
     await handleLinkMultiple(sourceId, [targetId]);
   };
 
+  const handleLinkPairs = async (pairs: Array<[string, string]>) => {
+    const { nextItems, linkedPairCount } = computeBatchLinkItems(items, pairs);
+    if (linkedPairCount === 0) return;
+    await persistSnapshot(nextItems);
+    setNotice(`已写入 ${linkedPairCount} 条影史关联到馆藏`);
+  };
+
   const handleUnlinkItems = async (sourceId: string, targetId: string) => {
     const now = new Date().toISOString();
     const nextItems = items.map((it) => {
@@ -1639,7 +1648,10 @@ export default function App() {
                   <button
                     type="button"
                     data-testid="studio-global-map-btn"
-                    onClick={() => setGlobalMapOpen(true)}
+                    onClick={() => {
+                      setGlobalMapInitialId(null);
+                      setGlobalMapOpen(true);
+                    }}
                     className="flex min-h-[54px] flex-col items-center justify-center gap-1 rounded-2xl border border-[#E4DFD5] bg-white px-1.5 py-2 text-[#1A1816] shadow-[0_1px_2px_rgba(26,24,22,0.03)] cursor-pointer active:scale-[0.97] hover:border-[#1A1816] transition-all sm:min-h-[44px] sm:flex-row sm:gap-2 dark:border-[#322D27] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:hover:border-[#7AB59E]"
                   >
                     <Compass className="h-4 w-4 text-[#4E7A6A] dark:text-[#7AB59E]" aria-hidden="true" />
@@ -2327,6 +2339,7 @@ export default function App() {
         )}
         onTogglePinShowcase={(it) => void handleTogglePinShowcase(it)}
         onOpenGlobalMap={() => {
+          setGlobalMapInitialId(selectedItem?.id ?? null);
           setSelectedItemId(null);
           setGlobalMapOpen(true);
         }}
@@ -2405,11 +2418,18 @@ export default function App() {
       <GlobalRelationMapModal
         open={globalMapOpen}
         allItems={displayItems}
-        onClose={() => setGlobalMapOpen(false)}
+        initialFocusedId={globalMapInitialId}
+        onClose={() => {
+          setGlobalMapOpen(false);
+          setGlobalMapInitialId(null);
+        }}
         onSelectItem={(it) => {
           setGlobalMapOpen(false);
+          setGlobalMapInitialId(null);
           setSelectedItemId(it.id);
         }}
+        onLinkExisting={handleLinkExisting}
+        onLinkPairs={handleLinkPairs}
       />
 
       <AlbumCuratorModal

@@ -3,10 +3,16 @@ import assert from 'node:assert/strict';
 import type { ArchiveItem } from '../types/archive';
 import {
   buildGlobalRelationGraph,
+  computeCurvedEdgeGeometry,
+  computeEdgeCurveOffsets,
+  computeFocusCamera,
+  computeSmartEdgeLabelPoint,
   describeRelationBetween,
+  findShortestGraphPath,
   getEdgeVisualStyle,
   getFocusedNodeConnections,
   getNodeVisualStyle,
+  searchGraphNodes,
 } from './globalGraph';
 
 function makeItem(partial: Partial<ArchiveItem> & { id: string; title: string }): ArchiveItem {
@@ -374,3 +380,173 @@ test('getEdgeVisualStyle and getNodeVisualStyle scale thickness and color depth 
     assert.equal(t0.auraOpacity, 0);
   }
 });
+
+test('buildGlobalRelationGraph with includeInferredEdges discovers multi-cluster filmography, bridges, and shortest paths', () => {
+  const items: ArchiveItem[] = [
+    // Cluster 1: Wong Kar-wai universe (intentionally missing several manual relatedIds)
+    makeItem({
+      id: 'f-mfl',
+      accessionNo: 'CA-001',
+      category: 'film',
+      title: '花样年华',
+      originalTitle: 'In the Mood for Love',
+      subtitle: '王家卫 · 剧情 / 爱情',
+      year: '2000',
+      relatedIds: ['p-wkw'],
+      tags: ['港片美学'],
+    }),
+    makeItem({
+      id: 'p-wkw',
+      accessionNo: 'CA-002',
+      category: 'person',
+      title: '王家卫',
+      originalTitle: 'Wong Kar-wai',
+      subtitle: '导演 · 编剧',
+      relatedWorkTitle: '花样年华 / 重庆森林',
+      relatedIds: ['f-mfl'],
+      tags: ['作者导演'],
+    }),
+    makeItem({
+      id: 'p-tony',
+      accessionNo: 'CA-003',
+      category: 'person',
+      title: '梁朝伟',
+      originalTitle: 'Tony Leung',
+      subtitle: '演员',
+      relatedIds: [],
+      tags: ['眼神杀'],
+    }),
+    makeItem({
+      id: 'c-chow',
+      accessionNo: 'CA-004',
+      category: 'character',
+      title: '周慕云',
+      relatedWorkTitle: 'In the Mood for Love',
+      portrayedBy: 'Tony Leung',
+      relatedIds: [],
+      tags: ['克制深情'],
+    }),
+    makeItem({
+      id: 'f-ce',
+      accessionNo: 'CA-005',
+      category: 'film',
+      title: '重庆森林',
+      subtitle: '王家卫 · 剧情 / 爱情',
+      year: '1994',
+      relatedIds: [],
+      tags: ['港片美学'],
+    }),
+    // Cluster 2: Ghibli universe
+    makeItem({
+      id: 'f-sa',
+      accessionNo: 'CA-006',
+      category: 'film',
+      title: '千与千寻',
+      subtitle: '宫崎骏 · 动画 / 奇幻',
+      year: '2001',
+      relatedIds: [],
+      tags: ['吉卜力'],
+    }),
+    makeItem({
+      id: 'c-nf',
+      accessionNo: 'CA-007',
+      category: 'character',
+      title: '无脸男',
+      relatedWorkTitle: '千与千寻',
+      relatedIds: [],
+      tags: ['吉卜力'],
+    }),
+  ];
+
+  const graph = buildGlobalRelationGraph(items, {
+    includeInferredEdges: true,
+    includeTagEdges: true,
+  });
+
+  // Explicit edge is only f-mfl <-> p-wkw, while multiple filmography edges are auto-discovered
+  assert.equal(graph.explicitEdgeCount, 1);
+  assert.ok(graph.inferredEdgeCount >= 4);
+  assert.ok(graph.unlinkedAutoPairs.length >= 4);
+  assert.equal(graph.isolatedNodes.length, 0);
+  // Two cleanly separated filmography universes
+  assert.equal(graph.clusters.length, 2);
+  assert.equal(graph.clusters[0].nodeIds.length, 5);
+  assert.equal(graph.clusters[1].nodeIds.length, 2);
+
+  // Shortest path from 重庆森林 -> 周慕云 traverses through 王家卫 / 花样年华
+  const path = findShortestGraphPath(graph, 'f-ce', 'c-chow', items);
+  assert.ok(path);
+  assert.equal(path.startId, 'f-ce');
+  assert.equal(path.endId, 'c-chow');
+  assert.equal(path.usesTagBridge, false);
+  assert.ok(path.hopCount >= 2 && path.hopCount <= 3);
+  assert.equal(path.steps.length, path.hopCount);
+
+  // Disconnected clusters return null when tag fallback disabled
+  const crossPath = findShortestGraphPath(graph, 'f-ce', 'c-nf', items, {
+    allowTagFallback: false,
+  });
+  assert.equal(crossPath, null);
+
+  // Focus on 重庆森林 exposes 2-hop bridges (e.g., 花样年华 via 王家卫)
+  const ceCtx = getFocusedNodeConnections(graph, 'f-ce', items)!;
+  assert.ok(ceCtx.directRelations.length >= 1);
+  assert.ok(ceCtx.secondHopRelations.length >= 1);
+  assert.ok(ceCtx.secondHopRelations.some((r) => r.bridgeSummary.includes('经由')));
+
+  // Single-category filter ('film') projects cross-category bridge (花样年华 <-> 重庆森林 via 王家卫)
+  const filmOnly = buildGlobalRelationGraph(items, {
+    category: 'film',
+    includeInferredEdges: true,
+  });
+  assert.equal(filmOnly.nodes.length, 3);
+  assert.ok(
+    filmOnly.edges.some(
+      (e) =>
+        (e.sourceId === 'f-mfl' && e.targetId === 'f-ce') ||
+        (e.sourceId === 'f-ce' && e.targetId === 'f-mfl')
+    )
+  );
+
+  // Search nodes works across Chinese & English titles
+  const searchHits = searchGraphNodes(graph, 'Tony');
+  assert.equal(searchHits[0]?.id, 'p-tony');
+
+  // Curved edge geometry & camera centering
+  const offsets = computeEdgeCurveOffsets(graph.nodes, graph.edges);
+  assert.equal(offsets.size, graph.edges.length);
+  const geom = computeCurvedEdgeGeometry({ x: 100, y: 100 }, { x: 300, y: 100 }, 24);
+  assert.match(geom.pathD, /^M 100 100 Q /);
+  assert.ok(Math.abs(geom.midX - 200) < 0.1);
+  assert.ok(Math.abs(geom.midY - 112) < 0.1);
+
+  const cam = computeFocusCamera(graph.nodes[0], graph, 1.25);
+  assert.ok(Number.isFinite(cam.x) && Number.isFinite(cam.y));
+
+  // Smart edge label placement shifts away from a midpoint node obstacle
+  const smartPt = computeSmartEdgeLabelPoint(
+    { x: 100, y: 100, radius: 18 },
+    { x: 300, y: 100, radius: 18 },
+    0,
+    [
+      { x: 100, y: 100, radius: 18 },
+      { x: 300, y: 100, radius: 18 },
+      { x: 200, y: 100, radius: 18 },
+    ]
+  );
+  assert.ok(Number.isFinite(smartPt.x) && Number.isFinite(smartPt.y));
+  assert.ok(Math.abs(smartPt.x - 200) > 10);
+
+  // Inferred edge visual style uses crisp dash pattern
+  const infStyle = getEdgeVisualStyle(
+    { kind: 'inferred', strength: 2, strengthWeight: 0.6 },
+    'highlighted'
+  );
+  assert.ok(infStyle.strokeDasharray);
+  const pathStyle = getEdgeVisualStyle(
+    { kind: 'explicit', strength: 2, strengthWeight: 0.6 },
+    'path'
+  );
+  assert.ok(pathStyle.haloWidth > 0);
+});
+
