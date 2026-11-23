@@ -1,5 +1,6 @@
 import { SummarySource } from './SummarySource';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import {
   Check,
   ChevronDown,
@@ -63,6 +64,13 @@ import { DetailMedalShowcase } from './DetailMedalShowcase';
 import { DetailRelationGraph } from './DetailRelationGraph';
 import { DetailTagManager } from './DetailTagManager';
 import { WatchLogSection } from './WatchLogSection';
+import {
+  type DrawerSwitchDirection,
+  getDrawerBackdropVariants,
+  getDrawerContentVariants,
+  getDrawerMetaFadeVariants,
+  getDrawerPanelVariants,
+} from '../utils/drawerMotion';
 
 function retainKnownLists(next: OnlineRelationsResponse, previous: OnlineRelationsResponse | null) {
   if (!previous) return next;
@@ -120,14 +128,32 @@ const STATUS_CHOICES: CollectionStatus[] = [
   'watchlist',
 ];
 
-export function DetailDrawer({
+interface DetailDrawerShellProps extends Omit<DetailDrawerProps, 'item'> {
+  item: ArchiveItem;
+}
+
+export function DetailDrawer(props: DetailDrawerProps) {
+  return (
+    <AnimatePresence>
+      {props.item ? (
+        <DetailDrawerShell
+          key="detail-drawer-shell"
+          {...props}
+          item={props.item}
+        />
+      ) : null}
+    </AnimatePresence>
+  );
+}
+
+function DetailDrawerShell({
   item: savedItem,
   allItems,
   positionLabel,
   onPrevItem,
   onNextItem,
   onClose,
-  onSelectRelated,
+  onSelectRelated: onSelectRelatedProp,
   onFilterByTag,
   onOpenCardModal,
   isPinnedToShowcase = false,
@@ -140,11 +166,52 @@ export function DetailDrawer({
   onLinkExisting,
   onUnlinkItems,
   onQuickCreateRelated,
-}: DetailDrawerProps) {
+}: DetailDrawerShellProps) {
+  const prefersReducedMotion = Boolean(useReducedMotion());
+  const [switchDirection, setSwitchDirection] =
+    useState<DrawerSwitchDirection>('neutral');
+
+  const backdropVariants = useMemo(
+    () => getDrawerBackdropVariants(prefersReducedMotion),
+    [prefersReducedMotion]
+  );
+  const panelVariants = useMemo(
+    () => getDrawerPanelVariants(prefersReducedMotion),
+    [prefersReducedMotion]
+  );
+  const contentVariants = useMemo(
+    () => getDrawerContentVariants(prefersReducedMotion),
+    [prefersReducedMotion]
+  );
+  const metaFadeVariants = useMemo(
+    () => getDrawerMetaFadeVariants(prefersReducedMotion),
+    [prefersReducedMotion]
+  );
+
+  const handlePrevItem = useCallback(() => {
+    if (!onPrevItem) return;
+    setSwitchDirection('prev');
+    onPrevItem();
+  }, [onPrevItem]);
+
+  const handleNextItem = useCallback(() => {
+    if (!onNextItem) return;
+    setSwitchDirection('next');
+    onNextItem();
+  }, [onNextItem]);
+
+  const onSelectRelated = useCallback(
+    (target: ArchiveItem) => {
+      setSwitchDirection('neutral');
+      onSelectRelatedProp(target);
+    },
+    [onSelectRelatedProp]
+  );
+
   const [resolvedFilm, setResolvedFilm] = useState<OnlineSearchResult | null>(null);
-  const imdbId = savedItem?.category === 'film' && savedItem.sourceName?.includes('IMDb')
+  const imdbId = savedItem.category === 'film' && savedItem.sourceName?.includes('IMDb')
     ? extractImdbIdFromUrl(savedItem.sourceUrl) : null;
-  const needsProfile = Boolean(imdbId && savedItem && !hasCjkCharacters(savedItem.summary || ''));
+  const needsProfile = Boolean(imdbId && !hasCjkCharacters(savedItem.summary || ''));
   useEffect(() => {
     if (!imdbId || !needsProfile) return;
     let active = true;
@@ -156,7 +223,7 @@ export function DetailDrawer({
   }, [imdbId, needsProfile]);
 
   const item = useMemo(() => {
-    if (!savedItem || !imdbId || !needsProfile || resolvedFilm?.externalId !== 'imdb-' + imdbId) return savedItem;
+    if (!imdbId || !needsProfile || resolvedFilm?.externalId !== 'imdb-' + imdbId) return savedItem;
     const rename = !hasCjkCharacters(savedItem.title) && hasCjkCharacters(resolvedFilm.title)
       && (!resolvedFilm.originalTitle || resolvedFilm.originalTitle.toLowerCase() === savedItem.title.toLowerCase());
     return { ...savedItem, title: rename ? resolvedFilm.title : savedItem.title,
@@ -410,7 +477,6 @@ export function DetailDrawer({
   }, [item?.id, relationsReloadTick]);
 
   useEffect(() => {
-    if (!item) return;
     const handleKey = (e: KeyboardEvent) => {
       if (coverPickerOpen) return;
       if (e.key === 'Escape') {
@@ -429,23 +495,15 @@ export function DetailDrawer({
       }
       if (e.key === 'ArrowLeft' && onPrevItem) {
         e.preventDefault();
-        onPrevItem();
+        handlePrevItem();
       } else if (e.key === 'ArrowRight' && onNextItem) {
         e.preventDefault();
-        onNextItem();
+        handleNextItem();
       }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [item, coverPickerOpen, onClose, onPrevItem, onNextItem]);
-
-  useEffect(() => {
-    if (item?.id) {
-      bodyScrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
-    }
-  }, [item?.id]);
-
-  if (!item) return null;
+  }, [coverPickerOpen, onClose, onPrevItem, onNextItem, handlePrevItem, handleNextItem]);
 
   const relatedItems = allItems.filter(
     (other) => other.id !== item.id && isExplicitlyLinked(item, other)
@@ -642,17 +700,26 @@ export function DetailDrawer({
   };
 
   return (
-    <div
+    <motion.div
       role="dialog"
       aria-modal="true"
       aria-labelledby="detail-drawer-title"
-      className="encounter-backdrop-in fixed inset-0 z-50 flex items-end justify-center bg-[#1A1816]/55 backdrop-blur-[2px] md:items-stretch md:justify-end dark:bg-black/72"
+      data-testid="detail-drawer-backdrop"
+      variants={backdropVariants}
+      initial="closed"
+      animate="open"
+      exit="closed"
+      className="fixed inset-0 z-50 flex items-end justify-center overflow-hidden bg-[#1A1816]/55 backdrop-blur-[2px] md:items-stretch md:justify-end dark:bg-black/72"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      {/* Mobile Bottom Sheet (rounded-t-3xl) -> Side Drawer on Desktop */}
-      <div className="drawer-panel-in relative flex max-h-[92dvh] w-full max-w-full flex-col overflow-hidden rounded-t-3xl bg-[#F7F5F0] shadow-2xl md:h-full md:max-h-full md:max-w-[600px] md:rounded-none md:border-l md:border-[#DFD9CD] dark:bg-[#141210] dark:md:border-[#322D27]">
+      {/* Mobile Bottom Sheet (rounded-t-3xl) -> Side Drawer on Desktop; smoothly slides in from right */}
+      <motion.div
+        data-testid="detail-drawer-panel"
+        variants={panelVariants}
+        className="relative flex max-h-[92dvh] w-full max-w-full flex-col overflow-hidden rounded-t-3xl bg-[#F7F5F0] shadow-2xl will-change-transform md:h-full md:max-h-full md:max-w-[600px] md:rounded-none md:border-l md:border-[#DFD9CD] dark:bg-[#141210] dark:md:border-[#322D27]"
+      >
         {/* Mobile Drag Handle */}
         <div
           className="flex justify-center pt-2.5 pb-1 md:hidden"
@@ -663,16 +730,27 @@ export function DetailDrawer({
 
         {/* Sticky Sheet Header */}
         <div className="flex items-center justify-between gap-2 border-b border-[#E4DFD5] bg-[#F7F5F0]/95 px-4 py-2.5 min-[420px]:px-5 dark:border-[#2E2924] dark:bg-[#141210]/95">
-          <div className="flex min-w-0 items-center gap-2 font-mono text-[13px] tabular-nums text-[#625C54] md:text-xs dark:text-[#A59D90]">
-            <span className="truncate">{item.accessionNo}</span>
-            <span aria-hidden="true">/</span>
-            <span className="shrink-0">{CATEGORY_LABELS[item.category]}档案</span>
-            {positionLabel && (
-              <>
-                <span aria-hidden="true" className="hidden sm:inline">·</span>
-                <span className="hidden text-[#8C857B] sm:inline dark:text-[#9A9184]">{positionLabel}</span>
-              </>
-            )}
+          <div className="min-w-0 flex-1 overflow-hidden">
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={item.id}
+                variants={metaFadeVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                className="flex min-w-0 items-center gap-2 font-mono text-[13px] tabular-nums text-[#625C54] md:text-xs dark:text-[#A59D90]"
+              >
+                <span className="truncate">{item.accessionNo}</span>
+                <span aria-hidden="true">/</span>
+                <span className="shrink-0">{CATEGORY_LABELS[item.category]}档案</span>
+                {positionLabel && (
+                  <>
+                    <span aria-hidden="true" className="hidden sm:inline">·</span>
+                    <span className="hidden text-[#8C857B] sm:inline dark:text-[#9A9184]">{positionLabel}</span>
+                  </>
+                )}
+              </motion.div>
+            </AnimatePresence>
           </div>
           <div className="flex shrink-0 items-center gap-1">
             {(onPrevItem || onNextItem) && (
@@ -681,7 +759,7 @@ export function DetailDrawer({
                   type="button"
                   data-testid="drawer-prev-item-btn"
                   disabled={!onPrevItem}
-                  onClick={onPrevItem}
+                  onClick={handlePrevItem}
                   aria-label="上一件藏品"
                   title="上一件藏品 (←)"
                   className="flex h-8 w-8 items-center justify-center rounded-lg text-[#4B453E] transition-colors hover:bg-[#F3EFE8] hover:text-[#1A1816] disabled:opacity-35 cursor-pointer dark:text-[#C4BCB0] dark:hover:bg-[#2C2721] dark:hover:text-[#F3EFE6]"
@@ -692,7 +770,7 @@ export function DetailDrawer({
                   type="button"
                   data-testid="drawer-next-item-btn"
                   disabled={!onNextItem}
-                  onClick={onNextItem}
+                  onClick={handleNextItem}
                   aria-label="下一件藏品"
                   title="下一件藏品 (→)"
                   className="flex h-8 w-8 items-center justify-center rounded-lg text-[#4B453E] transition-colors hover:bg-[#F3EFE8] hover:text-[#1A1816] disabled:opacity-35 cursor-pointer dark:text-[#C4BCB0] dark:hover:bg-[#2C2721] dark:hover:text-[#F3EFE6]"
@@ -788,8 +866,27 @@ export function DetailDrawer({
           ref={bodyScrollRef}
           className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-5 pb-10 min-[420px]:px-5 sm:px-6"
         >
-          {/* Header Block: Cover + Key Metadata */}
-          <div className="flex gap-4">
+          <AnimatePresence
+            mode="wait"
+            initial={false}
+            custom={switchDirection}
+            onExitComplete={() => {
+              bodyScrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+            }}
+          >
+            <motion.div
+              key={item.id}
+              data-testid="detail-drawer-content"
+              data-item-id={item.id}
+              data-transition-dir={switchDirection}
+              custom={switchDirection}
+              variants={contentVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+            >
+              {/* Header Block: Cover + Key Metadata */}
+              <div className="flex gap-4">
             <div className="gallery-paper-mat w-[124px] shrink-0 self-start overflow-hidden border border-[#E4DFD5] p-2 min-[420px]:w-[134px] sm:w-[144px] dark:border-[#322D27]">
               <button
                 type="button"
@@ -1941,7 +2038,9 @@ export function DetailDrawer({
                 </button>
               </div>
             )}
-          </div>
+            </div>
+            </motion.div>
+          </AnimatePresence>
         </div>
 
         {/* Sticky Bottom Save Bar */}
@@ -1975,7 +2074,7 @@ export function DetailDrawer({
             </button>
           </div>
         </div>
-      </div>
+      </motion.div>
 
       <CoverPickerModal
         open={coverPickerOpen}
@@ -1987,6 +2086,6 @@ export function DetailDrawer({
           setSavedFeedback('封面已更新');
         }}
       />
-    </div>
+    </motion.div>
   );
 }
