@@ -32,6 +32,7 @@ import {
   formatLocalDateKey,
 } from '../utils/collector';
 import {
+  computeWarmGlowAnchor,
   getSecondaryFavorites,
   getSecondaryQuotes,
   getSecondaryRecent,
@@ -179,6 +180,18 @@ export function CollectorSpotlightRail({
   const personCount = items.filter((it) => it.category === 'person').length;
   const characterCount = items.filter((it) => it.category === 'character').length;
 
+  const handleCardPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'touch') return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const { xPercent, yPercent } = computeWarmGlowAnchor(
+      e.clientX,
+      e.clientY,
+      rect
+    );
+    e.currentTarget.style.setProperty('--glow-x', xPercent);
+    e.currentTarget.style.setProperty('--glow-y', yPercent);
+  };
+
   return (
     <section
       aria-label="藏馆顶部展示区"
@@ -191,7 +204,8 @@ export function CollectorSpotlightRail({
           <div
             data-testid="daily-spotlight-card"
             data-showcase-mode={primaryShowcase.mode}
-            className={`gallery-card-dark flex flex-col justify-between overflow-hidden border border-[#342F28] p-4 min-[420px]:p-5 text-[#F5F1E8] ${
+            onPointerMove={handleCardPointerMove}
+            className={`gallery-card-dark showcase-card-warm showcase-card-warm-dark flex flex-col justify-between overflow-hidden border border-[#342F28] p-4 min-[420px]:p-5 text-[#F5F1E8] ${
               showSecondary ? 'lg:col-span-7' : 'lg:col-span-12'
             }`}
           >
@@ -463,7 +477,8 @@ export function CollectorSpotlightRail({
         {/* 2. Right Secondary Showcase Panel (Swappable Curatorial Module) */}
         {showSecondary && (
           <div
-            className="flex flex-col justify-between rounded-[22px] border border-[#E6E0D4] bg-[#FFFDF9] p-4 min-[420px]:p-5 lg:col-span-5"
+            onPointerMove={handleCardPointerMove}
+            className="showcase-card-warm showcase-card-warm-light flex flex-col justify-between rounded-[22px] border border-[#E6E0D4] p-4 min-[420px]:p-5 lg:col-span-5"
             data-testid="collector-albums-section"
             data-secondary-mode={showcaseConfig.secondaryMode}
           >
@@ -644,10 +659,10 @@ export function CollectorSpotlightRail({
                             collector.albums.length === 1 ? 'w-full' : 'w-[272px] lg:w-full'
                           } shrink-0 rounded-2xl border p-3.5 transition-colors ${
                             isActive
-                              ? 'border-[#1A1816] bg-[#FAF8F3]'
+                              ? 'border-[#1A1816] bg-[#FAF8F3]/78'
                               : isComplete
-                                ? 'border-[#C9A45C]/80 bg-[#FDFBF5]'
-                                : 'border-[#ECE6DA] bg-[#FAF9F6]'
+                                ? 'border-[#C9A45C]/80 bg-[#FDFBF5]/80'
+                                : 'border-[#ECE6DA] bg-[#FAF9F6]/76'
                           }`}
                         >
                           <div className="flex items-start justify-between gap-2">
@@ -774,7 +789,7 @@ export function CollectorSpotlightRail({
                   </div>
                 ) : (
                   !showCreateAlbum && (
-                    <div className="mt-3.5 flex flex-col justify-between gap-4 rounded-2xl border border-dashed border-[#D8D0C2] bg-[#FAF8F4] p-4">
+                    <div className="mt-3.5 flex flex-col justify-between gap-4 rounded-2xl border border-dashed border-[#D8D0C2] bg-[#FAF8F4]/72 p-4">
                       <div>
                         <p className="font-editorial text-[15px] font-medium text-[#1A1816]">
                           开启你的第一本专题图鉴册
@@ -938,7 +953,7 @@ export function CollectorSpotlightRail({
                 </div>
 
                 {activeQuoteEntry ? (
-                  <div className="flex flex-1 flex-col justify-between rounded-2xl border border-[#ECE6DA] bg-[#FAF8F4] p-4">
+                  <div className="flex flex-1 flex-col justify-between rounded-2xl border border-[#ECE6DA] bg-[#FAF8F4]/76 p-4">
                     <p className="font-editorial text-[16px] leading-relaxed text-[#1A1816]">
                       “{activeQuoteEntry.text}”
                     </p>
@@ -1025,7 +1040,7 @@ export function CollectorSpotlightRail({
                         key={rec.id}
                         type="button"
                         onClick={() => onOpenDetail(rec)}
-                        className="flex w-full items-center gap-2.5 rounded-xl border border-[#ECE6DA] bg-[#FAF9F6] p-2 text-left transition-colors hover:border-[#1A1816] cursor-pointer"
+                        className="flex w-full items-center gap-2.5 rounded-xl border border-[#ECE6DA] bg-[#FAF9F6]/76 p-2 text-left transition-colors hover:border-[#1A1816] cursor-pointer"
                       >
                         <ArchivalImage
                           src={rec.coverUrl}

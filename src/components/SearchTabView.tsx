@@ -10,7 +10,9 @@ import type {
 import { searchOnline } from '../services/archiveApi';
 import { CATEGORY_LABELS, isAlreadyCollected } from '../utils/archive';
 import {
+  clearRecentSearches,
   CURATED_SEARCH_SUGGESTIONS,
+  getVisibleRecentSearches,
   loadRecentSearches,
   pushRecentSearchQuery,
   removeRecentSearchQuery,
@@ -199,7 +201,13 @@ export function SearchTabView({
     });
   };
 
+  const handleClearRecent = () => {
+    setRecentSearches([]);
+    clearRecentSearches();
+  };
+
   const suggestions = CURATED_SEARCH_SUGGESTIONS[category];
+  const visibleRecentSearches = getVisibleRecentSearches(recentSearches);
 
   return (
     <section className="mx-auto max-w-[1100px] px-4 pt-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] min-[420px]:px-5 md:px-8 md:pt-7 md:pb-16">
@@ -293,13 +301,67 @@ export function SearchTabView({
           </button>
         </form>
 
+        {/* Persistent Search History (Recent 3 Keywords, Always Accessible Below Search Box) */}
+        {visibleRecentSearches.length > 0 && (
+          <div
+            aria-label="搜索历史记录"
+            data-testid="search-history-list"
+            className="mt-3 flex flex-wrap items-center gap-2"
+          >
+            <span className="inline-flex shrink-0 items-center gap-1 text-[12px] font-medium text-[#7A7268]">
+              <Clock className="h-3.5 w-3.5 text-[#8C857B]" aria-hidden="true" />
+              <span>历史记录</span>
+            </span>
+            {visibleRecentSearches.map((item) => {
+              const isCurrent =
+                hasSearched && query.trim().toLowerCase() === item.toLowerCase();
+              return (
+                <span
+                  key={`recent-${item}`}
+                  data-testid="search-history-item"
+                  className={`inline-flex min-h-[34px] max-w-full items-center rounded-lg border pl-2.5 pr-1 text-[13px] transition-colors md:text-xs ${
+                    isCurrent
+                      ? 'border-[#C9A45C] bg-[#FDFBF5] text-[#1A1816]'
+                      : 'border-[#E6E0D4] bg-[#FAF9F6] text-[#4B453E] hover:border-[#CFC5B4] hover:bg-white'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => handleQuickPick(item)}
+                    aria-label={`再次检索「${item}」`}
+                    className="max-w-[180px] truncate pr-1 text-left font-medium hover:text-[#B43B2B] cursor-pointer"
+                  >
+                    {item}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveRecent(item)}
+                    aria-label={`移除历史记录「${item}」`}
+                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[#9C9488] transition-colors hover:bg-[#EFECE5] hover:text-[#1A1816] cursor-pointer"
+                  >
+                    <X className="h-3 w-3" aria-hidden="true" />
+                  </button>
+                </span>
+              );
+            })}
+            <button
+              type="button"
+              data-testid="clear-search-history-btn"
+              onClick={handleClearRecent}
+              className="ml-auto inline-flex min-h-[32px] items-center rounded-lg px-2 text-[12px] text-[#8C857B] whitespace-nowrap cursor-pointer transition-colors hover:bg-[#F3EFE8] hover:text-[#1A1816]"
+            >
+              清空
+            </button>
+          </div>
+        )}
+
         <p className="mt-3 text-[13px] leading-relaxed text-[#7A7268] md:text-[12px]">
           支持中英文片名和 IMDb / 豆瓣链接。常见影片可用内置中文片名索引查询，评分、海报与简介按联网结果显示。
         </p>
 
-        {/* Curated Quick-Picks & Recent Search History */}
+        {/* Curated Quick-Picks */}
         {!loading && !hasSearched && (
-          <div className="mt-4 space-y-3 border-t border-[#F0ECE4] pt-4">
+          <div className="mt-4 border-t border-[#F0ECE4] pt-4">
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1 text-[12px] font-medium text-[#7A7268]">
                 <Sparkles className="h-3.5 w-3.5 text-[#A67C37]" aria-hidden="true" />
@@ -316,37 +378,6 @@ export function SearchTabView({
                 </button>
               ))}
             </div>
-
-            {recentSearches.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-1 text-[12px] font-medium text-[#7A7268]">
-                  <Clock className="h-3.5 w-3.5 text-[#8C857B]" aria-hidden="true" />
-                  最近搜索
-                </span>
-                {recentSearches.map((item) => (
-                  <span
-                    key={`recent-${item}`}
-                    className="inline-flex min-h-[34px] items-center rounded-lg border border-[#EAE4D9] bg-white pl-2.5 pr-1 text-[13px] text-[#4B453E] md:text-xs"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => handleQuickPick(item)}
-                      className="pr-1 hover:text-[#1A1816] cursor-pointer"
-                    >
-                      {item}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveRecent(item)}
-                      aria-label={`移除最近搜索「${item}」`}
-                      className="flex h-6 w-6 items-center justify-center rounded-md text-[#9C9488] hover:bg-[#F3EFE8] hover:text-[#1A1816] cursor-pointer"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
           </div>
         )}
       </div>

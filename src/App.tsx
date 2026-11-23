@@ -18,6 +18,7 @@ import { AlbumCuratorModal } from './components/AlbumCuratorModal';
 import { ArchiveGrid, type ArchiveViewMode } from './components/ArchiveGrid';
 import { BatchActionBar } from './components/BatchActionBar';
 import { CollectibleCardModal } from './components/CollectibleCardModal';
+import { CollectionStatsCapsule } from './components/CollectionStatsCapsule';
 import { CollectorSpotlightRail } from './components/CollectorSpotlightRail';
 import { DailyCheckInBanner } from './components/DailyCheckInBanner';
 import { DetailDrawer } from './components/DetailDrawer';
@@ -1442,6 +1443,14 @@ export default function App() {
 
         {activeTab === 'library' && (
           <>
+            {/* Real-Time Collection Distribution Capsule (Recharts PieChart) */}
+            <CollectionStatsCapsule
+              items={displayItems}
+              activeCategory={activeCategory}
+              onSelectCategory={setActiveCategory}
+              onJumpToSearch={() => jumpToSearch()}
+            />
+
             {/* Collector Daily Ritual & Themed Albums Shelf */}
             <CollectorSpotlightRail
               items={displayItems}

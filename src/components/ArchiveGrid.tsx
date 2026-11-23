@@ -13,6 +13,7 @@ import {
   isPointerDragExceeded,
   type Point2D,
 } from '../utils/quickStatusMenu';
+import { getArchiveCardVisualClasses } from '../utils/uiHelpers';
 import { ArchivalImage } from './ArchivalImage';
 import { QuickStatusPopover } from './QuickStatusPopover';
 
@@ -350,26 +351,30 @@ export function ArchiveGrid({
         data-view-mode="list"
         className="mx-auto max-w-[1180px] px-4 pt-3 pb-[calc(6.5rem+env(safe-area-inset-bottom))] min-[420px]:px-5 md:px-8 md:pb-16"
       >
-        <div className="divide-y divide-[#E8E2D7] overflow-hidden rounded-2xl border border-[#E4DFD5] bg-[#FFFDF9]">
+        <div className="flex flex-col gap-2.5">
           {items.map((item) => {
             const relatedItems = getRelatedItems(item, allItems);
             const relatedSummary = formatRelatedSummary(relatedItems);
             const completeness = computeItemCompleteness(item);
             const isMasterpiece = completeness.tier === 'masterpiece';
+            const isFavorite = item.status === 'favorite';
             const excerpt = item.quote || item.notes || item.summary;
 
             const isSelected = batchMode && selectedIdSet.has(item.id);
             const isPressing = pressingItemId === item.id;
+            const cardVisual = getArchiveCardVisualClasses({
+              status: item.status,
+              isMasterpiece,
+              isSelected,
+              isPressing,
+              viewMode: 'list',
+            });
+
             return (
               <article
                 key={item.id}
-                className={`group relative flex items-center gap-3.5 px-3.5 py-3 transition-colors sm:px-5 sm:py-3.5 ${
-                  isSelected
-                    ? 'bg-[#FDF6F4]'
-                    : isPressing
-                      ? 'bg-[#F6F1E7]'
-                      : 'hover:bg-[#FAF7F0]'
-                }`}
+                data-favorite-glow={cardVisual.hasFavoriteGlow ? 'true' : undefined}
+                className={`group relative flex items-center gap-3.5 rounded-2xl border px-3.5 py-3 transition-all sm:px-5 sm:py-3.5 ${cardVisual.frameClassName}`}
               >
                 <button
                   type="button"
@@ -426,7 +431,13 @@ export function ArchiveGrid({
                         </>
                       )}
                       <span aria-hidden="true">·</span>
-                      <span>{getStatusLabel(item.status, item.category)}</span>
+                      <span
+                        className={
+                          isFavorite ? 'font-medium text-[#8E6523]' : undefined
+                        }
+                      >
+                        {getStatusLabel(item.status, item.category)}
+                      </span>
                       {isMasterpiece && (
                         <>
                           <span aria-hidden="true">·</span>
@@ -515,30 +526,31 @@ export function ArchiveGrid({
           const relatedSummary = formatRelatedSummary(relatedItems);
           const completeness = computeItemCompleteness(item);
           const isMasterpiece = completeness.tier === 'masterpiece';
-          const metaLine = [
+          const isFavorite = item.status === 'favorite';
+          const metaPrefix = [
             item.accessionNo,
             CATEGORY_LABELS[item.category],
             item.year,
-            getStatusLabel(item.status, item.category),
           ]
             .filter(Boolean)
             .join(' · ');
+          const statusLabel = getStatusLabel(item.status, item.category);
 
           const isSelected = batchMode && selectedIdSet.has(item.id);
           const isPressing = pressingItemId === item.id;
+          const cardVisual = getArchiveCardVisualClasses({
+            status: item.status,
+            isMasterpiece,
+            isSelected,
+            isPressing,
+            viewMode: 'grid',
+          });
 
           return (
             <article key={item.id} className="group relative flex min-w-0 flex-col">
               <div
-                className={`gallery-card gallery-card-interactive relative flex flex-1 flex-col overflow-hidden border ${
-                  isSelected
-                    ? 'border-[#B43B2B] ring-2 ring-[#B43B2B]/80'
-                    : isPressing
-                      ? 'scale-[0.985] border-[#B43B2B]/70 ring-2 ring-[#B43B2B]/25'
-                      : isMasterpiece
-                        ? 'gallery-card-masterpiece border-[#C9A45C]/80'
-                        : 'border-[#E6E0D4] hover:border-[#CFC5B4]'
-                }`}
+                data-favorite-glow={cardVisual.hasFavoriteGlow ? 'true' : undefined}
+                className={`gallery-card gallery-card-interactive relative flex flex-1 flex-col overflow-hidden border ${cardVisual.frameClassName}`}
               >
                 <button
                   type="button"
@@ -598,7 +610,15 @@ export function ArchiveGrid({
                   {/* Readable Archival Metadata */}
                   <div className="flex flex-1 flex-col px-3 pt-2.5 pb-3.5 min-[420px]:px-3.5">
                     <p className="truncate font-mono text-[11px] text-[#7A7268] tabular-nums md:text-[10px]">
-                      {metaLine}
+                      <span>{metaPrefix}</span>
+                      <span aria-hidden="true"> · </span>
+                      <span
+                        className={
+                          isFavorite ? 'font-medium text-[#8E6523]' : undefined
+                        }
+                      >
+                        {statusLabel}
+                      </span>
                     </p>
                     <h2 className="mt-1 line-clamp-1 font-editorial text-[16px] min-[420px]:text-[17px] font-medium leading-snug text-[#1A1816] transition-colors group-hover:text-[#B43B2B] md:text-[16px]">
                       {item.title}

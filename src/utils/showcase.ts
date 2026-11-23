@@ -359,3 +359,46 @@ export function getSecondaryRecent(
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .slice(0, limit);
 }
+
+export interface WarmGlowAnchor {
+  xPercent: string;
+  yPercent: string;
+}
+
+export const DEFAULT_WARM_GLOW_ANCHOR: WarmGlowAnchor = {
+  xPercent: '48%',
+  yPercent: '24%',
+};
+
+/**
+ * Converts pointer coordinates inside a showcase card rect into clamped CSS
+ * percentage anchors so warm radial light diffuses smoothly without harsh edge clipping.
+ */
+export function computeWarmGlowAnchor(
+  clientX: number,
+  clientY: number,
+  rect: { left: number; top: number; width: number; height: number } | null | undefined
+): WarmGlowAnchor {
+  if (
+    !rect ||
+    !Number.isFinite(rect.width) ||
+    !Number.isFinite(rect.height) ||
+    rect.width <= 0 ||
+    rect.height <= 0 ||
+    !Number.isFinite(clientX) ||
+    !Number.isFinite(clientY)
+  ) {
+    return DEFAULT_WARM_GLOW_ANCHOR;
+  }
+
+  const rawX = ((clientX - rect.left) / rect.width) * 100;
+  const rawY = ((clientY - rect.top) / rect.height) * 100;
+  const clampedX = Math.max(8, Math.min(92, Math.round(rawX * 10) / 10));
+  const clampedY = Math.max(8, Math.min(92, Math.round(rawY * 10) / 10));
+
+  return {
+    xPercent: `${clampedX}%`,
+    yPercent: `${clampedY}%`,
+  };
+}
+

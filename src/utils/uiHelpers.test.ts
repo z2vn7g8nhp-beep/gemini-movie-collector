@@ -4,8 +4,11 @@ import type { ArchiveItem } from '../types/archive';
 import {
   countActiveLibraryFilters,
   getAdjacentArchiveItem,
+  getArchiveCardVisualClasses,
+  getVisibleRecentSearches,
   pushRecentSearchQuery,
   removeRecentSearchQuery,
+  VISIBLE_RECENT_SEARCHES,
 } from './uiHelpers';
 
 const MOCK_ITEMS: ArchiveItem[] = [
@@ -96,4 +99,54 @@ test('pushRecentSearchQuery deduplicates case-insensitively and enforces limit',
 
   const step3 = removeRecentSearchQuery(step2, 'A');
   assert.deepEqual(step3, ['d', 'b']);
+
+  assert.equal(VISIBLE_RECENT_SEARCHES, 3);
+  assert.deepEqual(
+    getVisibleRecentSearches(['霸王别姬', '重庆森林', '千与千寻', '花样年华']),
+    ['霸王别姬', '重庆森林', '千与千寻']
+  );
+  assert.deepEqual(getVisibleRecentSearches([]), []);
+});
+
+test('getArchiveCardVisualClasses applies golden outline glow for favorite cards in grid and list views', () => {
+  const favGrid = getArchiveCardVisualClasses({
+    status: 'favorite',
+    isMasterpiece: false,
+    isSelected: false,
+    isPressing: false,
+    viewMode: 'grid',
+  });
+  assert.equal(favGrid.hasFavoriteGlow, true);
+  assert.match(favGrid.frameClassName, /archive-card-favorite-grid/);
+
+  const favList = getArchiveCardVisualClasses({
+    status: 'favorite',
+    isMasterpiece: true,
+    isSelected: false,
+    isPressing: false,
+    viewMode: 'list',
+  });
+  assert.equal(favList.hasFavoriteGlow, true);
+  assert.match(favList.frameClassName, /archive-card-favorite-list/);
+
+  const watchedGrid = getArchiveCardVisualClasses({
+    status: 'watched',
+    isMasterpiece: false,
+    isSelected: false,
+    isPressing: false,
+    viewMode: 'grid',
+  });
+  assert.equal(watchedGrid.hasFavoriteGlow, false);
+  assert.doesNotMatch(watchedGrid.frameClassName, /archive-card-favorite/);
+
+  // Batch selection takes visual precedence over favorite glow
+  const selectedFav = getArchiveCardVisualClasses({
+    status: 'favorite',
+    isMasterpiece: true,
+    isSelected: true,
+    isPressing: false,
+    viewMode: 'grid',
+  });
+  assert.equal(selectedFav.hasFavoriteGlow, false);
+  assert.match(selectedFav.frameClassName, /ring-\[#B43B2B\]/);
 });

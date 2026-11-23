@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { SEED_COLLECTION } from '../data/seedCollection';
 import {
+  computeWarmGlowAnchor,
   DEFAULT_SHOWCASE_CONFIG,
+  DEFAULT_WARM_GLOW_ANCHOR,
   getSecondaryFavorites,
   getSecondaryQuotes,
   getSecondaryRecent,
@@ -142,4 +144,33 @@ test('secondary widget selectors return ranked favorites, prioritized quotes, an
   const recent = getSecondaryRecent(SEED_COLLECTION, 3);
   assert.equal(recent.length, 3);
   assert.ok(recent[0].createdAt >= recent[1].createdAt);
+});
+
+test('computeWarmGlowAnchor normalizes and clamps pointer positions safely', () => {
+  const rect = { left: 100, top: 50, width: 400, height: 200 };
+
+  assert.deepEqual(computeWarmGlowAnchor(300, 150, rect), {
+    xPercent: '50%',
+    yPercent: '50%',
+  });
+
+  // Edge and out-of-bounds values clamp within [8%, 92%]
+  assert.deepEqual(computeWarmGlowAnchor(80, 40, rect), {
+    xPercent: '8%',
+    yPercent: '8%',
+  });
+  assert.deepEqual(computeWarmGlowAnchor(600, 300, rect), {
+    xPercent: '92%',
+    yPercent: '92%',
+  });
+
+  // Zero or invalid geometry falls back cleanly
+  assert.deepEqual(
+    computeWarmGlowAnchor(200, 100, { left: 0, top: 0, width: 0, height: 200 }),
+    DEFAULT_WARM_GLOW_ANCHOR
+  );
+  assert.deepEqual(
+    computeWarmGlowAnchor(Number.NaN, 100, rect),
+    DEFAULT_WARM_GLOW_ANCHOR
+  );
 });
