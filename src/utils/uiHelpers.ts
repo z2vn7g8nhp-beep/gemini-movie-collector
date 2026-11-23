@@ -156,60 +156,70 @@ export function getArchiveCardVisualClasses({
   if (viewMode === 'list') {
     if (isSelected) {
       return {
-        frameClassName: 'border-[#B43B2B] bg-[#FDF6F4] ring-2 ring-[#B43B2B]/70',
+        frameClassName:
+          'border-[#B43B2B] bg-[#FDF6F4] ring-2 ring-[#B43B2B]/70 dark:bg-[#2F1A17] dark:border-[#D95B48]',
         hasFavoriteGlow: false,
       };
     }
     if (isPressing) {
       return {
-        frameClassName: 'scale-[0.992] border-[#B43B2B]/70 bg-[#F6F1E7] ring-2 ring-[#B43B2B]/20',
+        frameClassName:
+          'scale-[0.992] border-[#B43B2B]/70 bg-[#F6F1E7] ring-2 ring-[#B43B2B]/20 dark:bg-[#28221D] dark:border-[#D95B48]/70',
         hasFavoriteGlow: false,
       };
     }
     if (isFavorite) {
       return {
-        frameClassName: 'archive-card-favorite archive-card-favorite-list border-[#C9A45C]/90 bg-[#FFFDF9]',
+        frameClassName:
+          'archive-card-favorite archive-card-favorite-list border-[#C9A45C]/90 bg-[#FFFDF9] dark:border-[#C9A45C]/70 dark:bg-[#211D18]',
         hasFavoriteGlow: true,
       };
     }
     if (isMasterpiece) {
       return {
-        frameClassName: 'border-[#DDD2BE] bg-[#FFFDF9] hover:border-[#CFC1A6] hover:bg-[#FAF7F0]',
+        frameClassName:
+          'border-[#DDD2BE] bg-[#FFFDF9] hover:border-[#CFC1A6] hover:bg-[#FAF7F0] dark:border-[#4B4132] dark:bg-[#1D1A17] dark:hover:border-[#6A5A42] dark:hover:bg-[#24201B]',
         hasFavoriteGlow: false,
       };
     }
     return {
-      frameClassName: 'border-[#E4DFD5] bg-[#FFFDF9] hover:border-[#CFC5B4] hover:bg-[#FAF7F0]',
+      frameClassName:
+        'border-[#E4DFD5] bg-[#FFFDF9] hover:border-[#CFC5B4] hover:bg-[#FAF7F0] dark:border-[#322D27] dark:bg-[#1D1A17] dark:hover:border-[#4A433A] dark:hover:bg-[#24201C]',
       hasFavoriteGlow: false,
     };
   }
 
   if (isSelected) {
     return {
-      frameClassName: 'border-[#B43B2B] ring-2 ring-[#B43B2B]/80',
+      frameClassName:
+        'border-[#B43B2B] ring-2 ring-[#B43B2B]/80 dark:border-[#D95B48]',
       hasFavoriteGlow: false,
     };
   }
   if (isPressing) {
     return {
-      frameClassName: 'scale-[0.985] border-[#B43B2B]/70 ring-2 ring-[#B43B2B]/25',
+      frameClassName:
+        'scale-[0.985] border-[#B43B2B]/70 ring-2 ring-[#B43B2B]/25 dark:border-[#D95B48]/70',
       hasFavoriteGlow: false,
     };
   }
   if (isFavorite) {
     return {
-      frameClassName: 'archive-card-favorite archive-card-favorite-grid border-[#C9A45C]/90',
+      frameClassName:
+        'archive-card-favorite archive-card-favorite-grid border-[#C9A45C]/90 dark:border-[#C9A45C]/70',
       hasFavoriteGlow: true,
     };
   }
   if (isMasterpiece) {
     return {
-      frameClassName: 'gallery-card-masterpiece border-[#DFD2B8] hover:border-[#CBB892]',
+      frameClassName:
+        'gallery-card-masterpiece border-[#DFD2B8] hover:border-[#CBB892] dark:border-[#534634] dark:hover:border-[#786548]',
       hasFavoriteGlow: false,
     };
   }
   return {
-    frameClassName: 'border-[#E6E0D4] hover:border-[#CFC5B4]',
+    frameClassName:
+      'border-[#E6E0D4] hover:border-[#CFC5B4] dark:border-[#322D27] dark:hover:border-[#4B443B]',
     hasFavoriteGlow: false,
   };
 }

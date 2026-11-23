@@ -116,7 +116,7 @@ export function ArchivalImage({
           {!loaded && (
             <div
               aria-hidden="true"
-              className="absolute inset-0 bg-[#E8E2D7]"
+              className="absolute inset-0 bg-[#E8E2D7] dark:bg-[#2A2520]"
             />
           )}
           <img

@@ -31,8 +31,25 @@
     />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
+    <script>
+      (function () {
+        try {
+          var saved = window.localStorage.getItem('cinearchive.theme.v1');
+          var isDark =
+            saved === 'dark' ||
+            (saved !== 'light' &&
+              window.matchMedia &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches);
+          var root = document.documentElement;
+          root.classList.toggle('dark', isDark);
+          root.style.colorScheme = isDark ? 'dark' : 'light';
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute('content', isDark ? '#141210' : '#F7F5F0');
+        } catch (e) {}
+      })();
+    </script>
   </head>
-  <body class="bg-[#F7F5F0] text-[#1A1816] antialiased overflow-x-clip selection:bg-[#B43B2B]/15 selection:text-[#8E2A1D]">
+  <body class="bg-[#F7F5F0] text-[#1A1816] antialiased overflow-x-clip selection:bg-[#B43B2B]/15 selection:text-[#8E2A1D] dark:bg-[#141210] dark:text-[#F3EFE6] dark:selection:bg-[#E8725F]/25 dark:selection:text-[#FAF7F0]">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

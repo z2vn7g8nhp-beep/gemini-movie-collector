@@ -114,26 +114,26 @@ export function QuotesWallModal({
       aria-modal="true"
       aria-labelledby="quotes-wall-title"
       data-testid="quotes-wall-modal"
-      className="encounter-backdrop-in fixed inset-0 z-[70] flex items-end justify-center bg-[#141210]/70 backdrop-blur-xs md:items-center md:p-6"
+      className="encounter-backdrop-in fixed inset-0 z-[70] flex items-end justify-center bg-[#141210]/70 backdrop-blur-xs md:items-center md:p-6 dark:bg-black/80"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="drawer-panel-in flex max-h-[92dvh] w-full max-w-[600px] flex-col overflow-hidden rounded-t-3xl bg-[#F7F5F0] shadow-2xl md:rounded-3xl">
+      <div className="drawer-panel-in flex max-h-[92dvh] w-full max-w-[600px] flex-col overflow-hidden rounded-t-3xl bg-[#F7F5F0] shadow-2xl md:rounded-3xl dark:border dark:border-[#322D27] dark:bg-[#141210]">
         <div className="flex justify-center pt-2.5 pb-1 md:hidden" aria-hidden="true">
-          <div className="h-1.5 w-10 rounded-full bg-[#D3CCC0]" />
+          <div className="h-1.5 w-10 rounded-full bg-[#D3CCC0] dark:bg-[#3A342D]" />
         </div>
 
         {/* Sticky Header */}
-        <div className="flex items-center justify-between gap-2 border-b border-[#E4DFD5] px-4 py-3 min-[420px]:px-5">
+        <div className="flex items-center justify-between gap-2 border-b border-[#E4DFD5] px-4 py-3 min-[420px]:px-5 dark:border-[#2E2924] dark:bg-[#191613]">
           <div className="min-w-0">
             <h2
               id="quotes-wall-title"
-              className="font-editorial text-[19px] font-medium text-[#1A1816]"
+              className="font-editorial text-[19px] font-medium text-[#1A1816] dark:text-[#F3EFE6]"
             >
               光影金句本
             </h2>
-            <p className="mt-0.5 text-xs text-[#7A7268] tabular-nums">
+            <p className="mt-0.5 text-xs text-[#7A7268] tabular-nums dark:text-[#9E9588]">
               已摘录 {entries.length} 句经典台词与语录
             </p>
           </div>
@@ -143,9 +143,9 @@ export function QuotesWallModal({
                 type="button"
                 data-testid="quotes-shuffle-btn"
                 onClick={() => setShuffleSeed((s) => s + 1)}
-                className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-[#DCD6CB] bg-white px-3 text-xs font-medium text-[#1A1816] whitespace-nowrap cursor-pointer active:scale-[0.97]"
+                className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-[#DCD6CB] bg-white px-3 text-xs font-medium text-[#1A1816] whitespace-nowrap cursor-pointer active:scale-[0.97] dark:border-[#3A342D] dark:bg-[#24201C] dark:text-[#F3EFE6] dark:hover:border-[#564E44]"
               >
-                <Shuffle className="h-3.5 w-3.5 text-[#B43B2B]" aria-hidden="true" />
+                <Shuffle className="h-3.5 w-3.5 text-[#B43B2B] dark:text-[#EB7865]" aria-hidden="true" />
                 <span>翻一句</span>
               </button>
             )}
@@ -153,7 +153,7 @@ export function QuotesWallModal({
               type="button"
               onClick={onClose}
               aria-label="关闭光影金句本"
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[#625C54] hover:bg-[#EAE4D9] hover:text-[#1A1816] cursor-pointer"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[#625C54] hover:bg-[#EAE4D9] hover:text-[#1A1816] cursor-pointer dark:text-[#A59D90] dark:hover:bg-[#28241F] dark:hover:text-[#F3EFE6]"
             >
               <X className="h-5 w-5" />
             </button>
@@ -171,19 +171,19 @@ export function QuotesWallModal({
                     setExportingItem(null);
                     setPreviewUrl(null);
                   }}
-                  className="min-h-[40px] rounded-xl border border-[#DCD6CB] bg-white px-3.5 text-xs font-medium text-[#1A1816] cursor-pointer"
+                  className="min-h-[40px] rounded-xl border border-[#DCD6CB] bg-white px-3.5 text-xs font-medium text-[#1A1816] cursor-pointer dark:border-[#3A342D] dark:bg-[#24201C] dark:text-[#F3EFE6] dark:hover:border-[#564E44]"
                 >
                   返回金句墙
                 </button>
-                <div className="grid grid-cols-2 gap-1 rounded-xl bg-[#ECE8DF] p-1">
+                <div className="grid grid-cols-2 gap-1 rounded-xl bg-[#ECE8DF] p-1 dark:bg-[#231F1B]">
                   <button
                     type="button"
                     aria-pressed={exportTheme === 'ivory'}
                     onClick={() => void handleSwitchTheme('ivory')}
                     className={`min-h-[34px] rounded-lg px-3 text-xs font-medium cursor-pointer ${
                       exportTheme === 'ivory'
-                        ? 'bg-white text-[#1A1816] shadow-xs'
-                        : 'text-[#625C54]'
+                        ? 'bg-white text-[#1A1816] shadow-xs dark:bg-[#353029] dark:text-[#F5F1E8]'
+                        : 'text-[#625C54] dark:text-[#9E9588]'
                     }`}
                   >
                     象牙纸白
@@ -194,8 +194,8 @@ export function QuotesWallModal({
                     onClick={() => void handleSwitchTheme('darkroom')}
                     className={`min-h-[34px] rounded-lg px-3 text-xs font-medium cursor-pointer ${
                       exportTheme === 'darkroom'
-                        ? 'bg-[#1C1A17] text-[#F5DC9B] shadow-xs'
-                        : 'text-[#625C54]'
+                        ? 'bg-[#1C1A17] text-[#F5DC9B] shadow-xs dark:bg-[#353029] dark:text-[#F5DC9B]'
+                        : 'text-[#625C54] dark:text-[#9E9588]'
                     }`}
                   >
                     暗房黑金
@@ -203,7 +203,7 @@ export function QuotesWallModal({
                 </div>
               </div>
 
-              <div className="flex min-h-[320px] items-center justify-center overflow-hidden rounded-2xl border border-[#DFD9CD] bg-[#1C1A17] p-2">
+              <div className="flex min-h-[320px] items-center justify-center overflow-hidden rounded-2xl border border-[#DFD9CD] bg-[#1C1A17] p-2 dark:border-[#322D27]">
                 {rendering || !previewUrl ? (
                   <div className="flex items-center gap-2 text-xs text-[#CFC7B9]">
                     <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
@@ -218,7 +218,7 @@ export function QuotesWallModal({
                 )}
               </div>
 
-              <p className="text-center text-xs text-[#6E665C]">
+              <p className="text-center text-xs text-[#6E665C] dark:text-[#9E9588]">
                 手机端可长按图片存至相册，或点击下方一键导出
               </p>
 
@@ -238,7 +238,7 @@ export function QuotesWallModal({
               <div
                 role="group"
                 aria-label="金句分类筛选"
-                className="grid grid-cols-4 gap-1 rounded-xl bg-[#ECE8DF] p-1"
+                className="grid grid-cols-4 gap-1 rounded-xl bg-[#ECE8DF] p-1 dark:bg-[#231F1B]"
               >
                 {CAT_OPTIONS.map((opt) => {
                   const active = category === opt.id;
@@ -253,8 +253,8 @@ export function QuotesWallModal({
                       }}
                       className={`min-h-[40px] rounded-lg text-xs font-medium whitespace-nowrap cursor-pointer ${
                         active
-                          ? 'bg-white text-[#1A1816] shadow-xs'
-                          : 'text-[#625C54]'
+                          ? 'bg-white text-[#1A1816] shadow-xs dark:bg-[#353029] dark:text-[#F5F1E8]'
+                          : 'text-[#625C54] dark:text-[#9E9588]'
                       }`}
                     >
                       {opt.label}
@@ -264,12 +264,12 @@ export function QuotesWallModal({
               </div>
 
               {entries.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-[#D8D0C2] bg-white px-5 py-10 text-center">
-                  <Quote className="mx-auto h-7 w-7 text-[#BFB6A7]" aria-hidden="true" />
-                  <p className="mt-3 font-editorial text-lg font-medium text-[#1A1816]">
+                <div className="rounded-2xl border border-dashed border-[#D8D0C2] bg-white px-5 py-10 text-center dark:border-[#3A342D] dark:bg-[#1D1A17]">
+                  <Quote className="mx-auto h-7 w-7 text-[#BFB6A7] dark:text-[#6E655A]" aria-hidden="true" />
+                  <p className="mt-3 font-editorial text-lg font-medium text-[#1A1816] dark:text-[#F3EFE6]">
                     尚未摘录台词或金句
                   </p>
-                  <p className="mt-1.5 text-xs leading-relaxed text-[#6E665C]">
+                  <p className="mt-1.5 text-xs leading-relaxed text-[#6E665C] dark:text-[#9E9588]">
                     打开任意影视、影人或角色档案，在「经典台词 / 语录」栏写下一句打动你的话，就会自动汇聚到这里。
                   </p>
                 </div>
@@ -314,13 +314,13 @@ export function QuotesWallModal({
                     {entries.map(({ item, quoteText }) => (
                       <article
                         key={item.id}
-                        className="rounded-2xl border border-[#E4DFD5] bg-white p-4"
+                        className="rounded-2xl border border-[#E4DFD5] bg-white p-4 dark:border-[#322D27] dark:bg-[#1D1A17]"
                       >
-                        <p className="font-editorial text-[16px] italic leading-relaxed text-[#1A1816]">
+                        <p className="font-editorial text-[16px] italic leading-relaxed text-[#1A1816] dark:text-[#F3EFE6]">
                           “{quoteText}”
                         </p>
 
-                        <div className="mt-3.5 flex items-center justify-between gap-3 border-t border-[#F0ECE3] pt-3">
+                        <div className="mt-3.5 flex items-center justify-between gap-3 border-t border-[#F0ECE3] pt-3 dark:border-[#2E2924]">
                           <button
                             type="button"
                             onClick={() => {
@@ -338,10 +338,10 @@ export function QuotesWallModal({
                               className="h-11 w-9 shrink-0 rounded-lg"
                             />
                             <div className="min-w-0">
-                              <p className="truncate font-editorial text-sm font-medium text-[#1A1816]">
+                              <p className="truncate font-editorial text-sm font-medium text-[#1A1816] dark:text-[#F3EFE6]">
                                 {item.title}
                               </p>
-                              <p className="truncate font-mono text-[11px] text-[#7A7268] tabular-nums">
+                              <p className="truncate font-mono text-[11px] text-[#7A7268] tabular-nums dark:text-[#9E9588]">
                                 {CATEGORY_LABELS[item.category]}
                                 {item.year ? ` · ${item.year}` : ''}
                                 {item.relatedWorkTitle ? ` · 《${item.relatedWorkTitle}》` : ''}
@@ -354,9 +354,9 @@ export function QuotesWallModal({
                               type="button"
                               onClick={() => void handleOpenQuoteCard(item)}
                               aria-label={`为「${item.title}」生成金句卡片`}
-                              className="inline-flex h-10 items-center gap-1 rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-2.5 text-xs font-medium text-[#1A1816] whitespace-nowrap cursor-pointer"
+                              className="inline-flex h-10 items-center gap-1 rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-2.5 text-xs font-medium text-[#1A1816] whitespace-nowrap cursor-pointer dark:border-[#3A342D] dark:bg-[#24201C] dark:text-[#F3EFE6] dark:hover:border-[#564E44]"
                             >
-                              <ImageIcon className="h-3.5 w-3.5 text-[#A67C37]" aria-hidden="true" />
+                              <ImageIcon className="h-3.5 w-3.5 text-[#A67C37] dark:text-[#E4C37A]" aria-hidden="true" />
                               <span>制卡</span>
                             </button>
                             <button
@@ -366,7 +366,7 @@ export function QuotesWallModal({
                                 onSelectItem(item);
                               }}
                               aria-label={`打开「${item.title}」档案`}
-                              className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#E4DFD5] bg-white text-[#625C54] cursor-pointer"
+                              className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#E4DFD5] bg-white text-[#625C54] cursor-pointer dark:border-[#3A342D] dark:bg-[#24201C] dark:text-[#A59D90] dark:hover:text-[#F3EFE6]"
                             >
                               <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
                             </button>

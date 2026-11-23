@@ -191,7 +191,7 @@ export function RandomEncounterModal({
       data-testid="random-encounter-modal"
       data-item-id={activeItem?.id ?? ''}
       data-mode={mode}
-      className="encounter-backdrop-in fixed inset-0 z-[65] flex items-center justify-center overflow-hidden bg-[#12100E]/75 px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur-xs"
+      className="encounter-backdrop-in fixed inset-0 z-[65] flex items-center justify-center overflow-hidden bg-[#12100E]/75 px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur-xs dark:bg-black/82"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -202,7 +202,7 @@ export function RandomEncounterModal({
           currentDrawCount > 1 ? 'encounter-card-swap' : 'encounter-card-reveal'
         } relative flex max-h-[88dvh] w-full max-w-[396px] flex-col overflow-hidden rounded-3xl border md:max-w-[384px] ${
           isMasterpiece ? 'border-[#C9A45C]' : 'border-[#3B352D]'
-        } bg-[#F7F5F0] shadow-2xl`}
+        } bg-[#F7F5F0] shadow-2xl dark:bg-[#141210]`}
       >
         {/* Top Ceremonial Bar + Mode Switcher */}
         <div className="bg-[#1C1A17] px-3.5 py-2.5 text-[#F5F1E8]">
@@ -295,10 +295,10 @@ export function RandomEncounterModal({
         {/* Empty Watchlist State */}
         {!activeItem || !completeness ? (
           <div className="flex flex-1 flex-col items-center justify-center px-6 py-10 text-center">
-            <Film className="h-8 w-8 text-[#A59D90]" aria-hidden="true" />
+            <Film className="h-8 w-8 text-[#A59D90] dark:text-[#7E766B]" aria-hidden="true" />
             <h2
               id="random-encounter-title"
-              className="mt-3 font-editorial text-lg font-medium text-[#1A1816]"
+              className="mt-3 font-editorial text-lg font-medium text-[#1A1816] dark:text-[#F3EFE6]"
             >
               {mode === 'watchlist'
                 ? watchlistAllFilms.length === 0
@@ -306,7 +306,7 @@ export function RandomEncounterModal({
                   : '当前年代/标签下暂无待看影片'
                 : '藏馆暂无条目'}
             </h2>
-            <p className="mt-1.5 text-xs leading-relaxed text-[#6E665C]">
+            <p className="mt-1.5 text-xs leading-relaxed text-[#6E665C] dark:text-[#9E9588]">
               {mode === 'watchlist'
                 ? '将感兴趣的影片设为「想看」，就能在这里用盲盒一键决定今晚看哪一部。'
                 : '先联网搜索收录几部影视、影人或角色吧。'}
@@ -319,7 +319,7 @@ export function RandomEncounterModal({
                     setWatchlistDecade('all');
                     setWatchlistTag('');
                   }}
-                  className="h-11 w-full rounded-xl bg-[#1A1816] text-xs font-medium text-white cursor-pointer"
+                  className="h-11 w-full rounded-xl bg-[#1A1816] text-xs font-medium text-white cursor-pointer dark:bg-[#F3EFE6] dark:text-[#141210] dark:hover:bg-[#E4C37A]"
                 >
                   清除限定条件重抽
                 </button>
@@ -328,7 +328,7 @@ export function RandomEncounterModal({
                 <button
                   type="button"
                   onClick={() => setMode('all')}
-                  className="h-11 w-full rounded-xl border border-[#DCD6CB] bg-white text-xs font-medium text-[#1A1816] cursor-pointer"
+                  className="h-11 w-full rounded-xl border border-[#DCD6CB] bg-white text-xs font-medium text-[#1A1816] cursor-pointer dark:border-[#3A342D] dark:bg-[#24201C] dark:text-[#F3EFE6]"
                 >
                   切换为全馆随机邂逅
                 </button>
@@ -408,23 +408,23 @@ export function RandomEncounterModal({
 
               {/* Editorial Details Section */}
               <div className="space-y-3.5 px-5 py-4">
-                <p className="text-[13px] text-[#625C54] tabular-nums md:text-xs">
+                <p className="text-[13px] text-[#625C54] tabular-nums md:text-xs dark:text-[#A59D90]">
                   {metadataParts.join(' · ')}
                 </p>
 
                 <p
                   className={`line-clamp-3 text-[15px] leading-relaxed md:text-sm ${
                     activeItem.quote
-                      ? 'font-editorial italic text-[#1A1816]'
-                      : 'text-[#2E2A26]'
+                      ? 'font-editorial italic text-[#1A1816] dark:text-[#F3EFE6]'
+                      : 'text-[#2E2A26] dark:text-[#D5CEC2]'
                   }`}
                 >
                   {activeItem.quote ? `“${activeItem.quote}”` : storyExcerpt}
                 </p>
 
                 {medalShowcase && medalShowcase.earnedMedals.length > 0 && (
-                  <div className="flex items-center justify-between gap-2 border-t border-[#E4DFD5] pt-3">
-                    <span className="shrink-0 text-[12px] font-medium text-[#7A7268] md:text-[11px]">
+                  <div className="flex items-center justify-between gap-2 border-t border-[#E4DFD5] pt-3 dark:border-[#2E2924]">
+                    <span className="shrink-0 text-[12px] font-medium text-[#7A7268] md:text-[11px] dark:text-[#9E9588]">
                       已授勋章
                     </span>
                     <div className="flex items-center gap-2 overflow-hidden">
@@ -441,7 +441,7 @@ export function RandomEncounterModal({
                             size={26}
                             className="shrink-0"
                           />
-                          <span className="truncate text-[12px] font-medium text-[#3D3832] md:text-[11px]">
+                          <span className="truncate text-[12px] font-medium text-[#3D3832] md:text-[11px] dark:text-[#D5CEC2]">
                             {medal.shortTitle}
                           </span>
                         </div>
@@ -451,10 +451,10 @@ export function RandomEncounterModal({
                 )}
 
                 {(relatedItems.length > 0 || activeItem.tags.length > 0) && (
-                  <div className="space-y-1 border-t border-[#E4DFD5] pt-3 text-[13px] text-[#625C54] md:text-xs">
+                  <div className="space-y-1 border-t border-[#E4DFD5] pt-3 text-[13px] text-[#625C54] md:text-xs dark:border-[#2E2924] dark:text-[#B8AFA2]">
                     {relatedItems.length > 0 && (
                       <p className="truncate">
-                        <span className="text-[#8C857B]">关联：</span>
+                        <span className="text-[#8C857B] dark:text-[#8E8578]">关联：</span>
                         {relatedItems
                           .slice(0, 3)
                           .map((r) => r.title)
@@ -463,7 +463,7 @@ export function RandomEncounterModal({
                     )}
                     {activeItem.tags.length > 0 && (
                       <p className="truncate">
-                        <span className="text-[#8C857B]">标签：</span>
+                        <span className="text-[#8C857B] dark:text-[#8E8578]">标签：</span>
                         {activeItem.tags.slice(0, 5).join(' · ')}
                       </p>
                     )}
@@ -473,7 +473,7 @@ export function RandomEncounterModal({
             </div>
 
             {/* Sticky Ergonomic Action Bar */}
-            <div className="flex items-center gap-2 border-t border-[#E4DFD5] bg-[#FAF9F6] px-4 py-3">
+            <div className="flex items-center gap-2 border-t border-[#E4DFD5] bg-[#FAF9F6] px-4 py-3 dark:border-[#2E2924] dark:bg-[#191613]">
               {canDrawAgain && (
                 <button
                   type="button"
@@ -481,9 +481,9 @@ export function RandomEncounterModal({
                     mode === 'watchlist' ? handleDrawWatchlist() : onDrawAnother()
                   }
                   data-testid="encounter-draw-another-btn"
-                  className="inline-flex min-h-[46px] flex-1 items-center justify-center gap-1.5 rounded-xl border border-[#DCD6CB] bg-white px-3 text-[14px] font-medium text-[#1A1816] whitespace-nowrap cursor-pointer active:scale-[0.97] transition-transform md:min-h-[44px] md:text-xs"
+                  className="inline-flex min-h-[46px] flex-1 items-center justify-center gap-1.5 rounded-xl border border-[#DCD6CB] bg-white px-3 text-[14px] font-medium text-[#1A1816] whitespace-nowrap cursor-pointer active:scale-[0.97] transition-transform md:min-h-[44px] md:text-xs dark:border-[#3A342D] dark:bg-[#24201C] dark:text-[#F3EFE6] dark:hover:border-[#564E44]"
                 >
-                  <Dices className="h-4 w-4 text-[#A67C37]" aria-hidden="true" />
+                  <Dices className="h-4 w-4 text-[#A67C37] dark:text-[#E4C37A]" aria-hidden="true" />
                   <span>{mode === 'watchlist' ? '换一部' : '再邂逅一次'}</span>
                 </button>
               )}

@@ -213,22 +213,22 @@ export function OnlineSearchModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="collect-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#1A1816]/50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#1A1816]/50 p-4 dark:bg-black/75"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden border border-[#DCD6CB] bg-[#F7F5F0] shadow-2xl">
+      <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden border border-[#DCD6CB] bg-[#F7F5F0] shadow-2xl dark:border-[#322D27] dark:bg-[#141210]">
         {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-[#E4DFD5] bg-white px-6 py-4">
+        <div className="flex items-center justify-between border-b border-[#E4DFD5] bg-white px-6 py-4 dark:border-[#2E2924] dark:bg-[#191613]">
           <div>
             <h2
               id="collect-modal-title"
-              className="font-editorial text-xl font-semibold text-[#1A1816]"
+              className="font-editorial text-xl font-semibold text-[#1A1816] dark:text-[#F3EFE6]"
             >
               收录新藏品
             </h2>
-            <p className="mt-0.5 text-xs text-[#625C54]">
+            <p className="mt-0.5 text-xs text-[#625C54] dark:text-[#9E9588]">
               默认直连 IMDb 影视资料库（评分、奖项、高清海报）并自动融合豆瓣中文片名与简介，支持粘贴 IMDb / 豆瓣链接快速建档
             </p>
           </div>
@@ -236,7 +236,7 @@ export function OnlineSearchModal({
             type="button"
             onClick={onClose}
             aria-label="关闭收录窗口"
-            className="flex h-10 w-10 items-center justify-center rounded-md text-[#625C54] hover:bg-[#F3EFE8] hover:text-[#1A1816] cursor-pointer"
+            className="flex h-10 w-10 items-center justify-center rounded-md text-[#625C54] hover:bg-[#F3EFE8] hover:text-[#1A1816] cursor-pointer dark:text-[#A59D90] dark:hover:bg-[#28241F] dark:hover:text-[#F3EFE6]"
           >
             <X className="h-5 w-5" />
           </button>
@@ -246,7 +246,7 @@ export function OnlineSearchModal({
         <div
           role="tablist"
           aria-label="收录方式切换"
-          className="flex border-b border-[#E4DFD5] bg-white px-6"
+          className="flex border-b border-[#E4DFD5] bg-white px-6 dark:border-[#2E2924] dark:bg-[#181512]"
         >
           <button
             type="button"
@@ -255,15 +255,15 @@ export function OnlineSearchModal({
             onClick={() => setActiveTab('online')}
             className={`relative mr-6 py-3 text-sm font-medium whitespace-nowrap cursor-pointer transition-colors ${
               activeTab === 'online'
-                ? 'text-[#1A1816]'
-                : 'text-[#7A7268] hover:text-[#1A1816]'
+                ? 'text-[#1A1816] dark:text-[#F3EFE6]'
+                : 'text-[#7A7268] hover:text-[#1A1816] dark:text-[#9E9588] dark:hover:text-[#F3EFE6]'
             }`}
           >
             全网直连检索
             {activeTab === 'online' && (
               <span
                 aria-hidden="true"
-                className="absolute inset-x-0 bottom-0 h-[2px] bg-[#B43B2B]"
+                className="absolute inset-x-0 bottom-0 h-[2px] bg-[#B43B2B] dark:bg-[#EB7865]"
               />
             )}
           </button>
@@ -274,15 +274,15 @@ export function OnlineSearchModal({
             onClick={() => setActiveTab('manual')}
             className={`relative py-3 text-sm font-medium whitespace-nowrap cursor-pointer transition-colors ${
               activeTab === 'manual'
-                ? 'text-[#1A1816]'
-                : 'text-[#7A7268] hover:text-[#1A1816]'
+                ? 'text-[#1A1816] dark:text-[#F3EFE6]'
+                : 'text-[#7A7268] hover:text-[#1A1816] dark:text-[#9E9588] dark:hover:text-[#F3EFE6]'
             }`}
           >
             手动建档
             {activeTab === 'manual' && (
               <span
                 aria-hidden="true"
-                className="absolute inset-x-0 bottom-0 h-[2px] bg-[#B43B2B]"
+                className="absolute inset-x-0 bottom-0 h-[2px] bg-[#B43B2B] dark:bg-[#EB7865]"
               />
             )}
           </button>
@@ -297,7 +297,7 @@ export function OnlineSearchModal({
                 <div
                   role="group"
                   aria-label="检索类别"
-                  className="flex items-center gap-1 rounded-md bg-[#ECE8DF] p-1"
+                  className="flex items-center gap-1 rounded-md bg-[#ECE8DF] p-1 dark:bg-[#231F1B]"
                 >
                   {(['film', 'person', 'character'] as ArchiveCategory[]).map(
                     (cat) => (
@@ -308,8 +308,8 @@ export function OnlineSearchModal({
                         onClick={() => setCategory(cat)}
                         className={`min-h-[34px] rounded px-3.5 py-1 text-xs font-medium whitespace-nowrap cursor-pointer transition-colors ${
                           category === cat
-                            ? 'bg-white text-[#1A1816] shadow-xs'
-                            : 'text-[#625C54] hover:text-[#1A1816]'
+                            ? 'bg-white text-[#1A1816] shadow-xs dark:bg-[#353029] dark:text-[#F5F1E8]'
+                            : 'text-[#625C54] hover:text-[#1A1816] dark:text-[#9E9588] dark:hover:text-[#F3EFE6]'
                         }`}
                       >
                         {CATEGORY_LABELS[cat]}
@@ -318,7 +318,7 @@ export function OnlineSearchModal({
                   )}
                 </div>
 
-                <span className="text-xs text-[#625C54] whitespace-nowrap">
+                <span className="text-xs text-[#625C54] whitespace-nowrap dark:text-[#9E9588]">
                   IMDb 直连 · 豆瓣辅助
                 </span>
               </div>
@@ -333,7 +333,7 @@ export function OnlineSearchModal({
                     联网检索关键词
                   </label>
                   <Search
-                    className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8C857B]"
+                    className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8C857B] dark:text-[#8E8578]"
                     aria-hidden="true"
                   />
                   <input
@@ -351,7 +351,7 @@ export function OnlineSearchModal({
                           ? '输入导演、演员或声优姓名，例如：宫崎骏、张曼玉…'
                           : '输入影视或动画角色名，例如：甄嬛、绫波丽、小丑…'
                     }
-                    className="h-11 w-full rounded-md border border-[#DCD6CB] bg-white pl-10 pr-4 text-sm text-[#1A1816] placeholder:text-[#8C857B] focus:border-[#1A1816] focus:outline-none"
+                    className="h-11 w-full rounded-md border border-[#DCD6CB] bg-white pl-10 pr-4 text-sm text-[#1A1816] placeholder:text-[#8C857B] focus:border-[#1A1816] focus:outline-none dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:placeholder:text-[#7E766B] dark:focus:border-[#D4AF6A]"
                   />
                 </div>
                 <button
@@ -367,7 +367,7 @@ export function OnlineSearchModal({
               </form>
 
               {/* Quick Suggestions */}
-              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-[#7A7268]">
+              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-[#7A7268] dark:text-[#9E9588]">
                 <span>试试搜索：</span>
                 {PRESETS[category].map((preset) => (
                   <button
@@ -377,7 +377,7 @@ export function OnlineSearchModal({
                       setSearchQuery(preset);
                       void executeOnlineSearch(preset, category);
                     }}
-                    className="underline decoration-[#D2C9BA] underline-offset-4 hover:text-[#B43B2B] hover:decoration-[#B43B2B] cursor-pointer"
+                    className="underline decoration-[#D2C9BA] underline-offset-4 hover:text-[#B43B2B] hover:decoration-[#B43B2B] cursor-pointer dark:decoration-[#4A433A] dark:hover:text-[#EB7865] dark:hover:decoration-[#EB7865]"
                   >
                     {preset}
                   </button>
@@ -388,7 +388,7 @@ export function OnlineSearchModal({
               {searchError && (
                 <div
                   role="alert"
-                  className="mt-4 flex items-center justify-between gap-4 border border-[#E5BFB9] bg-[#FDF4F2] px-4 py-3 text-xs text-[#932D20]"
+                  className="mt-4 flex items-center justify-between gap-4 border border-[#E5BFB9] bg-[#FDF4F2] px-4 py-3 text-xs text-[#932D20] dark:border-[#6B3229] dark:bg-[#351B17] dark:text-[#F28C7B]"
                 >
                   <span>{searchError}</span>
                   {searchQuery.trim() && (
@@ -411,13 +411,13 @@ export function OnlineSearchModal({
                   {[0, 1, 2].map((idx) => (
                     <div
                       key={idx}
-                      className="flex gap-4 border border-[#E4DFD5] bg-white p-4 animate-pulse"
+                      className="flex gap-4 border border-[#E4DFD5] bg-white p-4 animate-pulse dark:border-[#322D27] dark:bg-[#1D1A17]"
                     >
-                      <div className="h-24 w-18 shrink-0 bg-[#EAE4D9]" />
+                      <div className="h-24 w-18 shrink-0 bg-[#EAE4D9] dark:bg-[#2A2520]" />
                       <div className="flex-1 space-y-2.5 py-1">
-                        <div className="h-4 w-1/3 bg-[#EAE4D9]" />
-                        <div className="h-3 w-1/2 bg-[#F1ECE3]" />
-                        <div className="h-3 w-5/6 bg-[#F1ECE3]" />
+                        <div className="h-4 w-1/3 bg-[#EAE4D9] dark:bg-[#2A2520]" />
+                        <div className="h-3 w-1/2 bg-[#F1ECE3] dark:bg-[#24201C]" />
+                        <div className="h-3 w-5/6 bg-[#F1ECE3] dark:bg-[#24201C]" />
                       </div>
                     </div>
                   ))}
@@ -427,7 +427,7 @@ export function OnlineSearchModal({
               {/* Results List */}
               {!loading && hasSearched && results.length > 0 && (
                 <div className="mt-6">
-                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-[#625C54]">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-[#625C54] dark:text-[#9E9588]">
                     <span className="tabular-nums">
                       共直连检索到 {results.length} 条公开档案
                     </span>
@@ -436,7 +436,7 @@ export function OnlineSearchModal({
                     )}
                   </div>
 
-                  <ul className="divide-y divide-[#E4DFD5] border border-[#E4DFD5] bg-white">
+                  <ul className="divide-y divide-[#E4DFD5] border border-[#E4DFD5] bg-white dark:divide-[#2E2924] dark:border-[#322D27] dark:bg-[#1D1A17]">
                     {results.map((resItem) => {
                       const collected = isAlreadyCollected(
                         existingItems,
@@ -461,22 +461,22 @@ export function OnlineSearchModal({
                             title={resItem.title}
                             category={resItem.category}
                             compact
-                            className="h-28 w-21 shrink-0 border border-[#EAE4D9]"
+                            className="h-28 w-21 shrink-0 border border-[#EAE4D9] dark:border-[#322D27]"
                           />
 
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                              <h3 className="font-editorial text-lg font-semibold text-[#1A1816]">
+                              <h3 className="font-editorial text-lg font-semibold text-[#1A1816] dark:text-[#F3EFE6]">
                                 {resItem.title}
                               </h3>
                               {resItem.originalTitle && (
-                                <span className="text-xs text-[#7A7268]">
+                                <span className="text-xs text-[#7A7268] dark:text-[#9E9588]">
                                   {resItem.originalTitle}
                                 </span>
                               )}
                             </div>
 
-                            <p className="mt-1 text-xs text-[#625C54]">
+                            <p className="mt-1 text-xs text-[#625C54] dark:text-[#A59D90]">
                               {[
                                 CATEGORY_LABELS[resItem.category],
                                 resItem.year,
@@ -487,14 +487,14 @@ export function OnlineSearchModal({
                                 .join(' · ')}
                             </p>
 
-                            <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-[#4B453E]">
+                            <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-[#4B453E] dark:text-[#C4BCB0]">
                               {resItem.summary}
                             </p>
                           </div>
 
                           <div className="shrink-0 sm:self-center">
                             {collected ? (
-                              <span className="inline-flex min-h-[38px] items-center gap-1.5 rounded-md border border-[#D4DFD7] bg-[#F2F7F4] px-3.5 py-2 text-xs font-medium text-[#2A6B46] whitespace-nowrap">
+                              <span className="inline-flex min-h-[38px] items-center gap-1.5 rounded-md border border-[#D4DFD7] bg-[#F2F7F4] px-3.5 py-2 text-xs font-medium text-[#2A6B46] whitespace-nowrap dark:border-[#2B523B] dark:bg-[#172B20] dark:text-[#6CC492]">
                                 <Check className="h-3.5 w-3.5" aria-hidden="true" />
                                 已在藏馆
                               </span>
@@ -504,7 +504,7 @@ export function OnlineSearchModal({
                                 disabled={isCollecting}
                                 onClick={() => handleCollect(resItem)}
                                 aria-label={`收录「${resItem.title}」到藏馆`}
-                                className="inline-flex min-h-[38px] items-center gap-1.5 rounded-md bg-[#1A1816] px-4 py-2 text-xs font-medium text-white whitespace-nowrap cursor-pointer transition-colors hover:bg-[#B43B2B] disabled:opacity-60"
+                                className="inline-flex min-h-[38px] items-center gap-1.5 rounded-md bg-[#1A1816] px-4 py-2 text-xs font-medium text-white whitespace-nowrap cursor-pointer transition-colors hover:bg-[#B43B2B] disabled:opacity-60 dark:bg-[#F3EFE6] dark:text-[#141210] dark:hover:bg-[#E4C37A]"
                               >
                                 <Plus className="h-3.5 w-3.5" aria-hidden="true" />
                                 {isCollecting ? '收录中…' : '收录到藏馆'}
@@ -520,11 +520,11 @@ export function OnlineSearchModal({
 
               {/* Empty Search Results */}
               {!loading && hasSearched && results.length === 0 && !searchError && (
-                <div className="mt-6 border border-[#E4DFD5] bg-white px-6 py-10 text-center">
-                  <p className="font-editorial text-lg text-[#1A1816]">
+                <div className="mt-6 border border-[#E4DFD5] bg-white px-6 py-10 text-center dark:border-[#322D27] dark:bg-[#1D1A17]">
+                  <p className="font-editorial text-lg text-[#1A1816] dark:text-[#F3EFE6]">
                     未检索到与「{searchQuery}」匹配的公开条目
                   </p>
-                  <p className="mt-2 text-xs text-[#625C54]">
+                  <p className="mt-2 text-xs text-[#625C54] dark:text-[#A59D90]">
                     可以尝试更换中英文关键词、切换检索类别，或直接转为手动建档。
                   </p>
                   <button
@@ -534,7 +534,7 @@ export function OnlineSearchModal({
                       setManualCategory(category);
                       setActiveTab('manual');
                     }}
-                    className="mt-4 min-h-[38px] rounded-md border border-[#1A1816] bg-white px-4 py-1.5 text-xs font-medium text-[#1A1816] cursor-pointer hover:bg-[#1A1816] hover:text-white transition-colors"
+                    className="mt-4 min-h-[38px] rounded-md border border-[#1A1816] bg-white px-4 py-1.5 text-xs font-medium text-[#1A1816] cursor-pointer hover:bg-[#1A1816] hover:text-white transition-colors dark:border-[#D4AF6A] dark:bg-[#24201C] dark:text-[#F3EFE6] dark:hover:bg-[#D4AF6A] dark:hover:text-[#141210]"
                   >
                     以「{searchQuery.trim()}」手动建档
                   </button>
@@ -545,7 +545,7 @@ export function OnlineSearchModal({
             /* Manual Creation Form */
             <form onSubmit={handleManualSubmit} noValidate className="space-y-4">
               <div>
-                <span className="block text-xs font-medium text-[#4B453E]">
+                <span className="block text-xs font-medium text-[#4B453E] dark:text-[#C4BCB0]">
                   建档分类
                 </span>
                 <div className="mt-1.5 flex gap-1.5">
@@ -558,8 +558,8 @@ export function OnlineSearchModal({
                         onClick={() => setManualCategory(cat)}
                         className={`min-h-[36px] rounded px-4 py-1.5 text-xs font-medium whitespace-nowrap cursor-pointer transition-colors ${
                           manualCategory === cat
-                            ? 'bg-[#1A1816] text-white'
-                            : 'border border-[#DCD6CB] bg-white text-[#4B453E] hover:border-[#1A1816]'
+                            ? 'bg-[#1A1816] text-white dark:bg-[#F3EFE6] dark:text-[#141210]'
+                            : 'border border-[#DCD6CB] bg-white text-[#4B453E] hover:border-[#1A1816] dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#C4BCB0] dark:hover:border-[#D4AF6A]'
                         }`}
                       >
                         {CATEGORY_LABELS[cat]}
@@ -573,9 +573,9 @@ export function OnlineSearchModal({
                 <div>
                   <label
                     htmlFor="manual-title"
-                    className="block text-xs font-medium text-[#4B453E]"
+                    className="block text-xs font-medium text-[#4B453E] dark:text-[#C4BCB0]"
                   >
-                    名称 / 片名 <span className="text-[#B43B2B]">*</span>
+                    名称 / 片名 <span className="text-[#B43B2B] dark:text-[#EB7865]">*</span>
                   </label>
                   <input
                     id="manual-title"
@@ -595,14 +595,14 @@ export function OnlineSearchModal({
                           ? '例如：张国荣'
                           : '例如：甄嬛'
                     }
-                    className={`mt-1.5 h-10 w-full rounded-md border bg-white px-3 text-sm text-[#1A1816] focus:outline-none ${
+                    className={`mt-1.5 h-10 w-full rounded-md border bg-white px-3 text-sm text-[#1A1816] focus:outline-none dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:placeholder:text-[#7E766B] ${
                       formErrors.title
-                        ? 'border-[#B43B2B]'
-                        : 'border-[#DCD6CB] focus:border-[#1A1816]'
+                        ? 'border-[#B43B2B] dark:border-[#EB7865]'
+                        : 'border-[#DCD6CB] focus:border-[#1A1816] dark:border-[#3A342D] dark:focus:border-[#D4AF6A]'
                     }`}
                   />
                   {formErrors.title && (
-                    <p role="alert" className="mt-1 text-xs text-[#B43B2B]">
+                    <p role="alert" className="mt-1 text-xs text-[#B43B2B] dark:text-[#F28C7B]">
                       {formErrors.title}
                     </p>
                   )}
@@ -611,7 +611,7 @@ export function OnlineSearchModal({
                 <div>
                   <label
                     htmlFor="manual-original-title"
-                    className="block text-xs font-medium text-[#4B453E]"
+                    className="block text-xs font-medium text-[#4B453E] dark:text-[#C4BCB0]"
                   >
                     原名 / 外文名（选填）
                   </label>
@@ -621,7 +621,7 @@ export function OnlineSearchModal({
                     value={originalTitle}
                     onChange={(e) => setOriginalTitle(e.target.value)}
                     placeholder="例如：Chungking Express"
-                    className="mt-1.5 h-10 w-full rounded-md border border-[#DCD6CB] bg-white px-3 text-sm text-[#1A1816] focus:border-[#1A1816] focus:outline-none"
+                    className="mt-1.5 h-10 w-full rounded-md border border-[#DCD6CB] bg-white px-3 text-sm text-[#1A1816] focus:border-[#1A1816] focus:outline-none dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:placeholder:text-[#7E766B] dark:focus:border-[#D4AF6A]"
                   />
                 </div>
               </div>
@@ -630,7 +630,7 @@ export function OnlineSearchModal({
                 <div>
                   <label
                     htmlFor="manual-subtitle"
-                    className="block text-xs font-medium text-[#4B453E]"
+                    className="block text-xs font-medium text-[#4B453E] dark:text-[#C4BCB0]"
                   >
                     {manualCategory === 'film'
                       ? '导演 / 类型'
@@ -650,14 +650,14 @@ export function OnlineSearchModal({
                           ? '演员 · 歌手'
                           : '女主角 · 后宫传奇'
                     }
-                    className="mt-1.5 h-10 w-full rounded-md border border-[#DCD6CB] bg-white px-3 text-sm text-[#1A1816] focus:border-[#1A1816] focus:outline-none"
+                    className="mt-1.5 h-10 w-full rounded-md border border-[#DCD6CB] bg-white px-3 text-sm text-[#1A1816] focus:border-[#1A1816] focus:outline-none dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:placeholder:text-[#7E766B] dark:focus:border-[#D4AF6A]"
                   />
                 </div>
 
                 <div>
                   <label
                     htmlFor="manual-year"
-                    className="block text-xs font-medium text-[#4B453E]"
+                    className="block text-xs font-medium text-[#4B453E] dark:text-[#C4BCB0]"
                   >
                     年份（4位数字）
                   </label>
@@ -672,14 +672,14 @@ export function OnlineSearchModal({
                       }
                     }}
                     placeholder="例如：2011"
-                    className={`mt-1.5 h-10 w-full rounded-md border bg-white px-3 text-sm font-mono text-[#1A1816] focus:outline-none ${
+                    className={`mt-1.5 h-10 w-full rounded-md border bg-white px-3 text-sm font-mono text-[#1A1816] focus:outline-none dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:placeholder:text-[#7E766B] ${
                       formErrors.year
-                        ? 'border-[#B43B2B]'
-                        : 'border-[#DCD6CB] focus:border-[#1A1816]'
+                        ? 'border-[#B43B2B] dark:border-[#EB7865]'
+                        : 'border-[#DCD6CB] focus:border-[#1A1816] dark:border-[#3A342D] dark:focus:border-[#D4AF6A]'
                     }`}
                   />
                   {formErrors.year && (
-                    <p role="alert" className="mt-1 text-xs text-[#B43B2B]">
+                    <p role="alert" className="mt-1 text-xs text-[#B43B2B] dark:text-[#F28C7B]">
                       {formErrors.year}
                     </p>
                   )}
@@ -688,7 +688,7 @@ export function OnlineSearchModal({
                 <div>
                   <label
                     htmlFor="manual-region"
-                    className="block text-xs font-medium text-[#4B453E]"
+                    className="block text-xs font-medium text-[#4B453E] dark:text-[#C4BCB0]"
                   >
                     国家 / 地区
                   </label>
@@ -698,7 +698,7 @@ export function OnlineSearchModal({
                     value={region}
                     onChange={(e) => setRegion(e.target.value)}
                     placeholder="例如：中国大陆"
-                    className="mt-1.5 h-10 w-full rounded-md border border-[#DCD6CB] bg-white px-3 text-sm text-[#1A1816] focus:border-[#1A1816] focus:outline-none"
+                    className="mt-1.5 h-10 w-full rounded-md border border-[#DCD6CB] bg-white px-3 text-sm text-[#1A1816] focus:border-[#1A1816] focus:outline-none dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:placeholder:text-[#7E766B] dark:focus:border-[#D4AF6A]"
                   />
                 </div>
               </div>
@@ -707,7 +707,7 @@ export function OnlineSearchModal({
                 <div>
                   <label
                     htmlFor="manual-work"
-                    className="block text-xs font-medium text-[#4B453E]"
+                    className="block text-xs font-medium text-[#4B453E] dark:text-[#C4BCB0]"
                   >
                     {manualCategory === 'character'
                       ? '出处影视作品'
@@ -723,7 +723,7 @@ export function OnlineSearchModal({
                     placeholder={
                       manualCategory === 'character' ? '例如：甄嬛传' : '选填'
                     }
-                    className="mt-1.5 h-10 w-full rounded-md border border-[#DCD6CB] bg-white px-3 text-sm text-[#1A1816] focus:border-[#1A1816] focus:outline-none"
+                    className="mt-1.5 h-10 w-full rounded-md border border-[#DCD6CB] bg-white px-3 text-sm text-[#1A1816] focus:border-[#1A1816] focus:outline-none dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:placeholder:text-[#7E766B] dark:focus:border-[#D4AF6A]"
                   />
                 </div>
 
@@ -731,7 +731,7 @@ export function OnlineSearchModal({
                   <div>
                     <label
                       htmlFor="manual-actor"
-                      className="block text-xs font-medium text-[#4B453E]"
+                      className="block text-xs font-medium text-[#4B453E] dark:text-[#C4BCB0]"
                     >
                       饰演演员 / 声优
                     </label>
@@ -741,14 +741,14 @@ export function OnlineSearchModal({
                       value={portrayedBy}
                       onChange={(e) => setPortrayedBy(e.target.value)}
                       placeholder="例如：孙俪"
-                      className="mt-1.5 h-10 w-full rounded-md border border-[#DCD6CB] bg-white px-3 text-sm text-[#1A1816] focus:border-[#1A1816] focus:outline-none"
+                      className="mt-1.5 h-10 w-full rounded-md border border-[#DCD6CB] bg-white px-3 text-sm text-[#1A1816] focus:border-[#1A1816] focus:outline-none dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:placeholder:text-[#7E766B] dark:focus:border-[#D4AF6A]"
                     />
                   </div>
                 ) : (
                   <div>
                     <label
                       htmlFor="manual-tags"
-                      className="block text-xs font-medium text-[#4B453E]"
+                      className="block text-xs font-medium text-[#4B453E] dark:text-[#C4BCB0]"
                     >
                       标签（顿号或逗号分隔）
                     </label>
@@ -758,7 +758,7 @@ export function OnlineSearchModal({
                       value={tagsText}
                       onChange={(e) => setTagsText(e.target.value)}
                       placeholder="例如：经典、重刷、心头好"
-                      className="mt-1.5 h-10 w-full rounded-md border border-[#DCD6CB] bg-white px-3 text-sm text-[#1A1816] focus:border-[#1A1816] focus:outline-none"
+                      className="mt-1.5 h-10 w-full rounded-md border border-[#DCD6CB] bg-white px-3 text-sm text-[#1A1816] focus:border-[#1A1816] focus:outline-none dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:placeholder:text-[#7E766B] dark:focus:border-[#D4AF6A]"
                     />
                   </div>
                 )}
@@ -768,7 +768,7 @@ export function OnlineSearchModal({
                 <div>
                   <label
                     htmlFor="manual-tags-char"
-                    className="block text-xs font-medium text-[#4B453E]"
+                    className="block text-xs font-medium text-[#4B453E] dark:text-[#C4BCB0]"
                   >
                     角色标签（顿号或逗号分隔）
                   </label>
@@ -778,7 +778,7 @@ export function OnlineSearchModal({
                     value={tagsText}
                     onChange={(e) => setTagsText(e.target.value)}
                     placeholder="例如：清醒独立、大女主、古装经典"
-                    className="mt-1.5 h-10 w-full rounded-md border border-[#DCD6CB] bg-white px-3 text-sm text-[#1A1816] focus:border-[#1A1816] focus:outline-none"
+                    className="mt-1.5 h-10 w-full rounded-md border border-[#DCD6CB] bg-white px-3 text-sm text-[#1A1816] focus:border-[#1A1816] focus:outline-none dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:placeholder:text-[#7E766B] dark:focus:border-[#D4AF6A]"
                   />
                 </div>
               )}
@@ -786,7 +786,7 @@ export function OnlineSearchModal({
               <div>
                 <label
                   htmlFor="manual-cover"
-                  className="block text-xs font-medium text-[#4B453E]"
+                  className="block text-xs font-medium text-[#4B453E] dark:text-[#C4BCB0]"
                 >
                   海报 / 剧照链接（选填，留空将生成典藏字标封面）
                 </label>
@@ -804,14 +804,14 @@ export function OnlineSearchModal({
                     }
                   }}
                   placeholder="https://..."
-                  className={`mt-1.5 h-10 w-full rounded-md border bg-white px-3 text-xs font-mono text-[#1A1816] focus:outline-none ${
+                  className={`mt-1.5 h-10 w-full rounded-md border bg-white px-3 text-xs font-mono text-[#1A1816] focus:outline-none dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:placeholder:text-[#7E766B] ${
                     formErrors.coverUrl
-                      ? 'border-[#B43B2B]'
-                      : 'border-[#DCD6CB] focus:border-[#1A1816]'
+                      ? 'border-[#B43B2B] dark:border-[#EB7865]'
+                      : 'border-[#DCD6CB] focus:border-[#1A1816] dark:border-[#3A342D] dark:focus:border-[#D4AF6A]'
                   }`}
                 />
                 {formErrors.coverUrl && (
-                  <p role="alert" className="mt-1 text-xs text-[#B43B2B]">
+                  <p role="alert" className="mt-1 text-xs text-[#B43B2B] dark:text-[#F28C7B]">
                     {formErrors.coverUrl}
                   </p>
                 )}
@@ -821,7 +821,7 @@ export function OnlineSearchModal({
                 <div>
                   <label
                     htmlFor="manual-status"
-                    className="block text-xs font-medium text-[#4B453E]"
+                    className="block text-xs font-medium text-[#4B453E] dark:text-[#C4BCB0]"
                   >
                     收藏状态
                   </label>
@@ -831,7 +831,7 @@ export function OnlineSearchModal({
                     onChange={(e) =>
                       setStatus(e.target.value as CollectionStatus)
                     }
-                    className="mt-1.5 h-10 w-full rounded-md border border-[#DCD6CB] bg-white px-3 text-sm text-[#1A1816] focus:border-[#1A1816] focus:outline-none"
+                    className="mt-1.5 h-10 w-full rounded-md border border-[#DCD6CB] bg-white px-3 text-sm text-[#1A1816] focus:border-[#1A1816] focus:outline-none dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:focus:border-[#D4AF6A]"
                   >
                     {(['favorite', 'watched', 'watching', 'watchlist'] as CollectionStatus[]).map(
                       (st) => (
@@ -846,7 +846,7 @@ export function OnlineSearchModal({
                 <div>
                   <label
                     htmlFor="manual-rating"
-                    className="block text-xs font-medium text-[#4B453E]"
+                    className="block text-xs font-medium text-[#4B453E] dark:text-[#C4BCB0]"
                   >
                     个人评分（0–5 星）
                   </label>
@@ -854,7 +854,7 @@ export function OnlineSearchModal({
                     id="manual-rating"
                     value={rating}
                     onChange={(e) => setRating(Number(e.target.value))}
-                    className="mt-1.5 h-10 w-full rounded-md border border-[#DCD6CB] bg-white px-3 text-sm text-[#1A1816] focus:border-[#1A1816] focus:outline-none"
+                    className="mt-1.5 h-10 w-full rounded-md border border-[#DCD6CB] bg-white px-3 text-sm text-[#1A1816] focus:border-[#1A1816] focus:outline-none dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:focus:border-[#D4AF6A]"
                   >
                     <option value={5}>5 星 · 强烈推荐</option>
                     <option value={4}>4 星 · 非常喜欢</option>
@@ -869,7 +869,7 @@ export function OnlineSearchModal({
               <div>
                 <label
                   htmlFor="manual-quote"
-                  className="block text-xs font-medium text-[#4B453E]"
+                  className="block text-xs font-medium text-[#4B453E] dark:text-[#C4BCB0]"
                 >
                   经典台词 / 语录（选填）
                 </label>
@@ -879,14 +879,14 @@ export function OnlineSearchModal({
                   value={quote}
                   onChange={(e) => setQuote(e.target.value)}
                   placeholder="例如：逆风如解意，容易莫摧残。"
-                  className="mt-1.5 h-10 w-full rounded-md border border-[#DCD6CB] bg-white px-3 text-sm text-[#1A1816] focus:border-[#1A1816] focus:outline-none"
+                  className="mt-1.5 h-10 w-full rounded-md border border-[#DCD6CB] bg-white px-3 text-sm text-[#1A1816] focus:border-[#1A1816] focus:outline-none dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:placeholder:text-[#7E766B] dark:focus:border-[#D4AF6A]"
                 />
               </div>
 
               <div>
                 <label
                   htmlFor="manual-summary"
-                  className="block text-xs font-medium text-[#4B453E]"
+                  className="block text-xs font-medium text-[#4B453E] dark:text-[#C4BCB0]"
                 >
                   档案简介（选填）
                 </label>
@@ -896,14 +896,14 @@ export function OnlineSearchModal({
                   value={summary}
                   onChange={(e) => setSummary(e.target.value)}
                   placeholder="简要介绍剧情、履历或角色背景…"
-                  className="mt-1.5 w-full rounded-md border border-[#DCD6CB] bg-white px-3 py-2 text-sm text-[#1A1816] focus:border-[#1A1816] focus:outline-none"
+                  className="mt-1.5 w-full rounded-md border border-[#DCD6CB] bg-white px-3 py-2 text-sm text-[#1A1816] focus:border-[#1A1816] focus:outline-none dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:placeholder:text-[#7E766B] dark:focus:border-[#D4AF6A]"
                 />
               </div>
 
               <div>
                 <label
                   htmlFor="manual-notes"
-                  className="block text-xs font-medium text-[#4B453E]"
+                  className="block text-xs font-medium text-[#4B453E] dark:text-[#C4BCB0]"
                 >
                   个人手记（选填）
                 </label>
@@ -913,20 +913,20 @@ export function OnlineSearchModal({
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="写下你的私藏评价或感动瞬间…"
-                  className="mt-1.5 w-full rounded-md border border-[#DCD6CB] bg-white px-3 py-2 text-sm text-[#1A1816] focus:border-[#1A1816] focus:outline-none"
+                  className="mt-1.5 w-full rounded-md border border-[#DCD6CB] bg-white px-3 py-2 text-sm text-[#1A1816] focus:border-[#1A1816] focus:outline-none dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:placeholder:text-[#7E766B] dark:focus:border-[#D4AF6A]"
                 />
               </div>
 
               {existingItems.length > 0 && (
                 <div>
-                  <span className="block text-xs font-medium text-[#4B453E]">
+                  <span className="block text-xs font-medium text-[#4B453E] dark:text-[#C4BCB0]">
                     关联已有藏品（选填，可多选）
                   </span>
-                  <div className="mt-1.5 flex max-h-28 flex-wrap gap-x-4 gap-y-2 overflow-y-auto border border-[#E4DFD5] bg-white p-3">
+                  <div className="mt-1.5 flex max-h-28 flex-wrap gap-x-4 gap-y-2 overflow-y-auto border border-[#E4DFD5] bg-white p-3 dark:border-[#322D27] dark:bg-[#1D1A17]">
                     {existingItems.map((ex) => (
                       <label
                         key={ex.id}
-                        className="inline-flex items-center gap-1.5 text-xs text-[#2E2A26] cursor-pointer"
+                        className="inline-flex items-center gap-1.5 text-xs text-[#2E2A26] cursor-pointer dark:text-[#D5CEC2]"
                       >
                         <input
                           type="checkbox"
@@ -943,11 +943,11 @@ export function OnlineSearchModal({
                 </div>
               )}
 
-              <div className="flex items-center justify-end gap-3 border-t border-[#E4DFD5] pt-4">
+              <div className="flex items-center justify-end gap-3 border-t border-[#E4DFD5] pt-4 dark:border-[#2E2924]">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="min-h-[40px] rounded-md border border-[#DCD6CB] bg-white px-4 py-2 text-sm text-[#4B453E] cursor-pointer hover:border-[#1A1816]"
+                  className="min-h-[40px] rounded-md border border-[#DCD6CB] bg-white px-4 py-2 text-sm text-[#4B453E] cursor-pointer hover:border-[#1A1816] dark:border-[#3A342D] dark:bg-[#24201C] dark:text-[#C4BCB0] dark:hover:border-[#D4AF6A]"
                 >
                   取消
                 </button>

@@ -46,7 +46,7 @@ export function FilterToolbar({
             筛选馆藏条目
           </label>
           <Search
-            className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8C857B]"
+            className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8C857B] dark:text-[#8E8578]"
             aria-hidden="true"
           />
           <input
@@ -55,14 +55,14 @@ export function FilterToolbar({
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
             placeholder="筛查片名、影人、角色、台词或笔记…"
-            className="h-11 w-full rounded-md border border-[#DCD6CB] bg-white pl-10 pr-9 text-sm text-[#1A1816] placeholder:text-[#8C857B] transition-colors focus:border-[#1A1816] focus:outline-none"
+            className="h-11 w-full rounded-md border border-[#DCD6CB] bg-white pl-10 pr-9 text-sm text-[#1A1816] placeholder:text-[#8C857B] transition-colors focus:border-[#1A1816] focus:outline-none dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:placeholder:text-[#7E766B] dark:focus:border-[#D4AF6A]"
           />
           {query && (
             <button
               type="button"
               onClick={() => onQueryChange('')}
               aria-label="清空筛查关键词"
-              className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded text-[#625C54] hover:text-[#1A1816] cursor-pointer"
+              className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded text-[#625C54] hover:text-[#1A1816] cursor-pointer dark:text-[#A59D90] dark:hover:text-[#F3EFE6]"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -74,7 +74,7 @@ export function FilterToolbar({
           <div
             role="group"
             aria-label="按收藏状态筛选"
-            className="h-scroll-rail no-scrollbar flex items-center gap-1 rounded-md bg-[#ECE8DF] p-1"
+            className="h-scroll-rail no-scrollbar flex items-center gap-1 rounded-md bg-[#ECE8DF] p-1 dark:bg-[#231F1B]"
           >
             {statusOptions.map((opt) => {
               const active = status === opt.id;
@@ -86,8 +86,8 @@ export function FilterToolbar({
                   onClick={() => onStatusChange(opt.id)}
                   className={`min-h-[34px] rounded px-3 py-1.5 text-xs font-medium whitespace-nowrap shrink-0 cursor-pointer transition-colors duration-150 ${
                     active
-                      ? 'bg-white text-[#1A1816] shadow-xs'
-                      : 'text-[#625C54] hover:text-[#1A1816]'
+                      ? 'bg-white text-[#1A1816] shadow-xs dark:bg-[#353029] dark:text-[#F5F1E8]'
+                      : 'text-[#625C54] hover:text-[#1A1816] dark:text-[#9E9588] dark:hover:text-[#F3EFE6]'
                   }`}
                 >
                   {opt.label}
@@ -97,14 +97,14 @@ export function FilterToolbar({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            <label htmlFor="archive-sort" className="text-xs text-[#625C54] whitespace-nowrap">
+            <label htmlFor="archive-sort" className="text-xs text-[#625C54] whitespace-nowrap dark:text-[#A59D90]">
               排序
             </label>
             <select
               id="archive-sort"
               value={sortBy}
               onChange={(e) => onSortChange(e.target.value as SortOption)}
-              className="h-10 rounded-md border border-[#DCD6CB] bg-white px-3 text-xs font-medium text-[#1A1816] cursor-pointer focus:border-[#1A1816] focus:outline-none"
+              className="h-10 rounded-md border border-[#DCD6CB] bg-white px-3 text-xs font-medium text-[#1A1816] cursor-pointer focus:border-[#1A1816] focus:outline-none dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:focus:border-[#D4AF6A]"
             >
               <option value="recent">最近收录</option>
               <option value="rating">评分最高</option>
@@ -115,7 +115,7 @@ export function FilterToolbar({
         </div>
       </div>
 
-      <div className="mt-4 flex items-center justify-between border-b border-[#E4DFD5] pb-3 text-xs text-[#625C54]">
+      <div className="mt-4 flex items-center justify-between border-b border-[#E4DFD5] pb-3 text-xs text-[#625C54] dark:border-[#2E2924] dark:text-[#9E9588]">
         <span className="tabular-nums">共显示 {resultCount} 件藏品</span>
         <span>点击任意藏品卡片查看完整档案、编辑影评或跳转关联作品</span>
       </div>

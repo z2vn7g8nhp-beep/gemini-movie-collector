@@ -646,37 +646,37 @@ export function DetailDrawer({
       role="dialog"
       aria-modal="true"
       aria-labelledby="detail-drawer-title"
-      className="encounter-backdrop-in fixed inset-0 z-50 flex items-end justify-center bg-[#1A1816]/55 backdrop-blur-[2px] md:items-stretch md:justify-end"
+      className="encounter-backdrop-in fixed inset-0 z-50 flex items-end justify-center bg-[#1A1816]/55 backdrop-blur-[2px] md:items-stretch md:justify-end dark:bg-black/72"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       {/* Mobile Bottom Sheet (rounded-t-3xl) -> Side Drawer on Desktop */}
-      <div className="drawer-panel-in relative flex max-h-[92dvh] w-full max-w-full flex-col overflow-hidden rounded-t-3xl bg-[#F7F5F0] shadow-2xl md:h-full md:max-h-full md:max-w-[600px] md:rounded-none md:border-l md:border-[#DFD9CD]">
+      <div className="drawer-panel-in relative flex max-h-[92dvh] w-full max-w-full flex-col overflow-hidden rounded-t-3xl bg-[#F7F5F0] shadow-2xl md:h-full md:max-h-full md:max-w-[600px] md:rounded-none md:border-l md:border-[#DFD9CD] dark:bg-[#141210] dark:md:border-[#322D27]">
         {/* Mobile Drag Handle */}
         <div
           className="flex justify-center pt-2.5 pb-1 md:hidden"
           aria-hidden="true"
         >
-          <div className="h-1.5 w-10 rounded-full bg-[#D3CCC0]" />
+          <div className="h-1.5 w-10 rounded-full bg-[#D3CCC0] dark:bg-[#423B33]" />
         </div>
 
         {/* Sticky Sheet Header */}
-        <div className="flex items-center justify-between gap-2 border-b border-[#E4DFD5] bg-[#F7F5F0]/95 px-4 py-2.5 min-[420px]:px-5">
-          <div className="flex min-w-0 items-center gap-2 font-mono text-[13px] tabular-nums text-[#625C54] md:text-xs">
+        <div className="flex items-center justify-between gap-2 border-b border-[#E4DFD5] bg-[#F7F5F0]/95 px-4 py-2.5 min-[420px]:px-5 dark:border-[#2E2924] dark:bg-[#141210]/95">
+          <div className="flex min-w-0 items-center gap-2 font-mono text-[13px] tabular-nums text-[#625C54] md:text-xs dark:text-[#A59D90]">
             <span className="truncate">{item.accessionNo}</span>
             <span aria-hidden="true">/</span>
             <span className="shrink-0">{CATEGORY_LABELS[item.category]}档案</span>
             {positionLabel && (
               <>
                 <span aria-hidden="true" className="hidden sm:inline">·</span>
-                <span className="hidden text-[#8C857B] sm:inline">{positionLabel}</span>
+                <span className="hidden text-[#8C857B] sm:inline dark:text-[#9A9184]">{positionLabel}</span>
               </>
             )}
           </div>
           <div className="flex shrink-0 items-center gap-1">
             {(onPrevItem || onNextItem) && (
-              <div className="mr-0.5 flex items-center rounded-xl border border-[#E0D9CD] bg-white p-0.5">
+              <div className="mr-0.5 flex items-center rounded-xl border border-[#E0D9CD] bg-white p-0.5 dark:border-[#3A342D] dark:bg-[#1D1A17]">
                 <button
                   type="button"
                   data-testid="drawer-prev-item-btn"
@@ -684,7 +684,7 @@ export function DetailDrawer({
                   onClick={onPrevItem}
                   aria-label="上一件藏品"
                   title="上一件藏品 (←)"
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-[#4B453E] transition-colors hover:bg-[#F3EFE8] hover:text-[#1A1816] disabled:opacity-35 cursor-pointer"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-[#4B453E] transition-colors hover:bg-[#F3EFE8] hover:text-[#1A1816] disabled:opacity-35 cursor-pointer dark:text-[#C4BCB0] dark:hover:bg-[#2C2721] dark:hover:text-[#F3EFE6]"
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </button>
@@ -695,7 +695,7 @@ export function DetailDrawer({
                   onClick={onNextItem}
                   aria-label="下一件藏品"
                   title="下一件藏品 (→)"
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-[#4B453E] transition-colors hover:bg-[#F3EFE8] hover:text-[#1A1816] disabled:opacity-35 cursor-pointer"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-[#4B453E] transition-colors hover:bg-[#F3EFE8] hover:text-[#1A1816] disabled:opacity-35 cursor-pointer dark:text-[#C4BCB0] dark:hover:bg-[#2C2721] dark:hover:text-[#F3EFE6]"
                 >
                   <ChevronRight className="h-4 w-4" />
                 </button>
@@ -714,8 +714,8 @@ export function DetailDrawer({
                 }
                 className={`inline-flex h-9 items-center gap-1 rounded-xl border px-2.5 text-[13px] font-medium whitespace-nowrap cursor-pointer transition-colors md:text-xs ${
                   isPinnedToShowcase
-                    ? 'border-[#1A1816] bg-[#1A1816] text-[#F5DC9B]'
-                    : 'border-[#DCD6CB] bg-white text-[#1A1816] hover:border-[#1A1816]'
+                    ? 'border-[#1A1816] bg-[#1A1816] text-[#F5DC9B] dark:border-[#D4AF6A] dark:bg-[#2A241A] dark:text-[#F5DC9B]'
+                    : 'border-[#DCD6CB] bg-white text-[#1A1816] hover:border-[#1A1816] dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:hover:border-[#D4AF6A]'
                 }`}
               >
                 <Pin className="h-3.5 w-3.5" aria-hidden="true" />
@@ -727,9 +727,9 @@ export function DetailDrawer({
                 type="button"
                 onClick={() => onOpenCardModal(item)}
                 aria-label="以实体藏卡模式赏析"
-                className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-[#DCD6CB] bg-white px-3 text-[13px] font-medium text-[#1A1816] whitespace-nowrap cursor-pointer transition-colors hover:border-[#1A1816] md:text-xs"
+                className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-[#DCD6CB] bg-white px-3 text-[13px] font-medium text-[#1A1816] whitespace-nowrap cursor-pointer transition-colors hover:border-[#1A1816] md:text-xs dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:hover:border-[#D4AF6A]"
               >
-                <Layers className="h-3.5 w-3.5 text-[#A67C37]" aria-hidden="true" />
+                <Layers className="h-3.5 w-3.5 text-[#A67C37] dark:text-[#E4C37A]" aria-hidden="true" />
                 <span>藏卡</span>
               </button>
             )}
@@ -738,7 +738,7 @@ export function DetailDrawer({
               onClick={onClose}
               aria-label="关闭档案详情"
               title="关闭 (Esc)"
-              className="flex h-10 w-10 items-center justify-center rounded-xl text-[#625C54] transition-colors hover:bg-[#EAE4D9] hover:text-[#1A1816] cursor-pointer"
+              className="flex h-10 w-10 items-center justify-center rounded-xl text-[#625C54] transition-colors hover:bg-[#EAE4D9] hover:text-[#1A1816] cursor-pointer dark:text-[#A59D90] dark:hover:bg-[#2A2520] dark:hover:text-[#F3EFE6]"
             >
               <X className="h-5 w-5" />
             </button>
@@ -748,23 +748,23 @@ export function DetailDrawer({
         {/* Compact Section Quick-Jump Anchor Strip */}
         <nav
           aria-label="档案快捷定位"
-          className="flex items-center gap-1 border-b border-[#EAE4D9] bg-[#FAF8F3] px-4 py-1.5 min-[420px]:px-5"
+          className="flex items-center gap-1 border-b border-[#EAE4D9] bg-[#FAF8F3] px-4 py-1.5 min-[420px]:px-5 dark:border-[#2E2924] dark:bg-[#191613]"
         >
           <button
             type="button"
             onClick={handleJumpToTop}
-            className="min-h-[32px] rounded-lg px-2.5 text-[12px] font-medium text-[#4B453E] transition-colors hover:bg-[#EFECE4] hover:text-[#1A1816] cursor-pointer"
+            className="min-h-[32px] rounded-lg px-2.5 text-[12px] font-medium text-[#4B453E] transition-colors hover:bg-[#EFECE4] hover:text-[#1A1816] cursor-pointer dark:text-[#C4BCB0] dark:hover:bg-[#29241F] dark:hover:text-[#F3EFE6]"
           >
             档案概览
           </button>
           <button
             type="button"
             onClick={handleJumpToRelations}
-            className="min-h-[32px] rounded-lg px-2.5 text-[12px] font-medium text-[#4B453E] transition-colors hover:bg-[#EFECE4] hover:text-[#1A1816] cursor-pointer"
+            className="min-h-[32px] rounded-lg px-2.5 text-[12px] font-medium text-[#4B453E] transition-colors hover:bg-[#EFECE4] hover:text-[#1A1816] cursor-pointer dark:text-[#C4BCB0] dark:hover:bg-[#29241F] dark:hover:text-[#F3EFE6]"
           >
             标签与关联
             {relatedItems.length > 0 && (
-              <span className="ml-1 font-mono text-[11px] tabular-nums text-[#8C857B]">
+              <span className="ml-1 font-mono text-[11px] tabular-nums text-[#8C857B] dark:text-[#9A9184]">
                 {relatedItems.length}
               </span>
             )}
@@ -772,11 +772,11 @@ export function DetailDrawer({
           <button
             type="button"
             onClick={handleJumpToEditNotes}
-            className="min-h-[32px] rounded-lg px-2.5 text-[12px] font-medium text-[#4B453E] transition-colors hover:bg-[#EFECE4] hover:text-[#1A1816] cursor-pointer"
+            className="min-h-[32px] rounded-lg px-2.5 text-[12px] font-medium text-[#4B453E] transition-colors hover:bg-[#EFECE4] hover:text-[#1A1816] cursor-pointer dark:text-[#C4BCB0] dark:hover:bg-[#29241F] dark:hover:text-[#F3EFE6]"
           >
             手记与编辑
             {isDirty && (
-              <span className="ml-1 text-[#B43B2B]" aria-label="有未保存修改">
+              <span className="ml-1 text-[#B43B2B] dark:text-[#F28C7B]" aria-label="有未保存修改">
                 · 未保存
               </span>
             )}
@@ -790,7 +790,7 @@ export function DetailDrawer({
         >
           {/* Header Block: Cover + Key Metadata */}
           <div className="flex gap-4">
-            <div className="gallery-paper-mat w-[124px] shrink-0 self-start overflow-hidden border border-[#E4DFD5] p-2 min-[420px]:w-[134px] sm:w-[144px]">
+            <div className="gallery-paper-mat w-[124px] shrink-0 self-start overflow-hidden border border-[#E4DFD5] p-2 min-[420px]:w-[134px] sm:w-[144px] dark:border-[#322D27]">
               <button
                 type="button"
                 onClick={() => setCoverPickerOpen(true)}
@@ -809,9 +809,9 @@ export function DetailDrawer({
                 type="button"
                 data-testid="change-cover-btn"
                 onClick={() => setCoverPickerOpen(true)}
-                className="mt-2 inline-flex min-h-[38px] w-full items-center justify-center gap-1 rounded-xl bg-[#F2ECE2] px-2 text-[12px] font-medium text-[#3D3832] transition-colors hover:bg-[#E7E0D3] hover:text-[#1A1816] whitespace-nowrap cursor-pointer md:min-h-[34px] md:text-[11px]"
+                className="mt-2 inline-flex min-h-[38px] w-full items-center justify-center gap-1 rounded-xl bg-[#F2ECE2] px-2 text-[12px] font-medium text-[#3D3832] transition-colors hover:bg-[#E7E0D3] hover:text-[#1A1816] whitespace-nowrap cursor-pointer md:min-h-[34px] md:text-[11px] dark:bg-[#2A2520] dark:text-[#E5DED2] dark:hover:bg-[#352F28] dark:hover:text-[#FAF7F0]"
               >
-                <ImagePlus className="h-3.5 w-3.5 shrink-0 text-[#B43B2B]" aria-hidden="true" />
+                <ImagePlus className="h-3.5 w-3.5 shrink-0 text-[#B43B2B] dark:text-[#EB7865]" aria-hidden="true" />
                 <span>换封面</span>
               </button>
             </div>
@@ -819,36 +819,36 @@ export function DetailDrawer({
             <div className="min-w-0 flex-1">
               <h2
                 id="detail-drawer-title"
-                className="font-editorial text-[24px] font-medium leading-tight text-[#1A1816] min-[420px]:text-[26px] md:text-2xl"
+                className="font-editorial text-[24px] font-medium leading-tight text-[#1A1816] min-[420px]:text-[26px] md:text-2xl dark:text-[#F5F1E8]"
               >
                 {charTitleParts.primaryName}
               </h2>
               {isCharacter && charTitleParts.secondaryAlias && (
-                <p className="mt-0.5 text-[15px] font-medium text-[#524C44] md:text-sm">
+                <p className="mt-0.5 text-[15px] font-medium text-[#524C44] md:text-sm dark:text-[#C4BCB0]">
                   {charTitleParts.secondaryAlias}
                 </p>
               )}
               {item.originalTitle && (
-                <p className="mt-1 break-words text-[13px] text-[#7A7268] md:text-xs">
+                <p className="mt-1 break-words text-[13px] text-[#7A7268] md:text-xs dark:text-[#A59D90]">
                   {item.originalTitle}
                 </p>
               )}
 
               {isCharacter ? (
-                <div className="mt-2.5 space-y-1 text-[13px] text-[#4B453E] md:text-xs">
+                <div className="mt-2.5 space-y-1 text-[13px] text-[#4B453E] md:text-xs dark:text-[#C4BCB0]">
                   {(item.relatedWorkTitle || linkedWorkItem) && (
                     <p className="truncate">
-                      <span className="text-[#8C857B]">出处：</span>
+                      <span className="text-[#8C857B] dark:text-[#9A9184]">出处：</span>
                       {linkedWorkItem ? (
                         <button
                           type="button"
                           onClick={() => onSelectRelated(linkedWorkItem)}
-                          className="font-medium text-[#1A1816] underline decoration-[#CFC7B9] underline-offset-4 hover:text-[#B43B2B] cursor-pointer"
+                          className="font-medium text-[#1A1816] underline decoration-[#CFC7B9] underline-offset-4 hover:text-[#B43B2B] cursor-pointer dark:text-[#F3EFE6] dark:decoration-[#5A5247] dark:hover:text-[#F28C7B]"
                         >
                           《{linkedWorkItem.title}》
                         </button>
                       ) : (
-                        <span className="font-medium text-[#1A1816]">
+                        <span className="font-medium text-[#1A1816] dark:text-[#F3EFE6]">
                           《{item.relatedWorkTitle}》
                         </span>
                       )}
@@ -856,17 +856,17 @@ export function DetailDrawer({
                   )}
                   {(item.portrayedBy || linkedActorItem) && (
                     <p className="truncate">
-                      <span className="text-[#8C857B]">饰演：</span>
+                      <span className="text-[#8C857B] dark:text-[#9A9184]">饰演：</span>
                       {linkedActorItem ? (
                         <button
                           type="button"
                           onClick={() => onSelectRelated(linkedActorItem)}
-                          className="font-medium text-[#1A1816] underline decoration-[#CFC7B9] underline-offset-4 hover:text-[#B43B2B] cursor-pointer"
+                          className="font-medium text-[#1A1816] underline decoration-[#CFC7B9] underline-offset-4 hover:text-[#B43B2B] cursor-pointer dark:text-[#F3EFE6] dark:decoration-[#5A5247] dark:hover:text-[#F28C7B]"
                         >
                           {linkedActorItem.title}
                         </button>
                       ) : (
-                        <span className="font-medium text-[#1A1816]">
+                        <span className="font-medium text-[#1A1816] dark:text-[#F3EFE6]">
                           {item.portrayedBy}
                         </span>
                       )}
@@ -875,13 +875,13 @@ export function DetailDrawer({
                 </div>
               ) : (
                 item.subtitle && (
-                  <p className="mt-1.5 text-[13px] font-medium text-[#3D3832] md:text-xs">
+                  <p className="mt-1.5 text-[13px] font-medium text-[#3D3832] md:text-xs dark:text-[#D1C9BC]">
                     {item.subtitle}
                   </p>
                 )
               )}
 
-              <p className="mt-2.5 flex items-center flex-wrap gap-x-1.5 text-[13px] text-[#625C54] tabular-nums md:text-xs">
+              <p className="mt-2.5 flex items-center flex-wrap gap-x-1.5 text-[13px] text-[#625C54] tabular-nums md:text-xs dark:text-[#B8AFA2]">
                 <span>
                   {[
                     getStatusLabel(item.status, item.category),
@@ -894,9 +894,9 @@ export function DetailDrawer({
                 {item.rating > 0 && (
                   <>
                     <span aria-hidden="true">·</span>
-                    <span className="inline-flex items-center gap-0.5 font-mono text-[#B43B2B]">
+                    <span className="inline-flex items-center gap-0.5 font-mono text-[#B43B2B] dark:text-[#F28C7B]">
                       <Star
-                        className="h-3.5 w-3.5 fill-[#B43B2B] text-[#B43B2B] md:h-3 md:w-3"
+                        className="h-3.5 w-3.5 fill-[#B43B2B] text-[#B43B2B] md:h-3 md:w-3 dark:fill-[#EB7865] dark:text-[#EB7865]"
                         aria-hidden="true"
                       />
                       {item.rating}.0
@@ -906,14 +906,14 @@ export function DetailDrawer({
               </p>
 
               {item.sourceName && (
-                <p className="mt-2 text-[13px] text-[#7A7268] md:text-xs">
+                <p className="mt-2 text-[13px] text-[#7A7268] md:text-xs dark:text-[#9E9588]">
                   来源：
                   {item.sourceUrl ? (
                     <a
                       href={item.sourceUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex items-center gap-1 text-[#1A1816] underline decoration-[#BFB6A7] underline-offset-4"
+                      className="inline-flex items-center gap-1 text-[#1A1816] underline decoration-[#BFB6A7] underline-offset-4 dark:text-[#E5DED2] dark:decoration-[#5A5247]"
                     >
                       {item.sourceName}
                       <ExternalLink className="h-3 w-3" aria-hidden="true" />
@@ -935,19 +935,19 @@ export function DetailDrawer({
           />
 
           {/* Archival Completeness Strip */}
-          <div className="mt-3.5 flex items-center justify-between gap-3 rounded-xl border border-[#E4DFD5] bg-white px-3.5 py-3">
+          <div className="mt-3.5 flex items-center justify-between gap-3 rounded-xl border border-[#E4DFD5] bg-white px-3.5 py-3 dark:border-[#322D27] dark:bg-[#1D1A17]">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 text-[13px] md:text-xs">
                 <span
                   className={`font-medium ${
                     completeness.tier === 'masterpiece'
-                      ? 'text-[#8E6523]'
-                      : 'text-[#1A1816]'
+                      ? 'text-[#8E6523] dark:text-[#E4C37A]'
+                      : 'text-[#1A1816] dark:text-[#F3EFE6]'
                   }`}
                 >
                   成色：{completeness.tierLabel}级
                 </span>
-                <span className="font-mono text-[12px] tabular-nums text-[#7A7268] md:text-[11px]">
+                <span className="font-mono text-[12px] tabular-nums text-[#7A7268] md:text-[11px] dark:text-[#A59D90]">
                   {completeness.score} / {completeness.maxScore}
                 </span>
               </div>
@@ -958,9 +958,9 @@ export function DetailDrawer({
                     className={`h-1 rounded-full ${
                       idx < completeness.score
                         ? completeness.tier === 'masterpiece'
-                          ? 'bg-[#A67C37]'
-                          : 'bg-[#B43B2B]'
-                        : 'bg-[#ECE7DD]'
+                          ? 'bg-[#A67C37] dark:bg-[#D4AF6A]'
+                          : 'bg-[#B43B2B] dark:bg-[#E06856]'
+                        : 'bg-[#ECE7DD] dark:bg-[#322D27]'
                     }`}
                   />
                 ))}
@@ -970,12 +970,12 @@ export function DetailDrawer({
               <button
                 type="button"
                 onClick={handleJumpToEditNotes}
-                className="min-h-[40px] shrink-0 rounded-lg border border-[#DCD6CB] bg-[#FAF9F6] px-3 text-[13px] font-medium text-[#1A1816] whitespace-nowrap cursor-pointer md:min-h-[36px] md:text-xs"
+                className="min-h-[40px] shrink-0 rounded-lg border border-[#DCD6CB] bg-[#FAF9F6] px-3 text-[13px] font-medium text-[#1A1816] whitespace-nowrap cursor-pointer md:min-h-[36px] md:text-xs dark:border-[#3A342D] dark:bg-[#24201C] dark:text-[#F3EFE6] dark:hover:border-[#D4AF6A]"
               >
                 去补齐{completeness.missingLabels[0] ? `「${completeness.missingLabels[0]}」` : ''}
               </button>
             ) : (
-              <span className="shrink-0 font-editorial text-[13px] text-[#8E6523] md:text-xs">
+              <span className="shrink-0 font-editorial text-[13px] text-[#8E6523] md:text-xs dark:text-[#E4C37A]">
                 已达典藏满格
               </span>
             )}
@@ -983,8 +983,8 @@ export function DetailDrawer({
 
           {/* Editorial Pull Quote */}
           {item.quote && (
-            <blockquote className="mt-5 border-y border-[#DFD9CD] py-4 text-center">
-              <p className="font-editorial text-[17px] italic leading-relaxed text-[#292521] md:text-base">
+            <blockquote className="mt-5 border-y border-[#DFD9CD] py-4 text-center dark:border-[#322D27]">
+              <p className="font-editorial text-[17px] italic leading-relaxed text-[#292521] md:text-base dark:text-[#EFE9DE]">
                 “{item.quote}”
               </p>
             </blockquote>
@@ -1001,7 +1001,7 @@ export function DetailDrawer({
             />
           ) : (
             item.summary && (
-              <p className="mt-5 text-[15px] leading-[1.75] text-[#2E2A26] md:text-sm md:leading-relaxed">
+              <p className="mt-5 text-[15px] leading-[1.75] text-[#2E2A26] md:text-sm md:leading-relaxed dark:text-[#DED7CB]">
                 {item.summary}
                 <SummarySource revision={item.summaryRevision} />
               </p>
@@ -1031,7 +1031,7 @@ export function DetailDrawer({
             data-testid="linked-relations-section"
           >
             <div className="flex items-center justify-between">
-              <h3 className="text-[13px] font-medium tracking-[0.06em] text-[#7A7268] md:text-xs md:tracking-[0.08em]">
+              <h3 className="text-[13px] font-medium tracking-[0.06em] text-[#7A7268] md:text-xs md:tracking-[0.08em] dark:text-[#A59D90]">
                 已关联馆藏（{relatedItems.length}）
               </h3>
             </div>
@@ -1046,7 +1046,7 @@ export function DetailDrawer({
                     <div
                       key={rel.id}
                       data-testid={`linked-item-${rel.id}`}
-                      className="flex items-center justify-between gap-2 rounded-2xl border border-[#E4DFD5] bg-white p-3"
+                      className="flex items-center justify-between gap-2 rounded-2xl border border-[#E4DFD5] bg-white p-3 dark:border-[#322D27] dark:bg-[#1D1A17]"
                     >
                       <button
                         type="button"
@@ -1063,15 +1063,15 @@ export function DetailDrawer({
                           className="h-14 w-11 shrink-0 rounded-xl"
                         />
                         <div className="min-w-0">
-                          <p className="text-[12px] text-[#7A7268] md:text-[11px]">
+                          <p className="text-[12px] text-[#7A7268] md:text-[11px] dark:text-[#A59D90]">
                             {CATEGORY_LABELS[rel.category]}
                             {rel.year ? ` · ${rel.year}` : ''}
                           </p>
-                          <p className="truncate font-editorial text-[15px] font-medium text-[#1A1816] md:text-sm">
+                          <p className="truncate font-editorial text-[15px] font-medium text-[#1A1816] md:text-sm dark:text-[#F3EFE6]">
                             {rel.title}
                           </p>
                           {rel.subtitle && (
-                            <p className="truncate text-[12px] text-[#625C54] md:text-[11px]">
+                            <p className="truncate text-[12px] text-[#625C54] md:text-[11px] dark:text-[#B8AFA2]">
                               {rel.subtitle}
                             </p>
                           )}
@@ -1082,7 +1082,7 @@ export function DetailDrawer({
                           type="button"
                           onClick={() => void handleRemoveLink(rel.id)}
                           aria-label={`取消与「${rel.title}」的关联`}
-                          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[#8C857B] hover:bg-[#F3EFE8] hover:text-[#B43B2B] cursor-pointer"
+                          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[#8C857B] hover:bg-[#F3EFE8] hover:text-[#B43B2B] cursor-pointer dark:text-[#9A9184] dark:hover:bg-[#2C2721] dark:hover:text-[#F28C7B]"
                         >
                           <X className="h-4 w-4" />
                         </button>
@@ -1092,7 +1092,7 @@ export function DetailDrawer({
                 })}
               </div>
             ) : (
-              <p className="mt-2 rounded-2xl border border-dashed border-[#DCD6CB] bg-white/60 px-3.5 py-3 text-[13px] leading-relaxed text-[#7A7268] md:text-xs">
+              <p className="mt-2 rounded-2xl border border-dashed border-[#DCD6CB] bg-white/60 px-3.5 py-3 text-[13px] leading-relaxed text-[#7A7268] md:text-xs dark:border-[#3A342D] dark:bg-[#1D1A17]/60 dark:text-[#A59D90]">
                 {item.category === 'film'
                   ? '尚未关联影人或角色。可直接从下方联网名单一键收录关联，或手动建档。'
                   : item.category === 'person'
@@ -1105,16 +1105,16 @@ export function DetailDrawer({
             {smartRecommendations.length > 0 && (
               <div
                 data-testid="detail-smart-link-suggestions"
-                className="mt-3 rounded-2xl border border-[#E5D5BE] bg-[#FFFDF8] p-3.5"
+                className="mt-3 rounded-2xl border border-[#E5D5BE] bg-[#FFFDF8] p-3.5 dark:border-[#5A4930] dark:bg-[#241E16]"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <p className="flex items-center gap-1.5 text-[13px] font-medium text-[#8E6523] md:text-xs">
+                  <p className="flex items-center gap-1.5 text-[13px] font-medium text-[#8E6523] md:text-xs dark:text-[#E4C37A]">
                     <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     <span>
                       发现 {smartRecommendations.length} 项相关未关联藏品
                     </span>
                   </p>
-                  <span className="shrink-0 text-[12px] text-[#8C857B] md:text-[11px]">
+                  <span className="shrink-0 text-[12px] text-[#8C857B] md:text-[11px] dark:text-[#A59D90]">
                     一键建立链接
                   </span>
                 </div>
@@ -1123,7 +1123,7 @@ export function DetailDrawer({
                   {smartRecommendations.map(({ item: recItem, reason }) => (
                     <li
                       key={`rec-${recItem.id}`}
-                      className="flex items-center justify-between gap-2 rounded-xl border border-[#ECE4D6] bg-white p-2.5"
+                      className="flex items-center justify-between gap-2 rounded-xl border border-[#ECE4D6] bg-white p-2.5 dark:border-[#3B3328] dark:bg-[#1A1714]"
                     >
                       <button
                         type="button"
@@ -1139,11 +1139,11 @@ export function DetailDrawer({
                           className="h-12 w-9 shrink-0 rounded-lg"
                         />
                         <div className="min-w-0 flex-1">
-                          <p className="truncate font-editorial text-[14px] font-medium text-[#1A1816] md:text-xs">
+                          <p className="truncate font-editorial text-[14px] font-medium text-[#1A1816] md:text-xs dark:text-[#F3EFE6]">
                             {recItem.title}
                           </p>
-                          <p className="mt-0.5 truncate text-[12px] text-[#6E665C] md:text-[11px]">
-                            <span className="text-[#A67C37]">
+                          <p className="mt-0.5 truncate text-[12px] text-[#6E665C] md:text-[11px] dark:text-[#A59D90]">
+                            <span className="text-[#A67C37] dark:text-[#E4C37A]">
                               {CATEGORY_LABELS[recItem.category]}
                             </span>
                             <span aria-hidden="true"> · </span>
@@ -1175,14 +1175,14 @@ export function DetailDrawer({
                 </label>
                 <div className="relative min-w-0 flex-1">
                   <Link2
-                    className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8C857B] md:h-3.5 md:w-3.5"
+                    className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8C857B] md:h-3.5 md:w-3.5 dark:text-[#9A9184]"
                     aria-hidden="true"
                   />
                   <select
                     id="add-related-select"
                     value={selectedLinkId}
                     onChange={(e) => setSelectedLinkId(e.target.value)}
-                    className="h-11 w-full rounded-xl border border-[#DCD6CB] bg-white pl-9 pr-3 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:pl-8 md:text-xs"
+                    className="h-11 w-full rounded-xl border border-[#DCD6CB] bg-white pl-9 pr-3 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:pl-8 md:text-xs dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:focus:border-[#D4AF6A]"
                   >
                     <option value="">关联馆内其他条目…</option>
                     {linkableCandidates.map((cand) => (
@@ -1196,7 +1196,7 @@ export function DetailDrawer({
                   type="button"
                   disabled={!selectedLinkId}
                   onClick={() => void handleAddLink()}
-                  className="inline-flex h-11 shrink-0 items-center gap-1 rounded-xl border border-[#DCD6CB] bg-white px-4 text-[14px] font-medium text-[#1A1816] whitespace-nowrap cursor-pointer disabled:opacity-40 md:px-3.5 md:text-xs"
+                  className="inline-flex h-11 shrink-0 items-center gap-1 rounded-xl border border-[#DCD6CB] bg-white px-4 text-[14px] font-medium text-[#1A1816] whitespace-nowrap cursor-pointer disabled:opacity-40 md:px-3.5 md:text-xs dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:hover:border-[#D4AF6A]"
                 >
                   <Plus className="h-3.5 w-3.5" aria-hidden="true" />
                   关联
@@ -1208,13 +1208,13 @@ export function DetailDrawer({
           {/* Live Online Discovery: Films & People ONLY (Characters focus on the Dossier above) */}
           {!isCharacter && (
           <section
-            className="mt-6 rounded-2xl border border-[#E4DFD5] bg-white p-3.5 sm:p-4"
+            className="mt-6 rounded-2xl border border-[#E4DFD5] bg-white p-3.5 sm:p-4 dark:border-[#322D27] dark:bg-[#1D1A17]"
             aria-label="联网演职员与角色发现"
             data-testid="online-relations-section"
           >
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0">
-                <h3 className="text-[14px] font-medium tracking-[0.04em] text-[#1A1816] md:text-xs md:tracking-[0.06em]">
+                <h3 className="text-[14px] font-medium tracking-[0.04em] text-[#1A1816] md:text-xs md:tracking-[0.06em] dark:text-[#F3EFE6]">
                   {item.category === 'film'
                     ? '联网演职员与登场角色'
                     : '联网参演作品与角色'}
@@ -1222,19 +1222,19 @@ export function DetailDrawer({
                 {imdbTitleId?.startsWith('tt') && (
                   <a href={`https://www.imdb.com/title/${imdbTitleId}/fullcredits/`}
                     target="_blank" rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-xs text-[#625C54] underline">
+                    className="inline-flex items-center gap-1 text-xs text-[#625C54] underline dark:text-[#B8AFA2]">
                     IMDb 完整演职员表 <ExternalLink className="h-3 w-3" aria-hidden="true" />
                   </a>
                 )}
                 {onlineRelations.castArticleRevision && (
-                  <p className="mt-1 text-xs text-[#625C54]">
+                  <p className="mt-1 text-xs text-[#625C54] dark:text-[#B8AFA2]">
                     角色署名参考
                     <a className="ml-1 underline" href={`https://en.wikipedia.org/w/index.php?oldid=${onlineRelations.castArticleRevision}`}
                       target="_blank" rel="noopener noreferrer">维基百科原文</a>
                   </p>
                 )}
                 {onlineRelations.sources.length > 0 && (
-                  <p className="mt-0.5 text-[12px] text-[#7A7268] md:text-[11px]">
+                  <p className="mt-0.5 text-[12px] text-[#7A7268] md:text-[11px] dark:text-[#A59D90]">
                     资料来源：{onlineRelations.sources.join(' · ')}
                   </p>
                 )}
@@ -1244,7 +1244,7 @@ export function DetailDrawer({
                 disabled={relationsLoading}
                 onClick={() => setRelationsReloadTick((t) => t + 1)}
                 aria-label="重新检索联网关联"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[#625C54] hover:bg-[#F3EFE8] hover:text-[#1A1816] cursor-pointer disabled:opacity-40"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[#625C54] hover:bg-[#F3EFE8] hover:text-[#1A1816] cursor-pointer disabled:opacity-40 dark:text-[#A59D90] dark:hover:bg-[#2C2721] dark:hover:text-[#F3EFE6]"
               >
                 <RefreshCw
                   className={`h-4 w-4 ${relationsLoading ? 'animate-spin' : ''}`}
@@ -1256,7 +1256,7 @@ export function DetailDrawer({
             <div
               role="tablist"
               aria-label="关联类型切换"
-              className="mt-3 grid grid-cols-2 gap-1 rounded-xl bg-[#EFECE5] p-1"
+              className="mt-3 grid grid-cols-2 gap-1 rounded-xl bg-[#EFECE5] p-1 dark:bg-[#24201C]"
             >
               <button
                 type="button"
@@ -1269,8 +1269,8 @@ export function DetailDrawer({
                 }}
                 className={`min-h-[42px] rounded-lg px-2 text-[13px] font-medium whitespace-nowrap cursor-pointer transition-colors md:min-h-[40px] md:text-xs ${
                   relationsTab === 'primary'
-                    ? 'bg-white text-[#1A1816] shadow-xs'
-                    : 'text-[#625C54]'
+                    ? 'bg-white text-[#1A1816] shadow-xs dark:bg-[#353029] dark:text-[#F5F1E8]'
+                    : 'text-[#625C54] dark:text-[#A89F92]'
                 }`}
               >
                 {primaryTabLabel}
@@ -1289,8 +1289,8 @@ export function DetailDrawer({
                 }}
                 className={`min-h-[42px] rounded-lg px-2 text-[13px] font-medium whitespace-nowrap cursor-pointer transition-colors md:min-h-[40px] md:text-xs ${
                   relationsTab === 'secondary'
-                    ? 'bg-white text-[#1A1816] shadow-xs'
-                    : 'text-[#625C54]'
+                    ? 'bg-white text-[#1A1816] shadow-xs dark:bg-[#353029] dark:text-[#F5F1E8]'
+                    : 'text-[#625C54] dark:text-[#A89F92]'
                 }`}
               >
                 {secondaryTabLabel}
@@ -1307,7 +1307,7 @@ export function DetailDrawer({
                   在联网名单中快速筛查
                 </label>
                 <Search
-                  className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8C857B] md:h-3.5 md:w-3.5"
+                  className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8C857B] md:h-3.5 md:w-3.5 dark:text-[#9A9184]"
                   aria-hidden="true"
                 />
                 <input
@@ -1316,14 +1316,14 @@ export function DetailDrawer({
                   value={relationsFilter}
                   onChange={(e) => setRelationsFilter(e.target.value)}
                   placeholder={`在全部 ${visibleOnlineList.length} 位名单中快速查找…`}
-                  className="h-11 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] pl-9 pr-9 text-[16px] text-[#1A1816] placeholder:text-[#8C857B] focus:border-[#1A1816] focus:bg-white focus:outline-none md:h-10 md:pl-8 md:pr-8 md:text-xs"
+                  className="h-11 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] pl-9 pr-9 text-[16px] text-[#1A1816] placeholder:text-[#8C857B] focus:border-[#1A1816] focus:bg-white focus:outline-none md:h-10 md:pl-8 md:pr-8 md:text-xs dark:border-[#3A342D] dark:bg-[#181512] dark:text-[#F3EFE6] dark:placeholder:text-[#8E8578] dark:focus:border-[#D4AF6A] dark:focus:bg-[#1D1A17]"
                 />
                 {relationsFilter && (
                   <button
                     type="button"
                     onClick={() => setRelationsFilter('')}
                     aria-label="清空筛查"
-                    className="absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-[#625C54] cursor-pointer"
+                    className="absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-[#625C54] cursor-pointer dark:text-[#A59D90]"
                   >
                     <X className="h-4 w-4 md:h-3.5 md:w-3.5" />
                   </button>
@@ -1334,17 +1334,17 @@ export function DetailDrawer({
             {/* Content Area */}
             <div className="mt-3">
               {relationsLoading && visibleOnlineList.length === 0 ? (
-                <div className="flex items-center justify-center gap-2 py-6 text-xs text-[#7A7268]">
-                  <Loader2 className="h-4 w-4 animate-spin text-[#B43B2B]" />
+                <div className="flex items-center justify-center gap-2 py-6 text-xs text-[#7A7268] dark:text-[#A59D90]">
+                  <Loader2 className="h-4 w-4 animate-spin text-[#B43B2B] dark:text-[#EB7865]" />
                   <span>正在查找演职员与角色…</span>
                 </div>
               ) : relationsError && !visibleOnlineList.length ? (
                 <div className="py-4 text-center">
-                  <p className="text-xs text-[#B43B2B]">{relationsError}</p>
+                  <p className="text-xs text-[#B43B2B] dark:text-[#F28C7B]">{relationsError}</p>
                   <button
                     type="button"
                     onClick={() => setRelationsReloadTick((t) => t + 1)}
-                    className="mt-2.5 min-h-[40px] rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-4 text-xs font-medium text-[#1A1816] cursor-pointer"
+                    className="mt-2.5 min-h-[40px] rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-4 text-xs font-medium text-[#1A1816] cursor-pointer dark:border-[#3A342D] dark:bg-[#24201C] dark:text-[#F3EFE6]"
                   >
                     重试检索
                   </button>
@@ -1375,7 +1375,7 @@ export function DetailDrawer({
                       return (
                         <li
                           key={cand.externalId}
-                          className="flex items-center justify-between gap-2.5 rounded-xl border border-[#ECE7DD] bg-[#FAF9F6] p-2"
+                          className="flex items-center justify-between gap-2.5 rounded-xl border border-[#ECE7DD] bg-[#FAF9F6] p-2 dark:border-[#322D27] dark:bg-[#24201C]"
                         >
                           <div className="flex min-w-0 flex-1 items-center gap-2.5">
                             <ArchivalImage
@@ -1387,11 +1387,11 @@ export function DetailDrawer({
                               className="h-14 w-11 shrink-0 rounded-lg"
                             />
                             <div className="min-w-0">
-                              <p className="truncate font-editorial text-[15px] font-medium text-[#1A1816] md:text-sm">
+                              <p className="truncate font-editorial text-[15px] font-medium text-[#1A1816] md:text-sm dark:text-[#F3EFE6]">
                                 {cand.title}
                               </p>
                               {(cand.subtitle || matchedAliasLabel) && (
-                                <p className="mt-0.5 line-clamp-1 text-[12px] text-[#625C54] md:text-[11px]">
+                                <p className="mt-0.5 line-clamp-1 text-[12px] text-[#625C54] md:text-[11px] dark:text-[#A59D90]">
                                   {[cand.subtitle, matchedAliasLabel]
                                     .filter(Boolean)
                                     .join(' · ')}
@@ -1404,10 +1404,10 @@ export function DetailDrawer({
                             <button
                               type="button"
                               onClick={() => onSelectRelated(existing)}
-                              className="inline-flex min-h-[40px] shrink-0 items-center gap-1 rounded-xl border border-[#D8D1C4] bg-white px-3 text-[13px] font-medium text-[#4B453E] whitespace-nowrap cursor-pointer md:text-xs"
+                              className="inline-flex min-h-[40px] shrink-0 items-center gap-1 rounded-xl border border-[#D8D1C4] bg-white px-3 text-[13px] font-medium text-[#4B453E] whitespace-nowrap cursor-pointer md:text-xs dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#C4BCB0]"
                             >
                               <Check
-                                className="h-3.5 w-3.5 text-[#2A6B46]"
+                                className="h-3.5 w-3.5 text-[#2A6B46] dark:text-[#6CC492]"
                                 aria-hidden="true"
                               />
                               已关联
@@ -1422,7 +1422,7 @@ export function DetailDrawer({
                                   cand.externalId
                                 )
                               }
-                              className="inline-flex min-h-[40px] shrink-0 items-center gap-1 rounded-xl border border-[#1A1816] bg-white px-3 text-[13px] font-medium text-[#1A1816] whitespace-nowrap cursor-pointer disabled:opacity-50 md:text-xs"
+                              className="inline-flex min-h-[40px] shrink-0 items-center gap-1 rounded-xl border border-[#1A1816] bg-white px-3 text-[13px] font-medium text-[#1A1816] whitespace-nowrap cursor-pointer disabled:opacity-50 md:text-xs dark:border-[#D4AF6A] dark:bg-[#1D1A17] dark:text-[#F3EFE6]"
                             >
                               <Link2
                                 className="h-3.5 w-3.5"
@@ -1453,7 +1453,7 @@ export function DetailDrawer({
                     <button
                       type="button"
                       onClick={() => setRelationsExpanded((v) => !v)}
-                      className="mt-2.5 flex min-h-[44px] w-full items-center justify-center gap-1 rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] text-[13px] font-medium text-[#3D3832] cursor-pointer active:scale-[0.99] md:min-h-[42px] md:text-xs"
+                      className="mt-2.5 flex min-h-[44px] w-full items-center justify-center gap-1 rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] text-[13px] font-medium text-[#3D3832] cursor-pointer active:scale-[0.99] md:min-h-[42px] md:text-xs dark:border-[#3A342D] dark:bg-[#24201C] dark:text-[#E5DED2]"
                     >
                       {relationsExpanded ? (
                         <>
@@ -1474,7 +1474,7 @@ export function DetailDrawer({
                   )}
                 </>
               ) : (
-                <p className="py-4 text-center text-[13px] leading-relaxed text-[#7A7268] md:text-xs">
+                <p className="py-4 text-center text-[13px] leading-relaxed text-[#7A7268] md:text-xs dark:text-[#A59D90]">
                   {filterNorm
                     ? `名单中未匹配到「${relationsFilter}」`
                     : totalOnlineCount > 0
@@ -1485,15 +1485,15 @@ export function DetailDrawer({
             </div>
 
             {/* Quick Manual Create & Pre-Link Shortcuts */}
-            <div className="mt-3 flex flex-wrap gap-2 border-t border-[#EFECE5] pt-3">
+            <div className="mt-3 flex flex-wrap gap-2 border-t border-[#EFECE5] pt-3 dark:border-[#2E2924]">
               {quickCreateTargets.map((targetCat) => (
                 <button
                   key={targetCat}
                   type="button"
                   onClick={() => onQuickCreateRelated(item, targetCat)}
-                  className="inline-flex min-h-[42px] flex-1 items-center justify-center gap-1.5 rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3 text-[13px] font-medium text-[#1A1816] whitespace-nowrap cursor-pointer active:scale-[0.98] md:min-h-[40px] md:text-xs"
+                  className="inline-flex min-h-[42px] flex-1 items-center justify-center gap-1.5 rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3 text-[13px] font-medium text-[#1A1816] whitespace-nowrap cursor-pointer active:scale-[0.98] md:min-h-[40px] md:text-xs dark:border-[#3A342D] dark:bg-[#24201C] dark:text-[#F3EFE6] dark:hover:border-[#D4AF6A]"
                 >
-                  <UserPlus className="h-3.5 w-3.5 text-[#7A7268]" aria-hidden="true" />
+                  <UserPlus className="h-3.5 w-3.5 text-[#7A7268] dark:text-[#A59D90]" aria-hidden="true" />
                   手动建档{CATEGORY_LABELS[targetCat]}并关联
                 </button>
               ))}
@@ -1506,10 +1506,10 @@ export function DetailDrawer({
             ref={editFormRef}
             id="detail-edit-form"
             onSubmit={handleSave}
-            className="mt-7 space-y-4 border-t border-[#E4DFD5] pt-6"
+            className="mt-7 space-y-4 border-t border-[#E4DFD5] pt-6 dark:border-[#2E2924]"
           >
             <div className="flex items-center justify-between gap-2">
-              <h3 className="text-[13px] font-medium tracking-[0.06em] text-[#7A7268] md:text-xs md:tracking-[0.08em]">
+              <h3 className="text-[13px] font-medium tracking-[0.06em] text-[#7A7268] md:text-xs md:tracking-[0.08em] dark:text-[#A59D90]">
                 {isCharacter ? '完善角色档案与评注' : '个人评注与编辑'}
               </h3>
             </div>
@@ -1518,7 +1518,7 @@ export function DetailDrawer({
               <div
                 role="tablist"
                 aria-label="角色编辑分区"
-                className="grid grid-cols-2 gap-1 rounded-xl bg-[#EFECE5] p-1"
+                className="grid grid-cols-2 gap-1 rounded-xl bg-[#EFECE5] p-1 dark:bg-[#24201C]"
               >
                 <button
                   type="button"
@@ -1527,8 +1527,8 @@ export function DetailDrawer({
                   onClick={() => setEditTab('notes')}
                   className={`min-h-[42px] rounded-lg px-2 text-[13px] font-medium whitespace-nowrap cursor-pointer transition-colors md:min-h-[40px] md:text-xs ${
                     editTab === 'notes'
-                      ? 'bg-white text-[#1A1816] shadow-xs'
-                      : 'text-[#625C54]'
+                      ? 'bg-white text-[#1A1816] shadow-xs dark:bg-[#353029] dark:text-[#F5F1E8]'
+                      : 'text-[#625C54] dark:text-[#A89F92]'
                   }`}
                 >
                   收藏与评注
@@ -1540,8 +1540,8 @@ export function DetailDrawer({
                   onClick={() => setEditTab('dossier')}
                   className={`min-h-[42px] rounded-lg px-2 text-[13px] font-medium whitespace-nowrap cursor-pointer transition-colors md:min-h-[40px] md:text-xs ${
                     editTab === 'dossier'
-                      ? 'bg-white text-[#1A1816] shadow-xs'
-                      : 'text-[#625C54]'
+                      ? 'bg-white text-[#1A1816] shadow-xs dark:bg-[#353029] dark:text-[#F5F1E8]'
+                      : 'text-[#625C54] dark:text-[#A89F92]'
                   }`}
                 >
                   角色设定档案
@@ -1553,7 +1553,7 @@ export function DetailDrawer({
               <>
                 {/* Status Grid */}
                 <div>
-                  <span className="block text-[13px] font-medium text-[#4B453E] md:text-xs">
+                  <span className="block text-[13px] font-medium text-[#4B453E] md:text-xs dark:text-[#C4BCB0]">
                     收藏状态
                   </span>
                   <div className="mt-2 grid grid-cols-4 gap-2">
@@ -1567,8 +1567,8 @@ export function DetailDrawer({
                           onClick={() => setStatus(st)}
                           className={`min-h-[44px] rounded-xl text-[13px] font-medium whitespace-nowrap cursor-pointer transition-colors md:min-h-[42px] md:text-xs ${
                             active
-                              ? 'bg-[#1A1816] text-white'
-                              : 'border border-[#DCD6CB] bg-white text-[#4B453E]'
+                              ? 'bg-[#1A1816] text-white dark:bg-[#F3EFE6] dark:text-[#141210]'
+                              : 'border border-[#DCD6CB] bg-white text-[#4B453E] dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#C4BCB0]'
                           }`}
                         >
                           {getStatusLabel(st, item.category)}
@@ -1580,7 +1580,7 @@ export function DetailDrawer({
 
                 {/* 44px Touch Star Rating */}
                 <div>
-                  <span className="block text-[13px] font-medium text-[#4B453E] md:text-xs">
+                  <span className="block text-[13px] font-medium text-[#4B453E] md:text-xs dark:text-[#C4BCB0]">
                     个人评分
                   </span>
                   <div className="mt-1.5 flex items-center gap-1">
@@ -1591,18 +1591,18 @@ export function DetailDrawer({
                         onClick={() => setRating(rating === starVal ? 0 : starVal)}
                         aria-label={`评为 ${starVal} 星`}
                         aria-pressed={rating >= starVal}
-                        className="flex h-11 w-11 items-center justify-center rounded-xl hover:bg-[#ECE7DD] cursor-pointer"
+                        className="flex h-11 w-11 items-center justify-center rounded-xl hover:bg-[#ECE7DD] cursor-pointer dark:hover:bg-[#2A2520]"
                       >
                         <Star
                           className={`h-6 w-6 ${
                             starVal <= rating
-                              ? 'fill-[#B43B2B] text-[#B43B2B]'
-                              : 'text-[#CBC3B6]'
+                              ? 'fill-[#B43B2B] text-[#B43B2B] dark:fill-[#EB7865] dark:text-[#EB7865]'
+                              : 'text-[#CBC3B6] dark:text-[#4E463D]'
                           }`}
                         />
                       </button>
                     ))}
-                    <span className="ml-2 font-mono text-[13px] tabular-nums text-[#625C54] md:text-xs">
+                    <span className="ml-2 font-mono text-[13px] tabular-nums text-[#625C54] md:text-xs dark:text-[#A59D90]">
                       {rating > 0 ? `${rating}.0 / 5` : '未评'}
                     </span>
                   </div>
@@ -1611,7 +1611,7 @@ export function DetailDrawer({
                 <div>
                   <label
                     htmlFor="detail-quote"
-                    className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
+                    className="block text-[13px] font-medium text-[#4B453E] md:text-xs dark:text-[#C4BCB0]"
                   >
                     经典台词 / 语录
                   </label>
@@ -1621,7 +1621,7 @@ export function DetailDrawer({
                     value={quote}
                     onChange={(e) => setQuote(e.target.value)}
                     placeholder="摘录最打动你的一句话…"
-                    className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-white px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:h-11 md:text-sm"
+                    className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-white px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:h-11 md:text-sm dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:placeholder:text-[#8E8578] dark:focus:border-[#D4AF6A]"
                   />
                 </div>
 
@@ -1629,7 +1629,7 @@ export function DetailDrawer({
                   <div>
                     <label
                       htmlFor="detail-char-highlights"
-                      className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
+                      className="block text-[13px] font-medium text-[#4B453E] md:text-xs dark:text-[#C4BCB0]"
                     >
                       名场面 / 高光时刻
                     </label>
@@ -1639,7 +1639,7 @@ export function DetailDrawer({
                       value={charHighlights}
                       onChange={(e) => setCharHighlights(e.target.value)}
                       placeholder="记下最难忘的出场镜头、反转或高光片段…"
-                      className="mt-1.5 w-full rounded-xl border border-[#DCD6CB] bg-white px-3.5 py-2.5 text-[16px] leading-relaxed text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:text-sm"
+                      className="mt-1.5 w-full rounded-xl border border-[#DCD6CB] bg-white px-3.5 py-2.5 text-[16px] leading-relaxed text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:text-sm dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:placeholder:text-[#8E8578] dark:focus:border-[#D4AF6A]"
                     />
                   </div>
                 )}
@@ -1647,7 +1647,7 @@ export function DetailDrawer({
                 <div>
                   <label
                     htmlFor="detail-notes"
-                    className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
+                    className="block text-[13px] font-medium text-[#4B453E] md:text-xs dark:text-[#C4BCB0]"
                   >
                     {isCharacter ? '喜欢理由 / 收藏手记' : '观影手记 / 收藏理由'}
                   </label>
@@ -1657,7 +1657,7 @@ export function DetailDrawer({
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     placeholder="写下你的感受或备忘…"
-                    className="mt-1.5 w-full rounded-xl border border-[#DCD6CB] bg-white px-3.5 py-2.5 text-[16px] leading-relaxed text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:text-sm"
+                    className="mt-1.5 w-full rounded-xl border border-[#DCD6CB] bg-white px-3.5 py-2.5 text-[16px] leading-relaxed text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:text-sm dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:placeholder:text-[#8E8578] dark:focus:border-[#D4AF6A]"
                   />
                 </div>
 
@@ -1665,7 +1665,7 @@ export function DetailDrawer({
                   <div>
                     <label
                       htmlFor="detail-work"
-                      className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
+                      className="block text-[13px] font-medium text-[#4B453E] md:text-xs dark:text-[#C4BCB0]"
                     >
                       {item.category === 'person' ? '代表作品' : '导演 / 主创'}
                     </label>
@@ -1674,7 +1674,7 @@ export function DetailDrawer({
                       type="text"
                       value={relatedWorkTitle}
                       onChange={(e) => setRelatedWorkTitle(e.target.value)}
-                      className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-white px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:h-11 md:text-sm"
+                      className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-white px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:h-11 md:text-sm dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:focus:border-[#D4AF6A]"
                     />
                   </div>
                 )}
@@ -1683,7 +1683,7 @@ export function DetailDrawer({
                   <div>
                     <label
                       htmlFor="detail-cover"
-                      className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
+                      className="block text-[13px] font-medium text-[#4B453E] md:text-xs dark:text-[#C4BCB0]"
                     >
                       自定义封面链接（自动服务端直连代理）
                     </label>
@@ -1693,7 +1693,7 @@ export function DetailDrawer({
                       value={coverUrlInput}
                       onChange={(e) => setCoverUrlInput(e.target.value)}
                       placeholder="https://..."
-                      className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-white px-3.5 font-mono text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:h-11 md:text-xs"
+                      className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-white px-3.5 font-mono text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:h-11 md:text-xs dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:placeholder:text-[#8E8578] dark:focus:border-[#D4AF6A]"
                     />
                   </div>
                 )}
@@ -1706,7 +1706,7 @@ export function DetailDrawer({
                   <div>
                     <label
                       htmlFor="detail-char-alias"
-                      className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
+                      className="block text-[13px] font-medium text-[#4B453E] md:text-xs dark:text-[#C4BCB0]"
                     >
                       别名 / 称号
                     </label>
@@ -1716,13 +1716,13 @@ export function DetailDrawer({
                       value={charAlias}
                       onChange={(e) => setCharAlias(e.target.value)}
                       placeholder="如 毁灭博士 / 雷神"
-                      className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-white px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:h-11 md:text-sm"
+                      className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-white px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:h-11 md:text-sm dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:placeholder:text-[#8E8578] dark:focus:border-[#D4AF6A]"
                     />
                   </div>
                   <div>
                     <label
                       htmlFor="detail-char-identity"
-                      className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
+                      className="block text-[13px] font-medium text-[#4B453E] md:text-xs dark:text-[#C4BCB0]"
                     >
                       身份定位
                     </label>
@@ -1732,7 +1732,7 @@ export function DetailDrawer({
                       value={charIdentity}
                       onChange={(e) => setCharIdentity(e.target.value)}
                       placeholder="如 拉托维尼亚君主 · 科学家"
-                      className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-white px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:h-11 md:text-sm"
+                      className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-white px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:h-11 md:text-sm dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:placeholder:text-[#8E8578] dark:focus:border-[#D4AF6A]"
                     />
                   </div>
                 </div>
@@ -1741,7 +1741,7 @@ export function DetailDrawer({
                   <div>
                     <label
                       htmlFor="detail-char-affiliation"
-                      className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
+                      className="block text-[13px] font-medium text-[#4B453E] md:text-xs dark:text-[#C4BCB0]"
                     >
                       所属阵营 / 组织
                     </label>
@@ -1751,13 +1751,13 @@ export function DetailDrawer({
                       value={charAffiliation}
                       onChange={(e) => setCharAffiliation(e.target.value)}
                       placeholder="如 复仇者联盟 / 拉托维尼亚"
-                      className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-white px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:h-11 md:text-sm"
+                      className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-white px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:h-11 md:text-sm dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:placeholder:text-[#8E8578] dark:focus:border-[#D4AF6A]"
                     />
                   </div>
                   <div>
                     <label
                       htmlFor="detail-char-origin"
-                      className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
+                      className="block text-[13px] font-medium text-[#4B453E] md:text-xs dark:text-[#C4BCB0]"
                     >
                       出身 / 籍贯
                     </label>
@@ -1767,7 +1767,7 @@ export function DetailDrawer({
                       value={charOrigin}
                       onChange={(e) => setCharOrigin(e.target.value)}
                       placeholder="如 阿斯加德 / 布鲁克林"
-                      className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-white px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:h-11 md:text-sm"
+                      className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-white px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:h-11 md:text-sm dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:placeholder:text-[#8E8578] dark:focus:border-[#D4AF6A]"
                     />
                   </div>
                 </div>
@@ -1775,7 +1775,7 @@ export function DetailDrawer({
                 <div>
                   <label
                     htmlFor="detail-char-abilities"
-                    className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
+                    className="block text-[13px] font-medium text-[#4B453E] md:text-xs dark:text-[#C4BCB0]"
                   >
                     能力 / 武器 / 性格特质
                   </label>
@@ -1785,7 +1785,7 @@ export function DetailDrawer({
                     value={charAbilities}
                     onChange={(e) => setCharAbilities(e.target.value)}
                     placeholder="如 天才智力 · 魔法 · 动力装甲"
-                    className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-white px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:h-11 md:text-sm"
+                    className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-white px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:h-11 md:text-sm dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:placeholder:text-[#8E8578] dark:focus:border-[#D4AF6A]"
                   />
                 </div>
 
@@ -1793,7 +1793,7 @@ export function DetailDrawer({
                   <div>
                     <label
                       htmlFor="detail-char-first"
-                      className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
+                      className="block text-[13px] font-medium text-[#4B453E] md:text-xs dark:text-[#C4BCB0]"
                     >
                       首次登场
                     </label>
@@ -1803,13 +1803,13 @@ export function DetailDrawer({
                       value={charFirstAppearance}
                       onChange={(e) => setCharFirstAppearance(e.target.value)}
                       placeholder="如 《神奇四侠》#5（1962）"
-                      className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-white px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:h-11 md:text-sm"
+                      className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-white px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:h-11 md:text-sm dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:placeholder:text-[#8E8578] dark:focus:border-[#D4AF6A]"
                     />
                   </div>
                   <div>
                     <label
                       htmlFor="detail-char-creator"
-                      className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
+                      className="block text-[13px] font-medium text-[#4B453E] md:text-xs dark:text-[#C4BCB0]"
                     >
                       原案创作者
                     </label>
@@ -1819,7 +1819,7 @@ export function DetailDrawer({
                       value={charCreator}
                       onChange={(e) => setCharCreator(e.target.value)}
                       placeholder="如 斯坦·李 · 杰克·科比"
-                      className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-white px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:h-11 md:text-sm"
+                      className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-white px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:h-11 md:text-sm dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:placeholder:text-[#8E8578] dark:focus:border-[#D4AF6A]"
                     />
                   </div>
                 </div>
@@ -1828,7 +1828,7 @@ export function DetailDrawer({
                   <div>
                     <label
                       htmlFor="detail-work"
-                      className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
+                      className="block text-[13px] font-medium text-[#4B453E] md:text-xs dark:text-[#C4BCB0]"
                     >
                       出处作品
                     </label>
@@ -1837,13 +1837,13 @@ export function DetailDrawer({
                       type="text"
                       value={relatedWorkTitle}
                       onChange={(e) => setRelatedWorkTitle(e.target.value)}
-                      className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-white px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:h-11 md:text-sm"
+                      className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-white px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:h-11 md:text-sm dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:focus:border-[#D4AF6A]"
                     />
                   </div>
                   <div>
                     <label
                       htmlFor="detail-actor"
-                      className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
+                      className="block text-[13px] font-medium text-[#4B453E] md:text-xs dark:text-[#C4BCB0]"
                     >
                       饰演演员 / 配音
                     </label>
@@ -1852,7 +1852,7 @@ export function DetailDrawer({
                       type="text"
                       value={portrayedBy}
                       onChange={(e) => setPortrayedBy(e.target.value)}
-                      className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-white px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:h-11 md:text-sm"
+                      className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-white px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:h-11 md:text-sm dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:focus:border-[#D4AF6A]"
                     />
                   </div>
                 </div>
@@ -1860,7 +1860,7 @@ export function DetailDrawer({
                 <div>
                   <label
                     htmlFor="detail-char-bio"
-                    className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
+                    className="block text-[13px] font-medium text-[#4B453E] md:text-xs dark:text-[#C4BCB0]"
                   >
                     人物小传（角色背景与生平）
                   </label>
@@ -1870,14 +1870,14 @@ export function DetailDrawer({
                     value={charBio}
                     onChange={(e) => setCharBio(e.target.value)}
                     placeholder="填写角色背景故事、性格演变或人物脉络…"
-                    className="mt-1.5 w-full rounded-xl border border-[#DCD6CB] bg-white px-3.5 py-2.5 text-[16px] leading-relaxed text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:text-sm"
+                    className="mt-1.5 w-full rounded-xl border border-[#DCD6CB] bg-white px-3.5 py-2.5 text-[16px] leading-relaxed text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:text-sm dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:placeholder:text-[#8E8578] dark:focus:border-[#D4AF6A]"
                   />
                 </div>
 
                 <div>
                   <label
                     htmlFor="detail-cover"
-                    className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
+                    className="block text-[13px] font-medium text-[#4B453E] md:text-xs dark:text-[#C4BCB0]"
                   >
                     自定义角色剧照链接（自动服务端直连代理）
                   </label>
@@ -1887,7 +1887,7 @@ export function DetailDrawer({
                     value={coverUrlInput}
                     onChange={(e) => setCoverUrlInput(e.target.value)}
                     placeholder="https://..."
-                    className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-white px-3.5 font-mono text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:h-11 md:text-xs"
+                    className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-white px-3.5 font-mono text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:h-11 md:text-xs dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:placeholder:text-[#8E8578] dark:focus:border-[#D4AF6A]"
                   />
                 </div>
               </div>
@@ -1896,7 +1896,7 @@ export function DetailDrawer({
             {savedFeedback && (
               <p
                 role="status"
-                className="rounded-xl border border-[#C8DFD0] bg-[#F2F7F4] px-3.5 py-2.5 text-[13px] font-medium text-[#2A6B46] md:text-xs"
+                className="rounded-xl border border-[#C8DFD0] bg-[#F2F7F4] px-3.5 py-2.5 text-[13px] font-medium text-[#2A6B46] md:text-xs dark:border-[#2B523B] dark:bg-[#172B20] dark:text-[#6CC492]"
               >
                 {savedFeedback}
               </p>
@@ -1913,12 +1913,12 @@ export function DetailDrawer({
           />
 
           {/* Quiet Destructive Action Row */}
-          <div className="mt-5 flex items-center justify-between border-t border-[#E4DFD5] pt-3">
+          <div className="mt-5 flex items-center justify-between border-t border-[#E4DFD5] pt-3 dark:border-[#2E2924]">
             {!confirmDelete ? (
               <button
                 type="button"
                 onClick={() => setConfirmDelete(true)}
-                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl px-2 text-[13px] font-medium text-[#7A7268] hover:text-[#B43B2B] cursor-pointer md:min-h-[42px] md:text-xs"
+                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl px-2 text-[13px] font-medium text-[#7A7268] hover:text-[#B43B2B] cursor-pointer md:min-h-[42px] md:text-xs dark:text-[#A59D90] dark:hover:text-[#F28C7B]"
               >
                 <Trash2 className="h-4 w-4 md:h-3.5 md:w-3.5" aria-hidden="true" />
                 移除此藏品
@@ -1935,7 +1935,7 @@ export function DetailDrawer({
                 <button
                   type="button"
                   onClick={() => setConfirmDelete(false)}
-                  className="min-h-[42px] rounded-xl border border-[#DCD6CB] bg-white px-3.5 text-[13px] text-[#4B453E] cursor-pointer md:min-h-[40px] md:text-xs"
+                  className="min-h-[42px] rounded-xl border border-[#DCD6CB] bg-white px-3.5 text-[13px] text-[#4B453E] cursor-pointer md:min-h-[40px] md:text-xs dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#C4BCB0]"
                 >
                   取消
                 </button>
@@ -1945,13 +1945,13 @@ export function DetailDrawer({
         </div>
 
         {/* Sticky Bottom Save Bar */}
-        <div className="border-t border-[#E4DFD5] bg-white px-4 py-3 pb-[calc(0.85rem+env(safe-area-inset-bottom))] min-[420px]:px-5">
+        <div className="border-t border-[#E4DFD5] bg-white px-4 py-3 pb-[calc(0.85rem+env(safe-area-inset-bottom))] min-[420px]:px-5 dark:border-[#2E2924] dark:bg-[#191613]">
           <div className="flex items-center gap-2.5">
             {isDirty && (
               <button
                 type="button"
                 onClick={handleResetDraft}
-                className="inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-[14px] font-medium text-[#4B453E] whitespace-nowrap cursor-pointer transition-colors hover:border-[#1A1816] hover:text-[#1A1816] md:text-xs"
+                className="inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-[14px] font-medium text-[#4B453E] whitespace-nowrap cursor-pointer transition-colors hover:border-[#1A1816] hover:text-[#1A1816] md:text-xs dark:border-[#3A342D] dark:bg-[#24201C] dark:text-[#C4BCB0] dark:hover:border-[#D4AF6A] dark:hover:text-[#F3EFE6]"
               >
                 <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
                 <span>还原</span>
@@ -1961,10 +1961,10 @@ export function DetailDrawer({
               type="submit"
               form="detail-edit-form"
               disabled={saving}
-              className={`h-11 flex-1 rounded-xl text-[15px] font-medium text-white cursor-pointer active:scale-[0.98] transition-all disabled:opacity-60 md:text-sm ${
+              className={`h-11 flex-1 rounded-xl text-[15px] font-medium cursor-pointer active:scale-[0.98] transition-all disabled:opacity-60 md:text-sm ${
                 isDirty
-                  ? 'bg-[#B43B2B] hover:bg-[#932D20] shadow-xs'
-                  : 'bg-[#1A1816] hover:bg-[#332E29]'
+                  ? 'bg-[#B43B2B] text-white hover:bg-[#932D20] shadow-xs'
+                  : 'bg-[#1A1816] text-white hover:bg-[#332E29] dark:bg-[#F3EFE6] dark:text-[#141210] dark:hover:bg-[#E4C37A]'
               }`}
             >
               {saving

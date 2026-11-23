@@ -107,13 +107,13 @@ export function OnlineSearchSection({
   };
 
   return (
-    <div className="mt-7 border border-[#DCD6CB] bg-white p-4 sm:p-5">
+    <div className="mt-7 border border-[#DCD6CB] bg-white p-4 sm:p-5 dark:border-[#322D27] dark:bg-[#1D1A17]">
       {/* Top Row: Category Switcher + fixed IMDb/Douban label */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div
           role="group"
           aria-label="联网搜索类别"
-          className="flex items-center gap-1 rounded-md bg-[#EFECE5] p-1"
+          className="flex items-center gap-1 rounded-md bg-[#EFECE5] p-1 dark:bg-[#231F1B]"
         >
           {(['film', 'person', 'character'] as ArchiveCategory[]).map((cat) => (
             <button
@@ -123,8 +123,8 @@ export function OnlineSearchSection({
               onClick={() => setCategory(cat)}
               className={`min-h-[34px] rounded px-3.5 py-1 text-xs font-medium whitespace-nowrap cursor-pointer transition-colors ${
                 category === cat
-                  ? 'bg-white text-[#1A1816] shadow-xs'
-                  : 'text-[#625C54] hover:text-[#1A1816]'
+                  ? 'bg-white text-[#1A1816] shadow-xs dark:bg-[#353029] dark:text-[#F5F1E8]'
+                  : 'text-[#625C54] hover:text-[#1A1816] dark:text-[#9E9588] dark:hover:text-[#F3EFE6]'
               }`}
             >
               搜{CATEGORY_LABELS[cat]}
@@ -132,7 +132,7 @@ export function OnlineSearchSection({
           ))}
         </div>
 
-        <span className="text-xs text-[#625C54] whitespace-nowrap">
+        <span className="text-xs text-[#625C54] whitespace-nowrap dark:text-[#9E9588]">
           IMDb 直连 · 豆瓣辅助
         </span>
       </div>
@@ -147,7 +147,7 @@ export function OnlineSearchSection({
             联网搜索影视、影人或角色
           </label>
           <Search
-            className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8C857B]"
+            className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8C857B] dark:text-[#8E8578]"
             aria-hidden="true"
           />
           <input
@@ -166,7 +166,7 @@ export function OnlineSearchSection({
                   ? '输入导演、演员姓名，或粘贴 IMDb（nm...）/ 豆瓣影人链接…'
                   : '输入想收藏的影视或动画角色名，回车直连检索并收录…'
             }
-            className="h-12 w-full rounded-md border border-[#D4CDC0] bg-[#FAF9F6] pl-10 pr-9 text-sm text-[#1A1816] placeholder:text-[#8C857B] transition-colors focus:border-[#1A1816] focus:bg-white focus:outline-none"
+            className="h-12 w-full rounded-md border border-[#D4CDC0] bg-[#FAF9F6] pl-10 pr-9 text-sm text-[#1A1816] placeholder:text-[#8C857B] transition-colors focus:border-[#1A1816] focus:bg-white focus:outline-none dark:border-[#3A342D] dark:bg-[#141210] dark:text-[#F3EFE6] dark:placeholder:text-[#7E766B] dark:focus:border-[#D4AF6A] dark:focus:bg-[#141210]"
           />
           {query && (
             <button
@@ -176,7 +176,7 @@ export function OnlineSearchSection({
                 handleClearResults();
               }}
               aria-label="清空联网搜索词"
-              className="absolute right-2.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded text-[#625C54] hover:text-[#1A1816] cursor-pointer"
+              className="absolute right-2.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded text-[#625C54] hover:text-[#1A1816] cursor-pointer dark:text-[#A59D90] dark:hover:text-[#F3EFE6]"
             >
               <X className="h-4 w-4" />
             </button>
@@ -197,7 +197,7 @@ export function OnlineSearchSection({
           <button
             type="button"
             onClick={() => onOpenManualCreate(query.trim(), category)}
-            className="inline-flex h-12 items-center justify-center rounded-md border border-[#D4CDC0] bg-white px-4 text-sm font-medium text-[#1A1816] whitespace-nowrap cursor-pointer transition-colors hover:border-[#1A1816]"
+            className="inline-flex h-12 items-center justify-center rounded-md border border-[#D4CDC0] bg-white px-4 text-sm font-medium text-[#1A1816] whitespace-nowrap cursor-pointer transition-colors hover:border-[#1A1816] dark:border-[#3A342D] dark:bg-[#24201C] dark:text-[#F3EFE6] dark:hover:border-[#D4AF6A]"
           >
             手动建档
           </button>
@@ -208,7 +208,7 @@ export function OnlineSearchSection({
       {error && (
         <div
           role="alert"
-          className="mt-3.5 flex items-center justify-between gap-4 border border-[#E5BFB9] bg-[#FDF4F2] px-4 py-2.5 text-xs text-[#932D20]"
+          className="mt-3.5 flex items-center justify-between gap-4 border border-[#E5BFB9] bg-[#FDF4F2] px-4 py-2.5 text-xs text-[#932D20] dark:border-[#6B3229] dark:bg-[#351B17] dark:text-[#F28C7B]"
         >
           <span>{error}</span>
           {query.trim() && (
@@ -229,13 +229,13 @@ export function OnlineSearchSection({
           {[0, 1, 2].map((idx) => (
             <div
               key={idx}
-              className="flex gap-4 border border-[#E4DFD5] bg-[#FAF9F6] p-3.5"
+              className="flex gap-4 border border-[#E4DFD5] bg-[#FAF9F6] p-3.5 dark:border-[#322D27] dark:bg-[#181512]"
             >
-              <div className="h-24 w-18 shrink-0 bg-[#EAE4D9]" />
+              <div className="h-24 w-18 shrink-0 bg-[#EAE4D9] dark:bg-[#2A2520]" />
               <div className="flex-1 space-y-2.5 py-1">
-                <div className="h-4 w-1/3 bg-[#EAE4D9]" />
-                <div className="h-3 w-1/2 bg-[#EFECE5]" />
-                <div className="h-3 w-4/5 bg-[#EFECE5]" />
+                <div className="h-4 w-1/3 bg-[#EAE4D9] dark:bg-[#2A2520]" />
+                <div className="h-3 w-1/2 bg-[#EFECE5] dark:bg-[#24201C]" />
+                <div className="h-3 w-4/5 bg-[#EFECE5] dark:bg-[#24201C]" />
               </div>
             </div>
           ))}
@@ -246,11 +246,11 @@ export function OnlineSearchSection({
       {!loading && hasSearched && results.length > 0 && (
         <div
           data-testid="online-search-results"
-          className="mt-5 border-t border-[#E4DFD5] pt-4"
+          className="mt-5 border-t border-[#E4DFD5] pt-4 dark:border-[#2E2924]"
         >
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-[#625C54]">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-[#625C54] dark:text-[#9E9588]">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-medium text-[#1A1816] tabular-nums">
+              <span className="font-medium text-[#1A1816] tabular-nums dark:text-[#F3EFE6]">
                 共直连检索到 {results.length} 条结果
               </span>
               {activeSources.length > 0 && (
@@ -263,13 +263,13 @@ export function OnlineSearchSection({
             <button
               type="button"
               onClick={handleClearResults}
-              className="text-xs text-[#625C54] underline underline-offset-4 hover:text-[#1A1816] cursor-pointer"
+              className="text-xs text-[#625C54] underline underline-offset-4 hover:text-[#1A1816] cursor-pointer dark:text-[#A59D90] dark:hover:text-[#F3EFE6]"
             >
               收起搜索结果
             </button>
           </div>
 
-          <ul className="max-h-[460px] divide-y divide-[#E4DFD5] overflow-y-auto border border-[#E4DFD5] bg-[#FAF9F6]">
+          <ul className="max-h-[460px] divide-y divide-[#E4DFD5] overflow-y-auto border border-[#E4DFD5] bg-[#FAF9F6] dark:divide-[#2E2924] dark:border-[#322D27] dark:bg-[#181512]">
             {results.map((item) => {
               const collected = isAlreadyCollected(
                 existingItems,
@@ -286,7 +286,7 @@ export function OnlineSearchSection({
               return (
                 <li
                   key={item.externalId}
-                  className="flex flex-col gap-3.5 p-3.5 sm:flex-row sm:items-start bg-white"
+                  className="flex flex-col gap-3.5 p-3.5 sm:flex-row sm:items-start bg-white dark:bg-[#1D1A17]"
                 >
                   <ArchivalImage
                     src={item.coverUrl}
@@ -294,22 +294,22 @@ export function OnlineSearchSection({
                     title={item.title}
                     category={item.category}
                     compact
-                    className="h-24 w-18 shrink-0 border border-[#EAE4D9]"
+                    className="h-24 w-18 shrink-0 border border-[#EAE4D9] dark:border-[#322D27]"
                   />
 
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                      <h3 className="font-editorial text-base font-medium text-[#1A1816]">
+                      <h3 className="font-editorial text-base font-medium text-[#1A1816] dark:text-[#F3EFE6]">
                         {item.title}
                       </h3>
                       {item.originalTitle && (
-                        <span className="text-xs text-[#7A7268]">
+                        <span className="text-xs text-[#7A7268] dark:text-[#9E9588]">
                           {item.originalTitle}
                         </span>
                       )}
                     </div>
 
-                    <p className="mt-1 text-xs text-[#625C54]">
+                    <p className="mt-1 text-xs text-[#625C54] dark:text-[#A59D90]">
                       {[
                         CATEGORY_LABELS[item.category],
                         item.year,
@@ -320,14 +320,14 @@ export function OnlineSearchSection({
                         .join(' · ')}
                     </p>
 
-                    <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-[#4B453E]">
+                    <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-[#4B453E] dark:text-[#C4BCB0]">
                       {item.summary}
                     </p>
                   </div>
 
                   <div className="shrink-0 sm:self-center">
                     {collected ? (
-                      <span className="inline-flex min-h-[36px] items-center gap-1.5 rounded-md border border-[#D4DFD7] bg-[#F2F7F4] px-3 py-1.5 text-xs font-medium text-[#2A6B46] whitespace-nowrap">
+                      <span className="inline-flex min-h-[36px] items-center gap-1.5 rounded-md border border-[#D4DFD7] bg-[#F2F7F4] px-3 py-1.5 text-xs font-medium text-[#2A6B46] whitespace-nowrap dark:border-[#2B523B] dark:bg-[#172B20] dark:text-[#6CC492]">
                         <Check className="h-3.5 w-3.5" aria-hidden="true" />
                         已在藏馆
                       </span>
@@ -337,7 +337,7 @@ export function OnlineSearchSection({
                         disabled={isCollecting}
                         onClick={() => void handleCollect(item)}
                         aria-label={`收录「${item.title}」到藏馆`}
-                        className="inline-flex min-h-[36px] items-center gap-1.5 rounded-md bg-[#1A1816] px-3.5 py-1.5 text-xs font-medium text-white whitespace-nowrap cursor-pointer transition-colors hover:bg-[#B43B2B] disabled:opacity-60"
+                        className="inline-flex min-h-[36px] items-center gap-1.5 rounded-md bg-[#1A1816] px-3.5 py-1.5 text-xs font-medium text-white whitespace-nowrap cursor-pointer transition-colors hover:bg-[#B43B2B] disabled:opacity-60 dark:bg-[#F3EFE6] dark:text-[#141210] dark:hover:bg-[#E4C37A]"
                       >
                         <Plus className="h-3.5 w-3.5" aria-hidden="true" />
                         {isCollecting ? '收录中…' : '收录到藏馆'}
@@ -353,14 +353,14 @@ export function OnlineSearchSection({
 
       {/* Empty Search Result */}
       {!loading && hasSearched && results.length === 0 && !error && (
-        <div className="mt-4 flex flex-col items-start justify-between gap-3 border-t border-[#E4DFD5] pt-4 sm:flex-row sm:items-center">
-          <p className="text-xs text-[#625C54]">
+        <div className="mt-4 flex flex-col items-start justify-between gap-3 border-t border-[#E4DFD5] pt-4 sm:flex-row sm:items-center dark:border-[#2E2924]">
+          <p className="text-xs text-[#625C54] dark:text-[#A59D90]">
             未检索到与「{query}」匹配的公开条目，可以换个关键词，或直接手动建档。
           </p>
           <button
             type="button"
             onClick={() => onOpenManualCreate(query.trim(), category)}
-            className="min-h-[36px] rounded-md border border-[#1A1816] bg-white px-3.5 py-1.5 text-xs font-medium text-[#1A1816] whitespace-nowrap cursor-pointer hover:bg-[#1A1816] hover:text-white transition-colors"
+            className="min-h-[36px] rounded-md border border-[#1A1816] bg-white px-3.5 py-1.5 text-xs font-medium text-[#1A1816] whitespace-nowrap cursor-pointer hover:bg-[#1A1816] hover:text-white transition-colors dark:border-[#D4AF6A] dark:bg-[#24201C] dark:text-[#F3EFE6] dark:hover:bg-[#D4AF6A] dark:hover:text-[#141210]"
           >
             手动建档「{query.trim()}」
           </button>

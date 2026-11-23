@@ -101,29 +101,29 @@ export function AlbumCuratorModal({
       aria-modal="true"
       aria-labelledby="album-curator-title"
       data-testid="album-curator-modal"
-      className="encounter-backdrop-in fixed inset-0 z-[70] flex items-end justify-center bg-[#141210]/70 backdrop-blur-xs md:items-center md:p-6"
+      className="encounter-backdrop-in fixed inset-0 z-[70] flex items-end justify-center bg-[#141210]/70 backdrop-blur-xs md:items-center md:p-6 dark:bg-black/75"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <form
         onSubmit={handleSubmit}
-        className="drawer-panel-in flex max-h-[92dvh] w-full max-w-[560px] flex-col overflow-hidden rounded-t-3xl bg-[#F7F5F0] shadow-2xl md:rounded-3xl"
+        className="drawer-panel-in flex max-h-[92dvh] w-full max-w-[560px] flex-col overflow-hidden rounded-t-3xl bg-[#F7F5F0] shadow-2xl md:rounded-3xl dark:border dark:border-[#322D27] dark:bg-[#141210]"
       >
         <div className="flex justify-center pt-2.5 pb-1 md:hidden" aria-hidden="true">
-          <div className="h-1.5 w-10 rounded-full bg-[#D3CCC0]" />
+          <div className="h-1.5 w-10 rounded-full bg-[#D3CCC0] dark:bg-[#423B33]" />
         </div>
 
         {/* Header */}
-        <div className="flex items-center justify-between gap-2 border-b border-[#E4DFD5] px-4 py-3 min-[420px]:px-5">
+        <div className="flex items-center justify-between gap-2 border-b border-[#E4DFD5] px-4 py-3 min-[420px]:px-5 dark:border-[#2E2924]">
           <div className="min-w-0">
             <h2
               id="album-curator-title"
-              className="font-editorial text-[19px] font-medium text-[#1A1816]"
+              className="font-editorial text-[19px] font-medium text-[#1A1816] dark:text-[#F5F1E8]"
             >
               专题图鉴自由选片
             </h2>
-            <p className="mt-0.5 text-xs text-[#7A7268] tabular-nums">
+            <p className="mt-0.5 text-xs text-[#7A7268] tabular-nums dark:text-[#A59D90]">
               已入册 {resolvedMatched.length} 件（手工勾选 {manualIds.length} 件）
             </p>
           </div>
@@ -131,7 +131,7 @@ export function AlbumCuratorModal({
             type="button"
             onClick={onClose}
             aria-label="关闭图鉴选片"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[#625C54] hover:bg-[#EAE4D9] cursor-pointer"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[#625C54] hover:bg-[#EAE4D9] cursor-pointer dark:text-[#A59D90] dark:hover:bg-[#2A2520] dark:hover:text-[#F3EFE6]"
           >
             <X className="h-5 w-5" />
           </button>
@@ -143,7 +143,7 @@ export function AlbumCuratorModal({
             <div>
               <label
                 htmlFor="curator-album-name"
-                className="block text-xs font-medium text-[#4B453E]"
+                className="block text-xs font-medium text-[#4B453E] dark:text-[#C4BCB0]"
               >
                 图鉴名称
               </label>
@@ -153,14 +153,14 @@ export function AlbumCuratorModal({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
-                className="mt-1 h-11 w-full rounded-xl border border-[#DCD6CB] bg-white px-3 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:text-sm"
+                className="mt-1 h-11 w-full rounded-xl border border-[#DCD6CB] bg-white px-3 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:text-sm dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:focus:border-[#D4AF6A]"
               />
             </div>
 
             <div>
               <label
                 htmlFor="curator-album-tag"
-                className="block text-xs font-medium text-[#4B453E]"
+                className="block text-xs font-medium text-[#4B453E] dark:text-[#C4BCB0]"
               >
                 自动归集标签（可选）
               </label>
@@ -170,13 +170,13 @@ export function AlbumCuratorModal({
                 value={tag}
                 onChange={(e) => setTag(e.target.value)}
                 placeholder="留空则完全按手工勾选"
-                className="mt-1 h-11 w-full rounded-xl border border-[#DCD6CB] bg-white px-3 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:text-sm"
+                className="mt-1 h-11 w-full rounded-xl border border-[#DCD6CB] bg-white px-3 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:text-sm dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:placeholder:text-[#8E8578] dark:focus:border-[#D4AF6A]"
               />
             </div>
           </div>
 
           <div>
-            <span className="block text-xs font-medium text-[#4B453E]">
+            <span className="block text-xs font-medium text-[#4B453E] dark:text-[#C4BCB0]">
               集齐目标件数
             </span>
             <div className="mt-1.5 grid grid-cols-6 gap-1.5">
@@ -188,8 +188,8 @@ export function AlbumCuratorModal({
                   onClick={() => setTargetCount(n)}
                   className={`min-h-[38px] rounded-xl font-mono text-xs font-medium tabular-nums cursor-pointer ${
                     targetCount === n
-                      ? 'bg-[#1A1816] text-white'
-                      : 'border border-[#DCD6CB] bg-white text-[#4B453E]'
+                      ? 'bg-[#1A1816] text-white dark:bg-[#F3EFE6] dark:text-[#141210]'
+                      : 'border border-[#DCD6CB] bg-white text-[#4B453E] dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#C4BCB0]'
                   }`}
                 >
                   {n}
@@ -202,7 +202,7 @@ export function AlbumCuratorModal({
           <div>
             <div className="relative">
               <Search
-                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8C857B]"
+                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8C857B] dark:text-[#9A9184]"
                 aria-hidden="true"
               />
               <input
@@ -211,7 +211,7 @@ export function AlbumCuratorModal({
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="搜索馆藏自由勾选入册…"
                 aria-label="搜索馆藏勾选入册"
-                className="h-11 w-full rounded-xl border border-[#DCD6CB] bg-white pl-9 pr-3 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:text-sm"
+                className="h-11 w-full rounded-xl border border-[#DCD6CB] bg-white pl-9 pr-3 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:text-sm dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:placeholder:text-[#8E8578] dark:focus:border-[#D4AF6A]"
               />
             </div>
 
@@ -233,8 +233,8 @@ export function AlbumCuratorModal({
                     onClick={() => toggleManualId(it.id)}
                     className={`flex w-full items-center gap-3 rounded-2xl border p-2.5 text-left transition-colors cursor-pointer ${
                       checked
-                        ? 'border-[#1A1816] bg-[#FFFDF9]'
-                        : 'border-[#E4DFD5] bg-white'
+                        ? 'border-[#1A1816] bg-[#FFFDF9] dark:border-[#D4AF6A] dark:bg-[#24201B]'
+                        : 'border-[#E4DFD5] bg-white dark:border-[#322D27] dark:bg-[#1D1A17]'
                     }`}
                   >
                     <ArchivalImage
@@ -246,10 +246,10 @@ export function AlbumCuratorModal({
                       className="h-12 w-9 shrink-0 rounded-lg"
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-editorial text-[15px] font-medium text-[#1A1816]">
+                      <p className="truncate font-editorial text-[15px] font-medium text-[#1A1816] dark:text-[#F3EFE6]">
                         {it.title}
                       </p>
-                      <p className="truncate font-mono text-[11px] text-[#7A7268] tabular-nums">
+                      <p className="truncate font-mono text-[11px] text-[#7A7268] tabular-nums dark:text-[#A59D90]">
                         {CATEGORY_LABELS[it.category]}
                         {it.year ? ` · ${it.year}` : ''}
                         {isTagMatched && !isManual ? ' · 由标签自动收录' : ''}
@@ -259,7 +259,7 @@ export function AlbumCuratorModal({
                       className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border ${
                         checked
                           ? 'border-[#B43B2B] bg-[#B43B2B] text-white'
-                          : 'border-[#D3CCC0] bg-[#FAF9F6] text-transparent'
+                          : 'border-[#D3CCC0] bg-[#FAF9F6] text-transparent dark:border-[#4A433A] dark:bg-[#24201C]'
                       }`}
                     >
                       <Check className="h-4 w-4" aria-hidden="true" />
@@ -272,7 +272,7 @@ export function AlbumCuratorModal({
         </div>
 
         {/* Sticky Footer */}
-        <div className="flex items-center gap-2 border-t border-[#E4DFD5] bg-white px-4 py-3 pb-[calc(0.9rem+env(safe-area-inset-bottom))] min-[420px]:px-5">
+        <div className="flex items-center gap-2 border-t border-[#E4DFD5] bg-white px-4 py-3 pb-[calc(0.9rem+env(safe-area-inset-bottom))] min-[420px]:px-5 dark:border-[#2E2924] dark:bg-[#191613]">
           {onExportAlbumPoster && resolvedMatched.length > 0 && (
             <button
               type="button"
@@ -280,9 +280,9 @@ export function AlbumCuratorModal({
                 onClose();
                 onExportAlbumPoster(previewAlbum, resolvedMatched);
               }}
-              className="inline-flex h-12 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-xs font-medium text-[#1A1816] whitespace-nowrap cursor-pointer"
+              className="inline-flex h-12 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-xs font-medium text-[#1A1816] whitespace-nowrap cursor-pointer dark:border-[#3A342D] dark:bg-[#24201C] dark:text-[#F3EFE6] dark:hover:border-[#D4AF6A]"
             >
-              <Grid3x3 className="h-4 w-4 text-[#A67C37]" aria-hidden="true" />
+              <Grid3x3 className="h-4 w-4 text-[#A67C37] dark:text-[#E4C37A]" aria-hidden="true" />
               <span>导出海报墙</span>
             </button>
           )}

@@ -285,32 +285,32 @@ export function ShowcaseCustomizerModal({
       aria-modal="true"
       aria-labelledby="showcase-customizer-title"
       data-testid="showcase-customizer-modal"
-      className="encounter-backdrop-in fixed inset-0 z-[70] flex items-end justify-center bg-[#141210]/70 backdrop-blur-xs md:items-center md:p-6"
+      className="encounter-backdrop-in fixed inset-0 z-[70] flex items-end justify-center bg-[#141210]/70 backdrop-blur-xs md:items-center md:p-6 dark:bg-black/80"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <form
         onSubmit={handleSubmit}
-        className="drawer-panel-in flex max-h-[92dvh] w-full max-w-[600px] flex-col overflow-hidden rounded-t-3xl bg-[#F7F5F0] shadow-2xl md:rounded-3xl"
+        className="drawer-panel-in flex max-h-[92dvh] w-full max-w-[600px] flex-col overflow-hidden rounded-t-3xl bg-[#F7F5F0] shadow-2xl md:rounded-3xl dark:border dark:border-[#322D27] dark:bg-[#141210]"
       >
         <div
           className="flex justify-center pt-2.5 pb-1 md:hidden"
           aria-hidden="true"
         >
-          <div className="h-1.5 w-10 rounded-full bg-[#D3CCC0]" />
+          <div className="h-1.5 w-10 rounded-full bg-[#D3CCC0] dark:bg-[#3A342D]" />
         </div>
 
         {/* Header */}
-        <div className="flex items-center justify-between gap-2 border-b border-[#E4DFD5] px-4 py-3 min-[420px]:px-5">
+        <div className="flex items-center justify-between gap-2 border-b border-[#E4DFD5] px-4 py-3 min-[420px]:px-5 dark:border-[#2E2924] dark:bg-[#191613]">
           <div className="min-w-0">
             <h2
               id="showcase-customizer-title"
-              className="font-editorial text-[19px] font-medium text-[#1A1816]"
+              className="font-editorial text-[19px] font-medium text-[#1A1816] dark:text-[#F3EFE6]"
             >
               自定义顶栏展示区
             </h2>
-            <p className="mt-0.5 text-xs text-[#7A7268]">
+            <p className="mt-0.5 text-xs text-[#7A7268] dark:text-[#9E9588]">
               自由更换藏馆顶部主展位内容与右侧策展模块
             </p>
           </div>
@@ -318,18 +318,18 @@ export function ShowcaseCustomizerModal({
             type="button"
             onClick={onClose}
             aria-label="关闭顶栏展示区设置"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[#625C54] hover:bg-[#EAE4D9] cursor-pointer"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[#625C54] hover:bg-[#EAE4D9] cursor-pointer dark:text-[#A59D90] dark:hover:bg-[#28241F] dark:hover:text-[#F3EFE6]"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Section Switcher */}
-        <div className="border-b border-[#E4DFD5] bg-[#FAF8F3] px-4 py-2.5 min-[420px]:px-5">
+        <div className="border-b border-[#E4DFD5] bg-[#FAF8F3] px-4 py-2.5 min-[420px]:px-5 dark:border-[#2E2924] dark:bg-[#181512]">
           <div
             role="tablist"
             aria-label="展示区设置分区"
-            className="grid grid-cols-2 gap-1 rounded-xl bg-[#ECE8DF] p-1"
+            className="grid grid-cols-2 gap-1 rounded-xl bg-[#ECE8DF] p-1 dark:bg-[#231F1B]"
           >
             <button
               type="button"
@@ -339,8 +339,8 @@ export function ShowcaseCustomizerModal({
               onClick={() => setSectionTab('primary')}
               className={`min-h-[38px] rounded-lg px-3 text-xs font-medium whitespace-nowrap cursor-pointer transition-colors ${
                 sectionTab === 'primary'
-                  ? 'bg-white text-[#1A1816] shadow-xs'
-                  : 'text-[#625C54] hover:text-[#1A1816]'
+                  ? 'bg-white text-[#1A1816] shadow-xs dark:bg-[#353029] dark:text-[#F5F1E8]'
+                  : 'text-[#625C54] hover:text-[#1A1816] dark:text-[#9E9588] dark:hover:text-[#F3EFE6]'
               }`}
             >
               左侧主展位 · {PRIMARY_MODE_META[primaryMode].label}
@@ -353,8 +353,8 @@ export function ShowcaseCustomizerModal({
               onClick={() => setSectionTab('secondary')}
               className={`min-h-[38px] rounded-lg px-3 text-xs font-medium whitespace-nowrap cursor-pointer transition-colors ${
                 sectionTab === 'secondary'
-                  ? 'bg-white text-[#1A1816] shadow-xs'
-                  : 'text-[#625C54] hover:text-[#1A1816]'
+                  ? 'bg-white text-[#1A1816] shadow-xs dark:bg-[#353029] dark:text-[#F5F1E8]'
+                  : 'text-[#625C54] hover:text-[#1A1816] dark:text-[#9E9588] dark:hover:text-[#F3EFE6]'
               }`}
             >
               右侧展位 · {SECONDARY_MODE_META[secondaryMode].label}
@@ -368,7 +368,7 @@ export function ShowcaseCustomizerModal({
             <div
               role="alert"
               data-testid="showcase-validation-error"
-              className="rounded-xl border border-[#E5BFB9] bg-[#FDF4F2] px-3.5 py-2.5 text-xs font-medium text-[#B43B2B]"
+              className="rounded-xl border border-[#E5BFB9] bg-[#FDF4F2] px-3.5 py-2.5 text-xs font-medium text-[#B43B2B] dark:border-[#6B3229] dark:bg-[#351B17] dark:text-[#F28C7B]"
             >
               {errorMsg}
             </div>
@@ -378,7 +378,7 @@ export function ShowcaseCustomizerModal({
             <>
               {/* Primary Mode Grid */}
               <div>
-                <p className="text-xs font-medium text-[#4B453E]">
+                <p className="text-xs font-medium text-[#4B453E] dark:text-[#C4BCB0]">
                   选择主展位内容来源
                 </p>
                 <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -394,14 +394,14 @@ export function ShowcaseCustomizerModal({
                         onClick={() => handleSelectPrimaryMode(id)}
                         className={`flex flex-col items-start rounded-2xl border p-3 text-left transition-colors cursor-pointer ${
                           active
-                            ? 'border-[#1A1816] bg-[#1A1816] text-[#FAF7F0]'
-                            : 'border-[#E4DFD5] bg-white text-[#1A1816] hover:border-[#B4A99A]'
+                            ? 'border-[#1A1816] bg-[#1A1816] text-[#FAF7F0] dark:border-[#D4AF6A] dark:bg-[#2A241B] dark:text-[#FAF7F0]'
+                            : 'border-[#E4DFD5] bg-white text-[#1A1816] hover:border-[#B4A99A] dark:border-[#322D27] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:hover:border-[#564E44]'
                         }`}
                       >
                         <div className="flex w-full items-center justify-between gap-1">
                           <Icon
                             className={`h-4 w-4 ${
-                              active ? 'text-[#D4AF6A]' : 'text-[#8E6523]'
+                              active ? 'text-[#D4AF6A]' : 'text-[#8E6523] dark:text-[#E4C37A]'
                             }`}
                             aria-hidden="true"
                           />
@@ -417,7 +417,7 @@ export function ShowcaseCustomizerModal({
                         </span>
                         <span
                           className={`mt-0.5 text-[11px] leading-snug ${
-                            active ? 'text-[#CFC7B9]' : 'text-[#7A7268]'
+                            active ? 'text-[#CFC7B9]' : 'text-[#7A7268] dark:text-[#9E9588]'
                           }`}
                         >
                           {meta.shortDesc}
@@ -430,7 +430,7 @@ export function ShowcaseCustomizerModal({
 
               {/* Pool status note for automatic modes */}
               {(primaryMode === 'favorites' || primaryMode === 'watching') && (
-                <div className="rounded-xl border border-[#E4DFD5] bg-white px-3.5 py-2.5 text-xs text-[#625C54]">
+                <div className="rounded-xl border border-[#E4DFD5] bg-white px-3.5 py-2.5 text-xs text-[#625C54] dark:border-[#322D27] dark:bg-[#1D1A17] dark:text-[#B8AFA2]">
                   {primaryMode === 'favorites'
                     ? favoritePoolCount > 0
                       ? `当前馆内共有 ${favoritePoolCount} 件挚爱 / 高分藏品参与展示，卡片内可随时点击「换一件」切换。`
@@ -447,24 +447,24 @@ export function ShowcaseCustomizerModal({
                   <div className="flex items-center justify-between">
                     <label
                       htmlFor="showcase-pin-search"
-                      className="text-xs font-medium text-[#4B453E]"
+                      className="text-xs font-medium text-[#4B453E] dark:text-[#C4BCB0]"
                     >
                       挑选要固定展示的藏品
                     </label>
-                    <span className="font-mono text-[11px] tabular-nums text-[#8C857B]">
+                    <span className="font-mono text-[11px] tabular-nums text-[#8C857B] dark:text-[#9A9184]">
                       共 {allItems.length} 件可选
                     </span>
                   </div>
 
                   {allItems.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-[#D8D0C2] bg-white p-4 text-center text-xs text-[#7A7268]">
+                    <div className="rounded-2xl border border-dashed border-[#D8D0C2] bg-white p-4 text-center text-xs text-[#7A7268] dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#9E9588]">
                       藏馆暂时为空，可以先收录条目或切换为「自定义展签」。
                     </div>
                   ) : (
                     <>
                       <div className="relative">
                         <Search
-                          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8C857B]"
+                          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8C857B] dark:text-[#8E8578]"
                           aria-hidden="true"
                         />
                         <input
@@ -473,7 +473,7 @@ export function ShowcaseCustomizerModal({
                           value={itemSearch}
                           onChange={(e) => setItemSearch(e.target.value)}
                           placeholder="搜索片名、影人、角色或标签…"
-                          className="h-10 w-full rounded-xl border border-[#DCD6CB] bg-white pl-9 pr-3 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:text-sm"
+                          className="h-10 w-full rounded-xl border border-[#DCD6CB] bg-white pl-9 pr-3 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:text-sm dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:placeholder:text-[#7E766B] dark:focus:border-[#D4AF6A]"
                         />
                       </div>
 
@@ -492,8 +492,8 @@ export function ShowcaseCustomizerModal({
                               }}
                               className={`flex w-full items-center gap-3 rounded-2xl border p-2 text-left transition-colors cursor-pointer ${
                                 selected
-                                  ? 'border-[#1A1816] bg-[#FFFDF9]'
-                                  : 'border-[#E4DFD5] bg-white hover:border-[#B4A99A]'
+                                  ? 'border-[#1A1816] bg-[#FFFDF9] dark:border-[#D4AF6A] dark:bg-[#241E16]'
+                                  : 'border-[#E4DFD5] bg-white hover:border-[#B4A99A] dark:border-[#322D27] dark:bg-[#1D1A17] dark:hover:border-[#564E44]'
                               }`}
                             >
                               <ArchivalImage
@@ -505,10 +505,10 @@ export function ShowcaseCustomizerModal({
                                 className="h-12 w-9 shrink-0 rounded-lg"
                               />
                               <div className="min-w-0 flex-1">
-                                <p className="truncate font-editorial text-[14px] font-medium text-[#1A1816]">
+                                <p className="truncate font-editorial text-[14px] font-medium text-[#1A1816] dark:text-[#F3EFE6]">
                                   {it.title}
                                 </p>
-                                <p className="truncate font-mono text-[11px] tabular-nums text-[#7A7268]">
+                                <p className="truncate font-mono text-[11px] tabular-nums text-[#7A7268] dark:text-[#9E9588]">
                                   {CATEGORY_LABELS[it.category]}
                                   {it.year ? ` · ${it.year}` : ''}
                                   {it.rating > 0 ? ` · ${it.rating}★` : ''}
@@ -518,7 +518,7 @@ export function ShowcaseCustomizerModal({
                                 className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border ${
                                   selected
                                     ? 'border-[#B43B2B] bg-[#B43B2B] text-white'
-                                    : 'border-[#D3CCC0] bg-[#FAF9F6] text-transparent'
+                                    : 'border-[#D3CCC0] bg-[#FAF9F6] text-transparent dark:border-[#443D34] dark:bg-[#24201C]'
                                 }`}
                               >
                                 <Check className="h-3.5 w-3.5" aria-hidden="true" />
@@ -527,7 +527,7 @@ export function ShowcaseCustomizerModal({
                           );
                         })}
                         {filteredItems.length === 0 && (
-                          <p className="py-4 text-center text-xs text-[#8C857B]">
+                          <p className="py-4 text-center text-xs text-[#8C857B] dark:text-[#9A9184]">
                             未找到匹配的馆藏条目
                           </p>
                         )}
@@ -539,14 +539,14 @@ export function ShowcaseCustomizerModal({
 
               {/* Custom Exhibition Fields */}
               {primaryMode === 'custom' && (
-                <div className="space-y-3 rounded-2xl border border-[#E4DFD5] bg-white p-3.5">
+                <div className="space-y-3 rounded-2xl border border-[#E4DFD5] bg-white p-3.5 dark:border-[#322D27] dark:bg-[#1D1A17]">
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
                       <label
                         htmlFor="showcase-custom-title"
-                        className="block text-xs font-medium text-[#4B453E]"
+                        className="block text-xs font-medium text-[#4B453E] dark:text-[#C4BCB0]"
                       >
-                        展位主标题 <span className="text-[#B43B2B]">*</span>
+                        展位主标题 <span className="text-[#B43B2B] dark:text-[#EB7865]">*</span>
                       </label>
                       <input
                         id="showcase-custom-title"
@@ -559,14 +559,14 @@ export function ShowcaseCustomizerModal({
                         }}
                         placeholder="例如：我的 2026 秋季私藏影展"
                         maxLength={80}
-                        className="mt-1 h-10 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none md:text-sm"
+                        className="mt-1 h-10 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none md:text-sm dark:border-[#3A342D] dark:bg-[#141210] dark:text-[#F3EFE6] dark:placeholder:text-[#7E766B] dark:focus:border-[#D4AF6A] dark:focus:bg-[#141210]"
                       />
                     </div>
 
                     <div>
                       <label
                         htmlFor="showcase-custom-subtitle"
-                        className="block text-xs font-medium text-[#4B453E]"
+                        className="block text-xs font-medium text-[#4B453E] dark:text-[#C4BCB0]"
                       >
                         副标题 / 英文题注（可选）
                       </label>
@@ -577,7 +577,7 @@ export function ShowcaseCustomizerModal({
                         onChange={(e) => setCustomSubtitle(e.target.value)}
                         placeholder="例如：Autumn Retrospective · 1990s"
                         maxLength={100}
-                        className="mt-1 h-10 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none md:text-sm"
+                        className="mt-1 h-10 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none md:text-sm dark:border-[#3A342D] dark:bg-[#141210] dark:text-[#F3EFE6] dark:placeholder:text-[#7E766B] dark:focus:border-[#D4AF6A] dark:focus:bg-[#141210]"
                       />
                     </div>
                   </div>
@@ -587,7 +587,7 @@ export function ShowcaseCustomizerModal({
                     <div className="flex items-center justify-between gap-2">
                       <label
                         htmlFor="showcase-custom-cover"
-                        className="text-xs font-medium text-[#4B453E]"
+                        className="text-xs font-medium text-[#4B453E] dark:text-[#C4BCB0]"
                       >
                         展位封面图（上传、链接或从馆藏挑选）
                       </label>
@@ -603,16 +603,16 @@ export function ShowcaseCustomizerModal({
                           type="button"
                           onClick={() => fileInputRef.current?.click()}
                           disabled={uploadingCover}
-                          className="inline-flex min-h-[32px] items-center gap-1 rounded-lg border border-[#DCD6CB] bg-[#FAF9F6] px-2.5 text-[11px] font-medium text-[#1A1816] hover:border-[#1A1816] cursor-pointer"
+                          className="inline-flex min-h-[32px] items-center gap-1 rounded-lg border border-[#DCD6CB] bg-[#FAF9F6] px-2.5 text-[11px] font-medium text-[#1A1816] hover:border-[#1A1816] cursor-pointer dark:border-[#3A342D] dark:bg-[#24201C] dark:text-[#F3EFE6] dark:hover:border-[#D4AF6A]"
                         >
-                          <ImagePlus className="h-3.5 w-3.5 text-[#8E6523]" aria-hidden="true" />
+                          <ImagePlus className="h-3.5 w-3.5 text-[#8E6523] dark:text-[#E4C37A]" aria-hidden="true" />
                           <span>{uploadingCover ? '处理中…' : '上传图片'}</span>
                         </button>
                         {customCoverUrl && (
                           <button
                             type="button"
                             onClick={() => setCustomCoverUrl('')}
-                            className="inline-flex min-h-[32px] items-center rounded-lg px-2 text-[11px] text-[#7A7268] hover:text-[#B43B2B] cursor-pointer"
+                            className="inline-flex min-h-[32px] items-center rounded-lg px-2 text-[11px] text-[#7A7268] hover:text-[#B43B2B] cursor-pointer dark:text-[#9E9588] dark:hover:text-[#F28C7B]"
                           >
                             清除
                           </button>
@@ -621,7 +621,7 @@ export function ShowcaseCustomizerModal({
                     </div>
 
                     <div className="mt-1.5 flex items-center gap-2.5">
-                      <div className="h-14 w-11 shrink-0 overflow-hidden rounded-lg border border-[#E4DFD5] bg-[#1A1816]">
+                      <div className="h-14 w-11 shrink-0 overflow-hidden rounded-lg border border-[#E4DFD5] bg-[#1A1816] dark:border-[#3A342D]">
                         <ArchivalImage
                           src={customCoverUrl || undefined}
                           alt={customTitle || '展位封面预览'}
@@ -645,13 +645,13 @@ export function ShowcaseCustomizerModal({
                             ? '已使用本地上传图片（输入链接可替换）'
                             : '粘贴封面图片 URL（https://…）'
                         }
-                        className="h-10 min-w-0 flex-1 rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none md:text-sm"
+                        className="h-10 min-w-0 flex-1 rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none md:text-sm dark:border-[#3A342D] dark:bg-[#141210] dark:text-[#F3EFE6] dark:placeholder:text-[#7E766B] dark:focus:border-[#D4AF6A] dark:focus:bg-[#141210]"
                       />
                     </div>
 
                     {itemsWithCovers.length > 0 && (
                       <div className="mt-2">
-                        <span className="text-[11px] text-[#8C857B]">
+                        <span className="text-[11px] text-[#8C857B] dark:text-[#9A9184]">
                           从馆藏快速借用封面：
                         </span>
                         <div className="h-scroll-rail no-scrollbar mt-1.5 flex gap-2 pb-1">
@@ -690,7 +690,7 @@ export function ShowcaseCustomizerModal({
                     <div>
                       <label
                         htmlFor="showcase-custom-link-item"
-                        className="block text-xs font-medium text-[#4B453E]"
+                        className="block text-xs font-medium text-[#4B453E] dark:text-[#C4BCB0]"
                       >
                         关联跳转藏品（可选）
                       </label>
@@ -698,7 +698,7 @@ export function ShowcaseCustomizerModal({
                         id="showcase-custom-link-item"
                         value={customLinkItemId}
                         onChange={(e) => setCustomLinkItemId(e.target.value)}
-                        className="mt-1 h-10 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none md:text-sm"
+                        className="mt-1 h-10 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none md:text-sm dark:border-[#3A342D] dark:bg-[#141210] dark:text-[#F3EFE6] dark:focus:border-[#D4AF6A] dark:focus:bg-[#141210]"
                       >
                         <option value="">不关联具体藏品（纯主题展签）</option>
                         {allItems.map((it) => (
@@ -713,11 +713,11 @@ export function ShowcaseCustomizerModal({
               )}
 
               {/* Shared Optional Custom Label & Quote Override */}
-              <div className="space-y-3 rounded-2xl border border-[#E4DFD5] bg-white p-3.5">
+              <div className="space-y-3 rounded-2xl border border-[#E4DFD5] bg-white p-3.5 dark:border-[#322D27] dark:bg-[#1D1A17]">
                 <div>
                   <label
                     htmlFor="showcase-custom-label"
-                    className="block text-xs font-medium text-[#4B453E]"
+                    className="block text-xs font-medium text-[#4B453E] dark:text-[#C4BCB0]"
                   >
                     展签角标文字（可选，留空使用默认）
                   </label>
@@ -729,14 +729,14 @@ export function ShowcaseCustomizerModal({
                     onChange={(e) => setCustomLabel(e.target.value)}
                     placeholder={`默认：${PRIMARY_MODE_META[primaryMode].defaultBadge}`}
                     maxLength={24}
-                    className="mt-1 h-10 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none md:text-sm"
+                    className="mt-1 h-10 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none md:text-sm dark:border-[#3A342D] dark:bg-[#141210] dark:text-[#F3EFE6] dark:placeholder:text-[#7E766B] dark:focus:border-[#D4AF6A] dark:focus:bg-[#141210]"
                   />
                 </div>
 
                 <div>
                   <label
                     htmlFor="showcase-custom-quote"
-                    className="block text-xs font-medium text-[#4B453E]"
+                    className="block text-xs font-medium text-[#4B453E] dark:text-[#C4BCB0]"
                   >
                     {primaryMode === 'custom'
                       ? '展位寄语 / 导语'
@@ -750,7 +750,7 @@ export function ShowcaseCustomizerModal({
                     onChange={(e) => setCustomQuote(e.target.value)}
                     placeholder="写一句想在藏馆首页抬头看见的话、台词或策展导语…"
                     maxLength={240}
-                    className="mt-1 w-full resize-none rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3 py-2 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none md:text-sm"
+                    className="mt-1 w-full resize-none rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3 py-2 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none md:text-sm dark:border-[#3A342D] dark:bg-[#141210] dark:text-[#F3EFE6] dark:placeholder:text-[#7E766B] dark:focus:border-[#D4AF6A] dark:focus:bg-[#141210]"
                   />
                 </div>
               </div>
@@ -758,7 +758,7 @@ export function ShowcaseCustomizerModal({
           ) : (
             /* Right Secondary Panel Selector */
             <div className="space-y-2.5">
-              <p className="text-xs font-medium text-[#4B453E]">
+              <p className="text-xs font-medium text-[#4B453E] dark:text-[#C4BCB0]">
                 选择顶栏右侧展示模块
               </p>
               {SECONDARY_MODES.map(({ id, icon: Icon }) => {
@@ -781,31 +781,31 @@ export function ShowcaseCustomizerModal({
                     onClick={() => setSecondaryMode(id)}
                     className={`flex w-full items-center gap-3.5 rounded-2xl border p-3.5 text-left transition-colors cursor-pointer ${
                       active
-                        ? 'border-[#1A1816] bg-[#FFFDF9]'
-                        : 'border-[#E4DFD5] bg-white hover:border-[#B4A99A]'
+                        ? 'border-[#1A1816] bg-[#FFFDF9] dark:border-[#D4AF6A] dark:bg-[#241E16]'
+                        : 'border-[#E4DFD5] bg-white hover:border-[#B4A99A] dark:border-[#322D27] dark:bg-[#1D1A17] dark:hover:border-[#564E44]'
                     }`}
                   >
                     <span
                       className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
                         active
-                          ? 'bg-[#1A1816] text-[#D4AF6A]'
-                          : 'bg-[#F3EFE8] text-[#625C54]'
+                          ? 'bg-[#1A1816] text-[#D4AF6A] dark:bg-[#352C1F] dark:text-[#E4C37A]'
+                          : 'bg-[#F3EFE8] text-[#625C54] dark:bg-[#24201C] dark:text-[#A59D90]'
                       }`}
                     >
                       <Icon className="h-4 w-4" aria-hidden="true" />
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-editorial text-[15px] font-medium text-[#1A1816]">
+                        <span className="font-editorial text-[15px] font-medium text-[#1A1816] dark:text-[#F3EFE6]">
                           {meta.label}
                         </span>
                         {extraHint && (
-                          <span className="font-mono text-[11px] tabular-nums text-[#8C857B]">
+                          <span className="font-mono text-[11px] tabular-nums text-[#8C857B] dark:text-[#9A9184]">
                             · {extraHint}
                           </span>
                         )}
                       </div>
-                      <p className="mt-0.5 text-xs text-[#6E665C]">
+                      <p className="mt-0.5 text-xs text-[#6E665C] dark:text-[#9E9588]">
                         {meta.shortDesc}
                       </p>
                     </div>
@@ -813,7 +813,7 @@ export function ShowcaseCustomizerModal({
                       className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border ${
                         active
                           ? 'border-[#B43B2B] bg-[#B43B2B] text-white'
-                          : 'border-[#D3CCC0] bg-[#FAF9F6] text-transparent'
+                          : 'border-[#D3CCC0] bg-[#FAF9F6] text-transparent dark:border-[#443D34] dark:bg-[#24201C]'
                       }`}
                     >
                       <Check className="h-3.5 w-3.5" aria-hidden="true" />
@@ -826,13 +826,13 @@ export function ShowcaseCustomizerModal({
         </div>
 
         {/* Sticky Footer */}
-        <div className="flex items-center gap-2.5 border-t border-[#E4DFD5] bg-white px-4 py-3 pb-[calc(0.9rem+env(safe-area-inset-bottom))] min-[420px]:px-5">
+        <div className="flex items-center gap-2.5 border-t border-[#E4DFD5] bg-white px-4 py-3 pb-[calc(0.9rem+env(safe-area-inset-bottom))] min-[420px]:px-5 dark:border-[#2E2924] dark:bg-[#191613]">
           <button
             type="button"
             data-testid="showcase-reset-btn"
             disabled={isDraftDefault}
             onClick={handleResetToDefault}
-            className="inline-flex h-12 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-xs font-medium text-[#4B453E] whitespace-nowrap cursor-pointer transition-colors hover:border-[#1A1816] hover:text-[#1A1816] disabled:opacity-40"
+            className="inline-flex h-12 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-xs font-medium text-[#4B453E] whitespace-nowrap cursor-pointer transition-colors hover:border-[#1A1816] hover:text-[#1A1816] disabled:opacity-40 dark:border-[#3A342D] dark:bg-[#24201C] dark:text-[#C4BCB0] dark:hover:border-[#D4AF6A] dark:hover:text-[#F3EFE6]"
           >
             <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
             <span>恢复默认</span>

@@ -478,7 +478,7 @@ export function CollectorSpotlightRail({
         {showSecondary && (
           <div
             onPointerMove={handleCardPointerMove}
-            className="showcase-card-warm showcase-card-warm-light flex flex-col justify-between rounded-[22px] border border-[#E6E0D4] p-4 min-[420px]:p-5 lg:col-span-5"
+            className="showcase-card-warm showcase-card-warm-light flex flex-col justify-between rounded-[22px] border border-[#E6E0D4] p-4 min-[420px]:p-5 lg:col-span-5 dark:border-[#322D27]"
             data-testid="collector-albums-section"
             data-secondary-mode={showcaseConfig.secondaryMode}
           >
@@ -487,14 +487,14 @@ export function CollectorSpotlightRail({
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5">
                     <BookOpen
-                      className="h-4 w-4 text-[#8E6523]"
+                      className="h-4 w-4 text-[#8E6523] dark:text-[#E4C37A]"
                       aria-hidden="true"
                     />
-                    <h3 className="font-editorial text-[16px] font-medium text-[#1A1816] md:text-[15px]">
+                    <h3 className="font-editorial text-[16px] font-medium text-[#1A1816] md:text-[15px] dark:text-[#F3EFE6]">
                       专题图鉴册
                     </h3>
                     {collector.albums.length > 0 && (
-                      <span className="font-mono text-[11px] tabular-nums text-[#8C857B]">
+                      <span className="font-mono text-[11px] tabular-nums text-[#8C857B] dark:text-[#9A9184]">
                         {collector.albums.length}
                       </span>
                     )}
@@ -504,7 +504,7 @@ export function CollectorSpotlightRail({
                     <button
                       type="button"
                       onClick={() => setShowCreateAlbum((v) => !v)}
-                      className="inline-flex min-h-[36px] items-center gap-1 rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3 text-xs font-medium text-[#1A1816] whitespace-nowrap cursor-pointer transition-colors hover:border-[#1A1816] hover:bg-white active:scale-[0.97]"
+                      className="inline-flex min-h-[36px] items-center gap-1 rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3 text-xs font-medium text-[#1A1816] whitespace-nowrap cursor-pointer transition-colors hover:border-[#1A1816] hover:bg-white active:scale-[0.97] dark:border-[#3A342D] dark:bg-[#25211D] dark:text-[#F3EFE6] dark:hover:border-[#D4AF6A] dark:hover:bg-[#2C2721]"
                     >
                       {showCreateAlbum ? (
                         <>
@@ -513,7 +513,7 @@ export function CollectorSpotlightRail({
                         </>
                       ) : (
                         <>
-                          <Plus className="h-3.5 w-3.5 text-[#B43B2B]" aria-hidden="true" />
+                          <Plus className="h-3.5 w-3.5 text-[#B43B2B] dark:text-[#EB7865]" aria-hidden="true" />
                           <span>新建图鉴</span>
                         </>
                       )}
@@ -524,7 +524,7 @@ export function CollectorSpotlightRail({
                       onClick={() => onOpenShowcaseCustomizer('secondary')}
                       aria-label="更换右侧展示模块"
                       title="更换右侧模块"
-                      className="flex h-9 w-9 items-center justify-center rounded-xl text-[#625C54] hover:bg-[#EFECE5] hover:text-[#1A1816] cursor-pointer"
+                      className="flex h-9 w-9 items-center justify-center rounded-xl text-[#625C54] hover:bg-[#EFECE5] hover:text-[#1A1816] cursor-pointer dark:text-[#A59D90] dark:hover:bg-[#2A2520] dark:hover:text-[#F3EFE6]"
                     >
                       <SlidersHorizontal className="h-3.5 w-3.5" />
                     </button>
@@ -536,12 +536,12 @@ export function CollectorSpotlightRail({
                   <form
                     onSubmit={handleSubmitAlbum}
                     data-testid="create-album-form"
-                    className="mt-3 space-y-3 rounded-2xl border border-[#E4DFD5] bg-[#FAF9F6] p-3.5"
+                    className="mt-3 space-y-3 rounded-2xl border border-[#E4DFD5] bg-[#FAF9F6] p-3.5 dark:border-[#342E27] dark:bg-[#24201B]"
                   >
                     <div>
                       <label
                         htmlFor="album-name-input"
-                        className="block text-xs font-medium text-[#4B453E]"
+                        className="block text-xs font-medium text-[#4B453E] dark:text-[#C4BCB0]"
                       >
                         图鉴册名称
                       </label>
@@ -554,10 +554,10 @@ export function CollectorSpotlightRail({
                           if (albumError) setAlbumError('');
                         }}
                         placeholder="例如：港片黄金年代、宫崎骏全集"
-                        className="mt-1 h-10 w-full rounded-xl border border-[#DCD6CB] bg-white px-3 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:text-sm"
+                        className="mt-1 h-10 w-full rounded-xl border border-[#DCD6CB] bg-white px-3 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:text-sm dark:border-[#3E3830] dark:bg-[#181512] dark:text-[#F3EFE6] dark:placeholder:text-[#8E8578] dark:focus:border-[#D4AF6A]"
                       />
                       {albumError && (
-                        <p role="alert" className="mt-1 text-xs text-[#B43B2B]">
+                        <p role="alert" className="mt-1 text-xs text-[#B43B2B] dark:text-[#F28C7B]">
                           {albumError}
                         </p>
                       )}
@@ -566,7 +566,7 @@ export function CollectorSpotlightRail({
                     <div>
                       <label
                         htmlFor="album-tag-input"
-                        className="block text-xs font-medium text-[#4B453E]"
+                        className="block text-xs font-medium text-[#4B453E] dark:text-[#C4BCB0]"
                       >
                         关联标签（自动收纳入册）
                       </label>
@@ -576,7 +576,7 @@ export function CollectorSpotlightRail({
                         value={albumTag}
                         onChange={(e) => setAlbumTag(e.target.value)}
                         placeholder="例如：港片美学"
-                        className="mt-1 h-10 w-full rounded-xl border border-[#DCD6CB] bg-white px-3 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:text-sm"
+                        className="mt-1 h-10 w-full rounded-xl border border-[#DCD6CB] bg-white px-3 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:text-sm dark:border-[#3E3830] dark:bg-[#181512] dark:text-[#F3EFE6] dark:placeholder:text-[#8E8578] dark:focus:border-[#D4AF6A]"
                       />
                       {tagRegistry.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-1.5">
@@ -592,8 +592,8 @@ export function CollectorSpotlightRail({
                               }}
                               className={`min-h-[32px] rounded-lg border px-2.5 text-xs cursor-pointer transition-colors ${
                                 albumTag === t.name
-                                  ? 'border-[#1A1816] bg-[#1A1816] text-white'
-                                  : 'border-[#DCD6CB] bg-white text-[#4B453E] hover:border-[#1A1816]'
+                                  ? 'border-[#1A1816] bg-[#1A1816] text-white dark:border-[#F3EFE6] dark:bg-[#F3EFE6] dark:text-[#141210]'
+                                  : 'border-[#DCD6CB] bg-white text-[#4B453E] hover:border-[#1A1816] dark:border-[#3E3830] dark:bg-[#1D1A17] dark:text-[#C4BCB0] dark:hover:border-[#D4AF6A]'
                               }`}
                             >
                               {t.name} ({t.count})
@@ -604,7 +604,7 @@ export function CollectorSpotlightRail({
                     </div>
 
                     <div>
-                      <span className="block text-xs font-medium text-[#4B453E]">
+                      <span className="block text-xs font-medium text-[#4B453E] dark:text-[#C4BCB0]">
                         集齐目标件数
                       </span>
                       <div className="mt-1 grid grid-cols-5 gap-1.5">
@@ -616,8 +616,8 @@ export function CollectorSpotlightRail({
                             onClick={() => setAlbumTarget(num)}
                             className={`min-h-[36px] rounded-xl font-mono text-xs font-medium tabular-nums cursor-pointer transition-colors ${
                               albumTarget === num
-                                ? 'bg-[#1A1816] text-white'
-                                : 'border border-[#DCD6CB] bg-white text-[#4B453E] hover:border-[#1A1816]'
+                                ? 'bg-[#1A1816] text-white dark:bg-[#F3EFE6] dark:text-[#141210]'
+                                : 'border border-[#DCD6CB] bg-white text-[#4B453E] hover:border-[#1A1816] dark:border-[#3E3830] dark:bg-[#1D1A17] dark:text-[#C4BCB0] dark:hover:border-[#D4AF6A]'
                             }`}
                           >
                             {num}件
@@ -659,10 +659,10 @@ export function CollectorSpotlightRail({
                             collector.albums.length === 1 ? 'w-full' : 'w-[272px] lg:w-full'
                           } shrink-0 rounded-2xl border p-3.5 transition-colors ${
                             isActive
-                              ? 'border-[#1A1816] bg-[#FAF8F3]/78'
+                              ? 'border-[#1A1816] bg-[#FAF8F3]/78 dark:border-[#D4AF6A] dark:bg-[#28231B]'
                               : isComplete
-                                ? 'border-[#C9A45C]/80 bg-[#FDFBF5]/80'
-                                : 'border-[#ECE6DA] bg-[#FAF9F6]/76'
+                                ? 'border-[#C9A45C]/80 bg-[#FDFBF5]/80 dark:border-[#C9A45C]/55 dark:bg-[#262118]'
+                                : 'border-[#ECE6DA] bg-[#FAF9F6]/76 dark:border-[#322D27] dark:bg-[#231F1B]'
                           }`}
                         >
                           <div className="flex items-start justify-between gap-2">
@@ -671,10 +671,10 @@ export function CollectorSpotlightRail({
                               onClick={() => onSelectAlbum(isActive ? '' : album.id)}
                               className="min-w-0 flex-1 text-left cursor-pointer"
                             >
-                              <p className="truncate font-editorial text-[15px] font-medium text-[#1A1816]">
+                              <p className="truncate font-editorial text-[15px] font-medium text-[#1A1816] dark:text-[#F3EFE6]">
                                 {album.name}
                               </p>
-                              <p className="mt-0.5 font-mono text-[11px] tabular-nums text-[#7A7268]">
+                              <p className="mt-0.5 font-mono text-[11px] tabular-nums text-[#7A7268] dark:text-[#9E9588]">
                                 {filledCount} / {targetCount} 件
                                 {isComplete
                                   ? ' · 已集齐'
@@ -689,7 +689,7 @@ export function CollectorSpotlightRail({
                                   onClick={() => onEditAlbum(album)}
                                   aria-label={`自由选片编辑「${album.name}」`}
                                   title="自由选片"
-                                  className="flex h-8 w-8 items-center justify-center rounded-lg text-[#625C54] hover:bg-[#EFECE5] hover:text-[#1A1816] cursor-pointer"
+                                  className="flex h-8 w-8 items-center justify-center rounded-lg text-[#625C54] hover:bg-[#EFECE5] hover:text-[#1A1816] cursor-pointer dark:text-[#A59D90] dark:hover:bg-[#312C25] dark:hover:text-[#F3EFE6]"
                                 >
                                   <SlidersHorizontal className="h-3.5 w-3.5" />
                                 </button>
@@ -700,7 +700,7 @@ export function CollectorSpotlightRail({
                                   onClick={() => onExportAlbumPoster(album, matched)}
                                   aria-label={`导出「${album.name}」海报墙`}
                                   title="导出海报墙"
-                                  className="flex h-8 w-8 items-center justify-center rounded-lg text-[#8E6523] hover:bg-[#EFECE5] cursor-pointer"
+                                  className="flex h-8 w-8 items-center justify-center rounded-lg text-[#8E6523] hover:bg-[#EFECE5] cursor-pointer dark:text-[#E4C37A] dark:hover:bg-[#312C25]"
                                 >
                                   <Grid3x3 className="h-3.5 w-3.5" />
                                 </button>
@@ -709,7 +709,7 @@ export function CollectorSpotlightRail({
                                 type="button"
                                 onClick={() => void onDeleteAlbum(album.id)}
                                 aria-label={`删除图鉴册「${album.name}」`}
-                                className="flex h-8 w-8 items-center justify-center rounded-lg text-[#8C857B] hover:bg-[#EFECE5] hover:text-[#B43B2B] cursor-pointer"
+                                className="flex h-8 w-8 items-center justify-center rounded-lg text-[#8C857B] hover:bg-[#EFECE5] hover:text-[#B43B2B] cursor-pointer dark:text-[#9A9184] dark:hover:bg-[#312C25] dark:hover:text-[#F28C7B]"
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
                               </button>
@@ -728,7 +728,7 @@ export function CollectorSpotlightRail({
                               aria-valuemin={0}
                               aria-valuemax={100}
                               aria-valuetext={`${percent}%，已收集 ${filledCount} / ${targetCount} 件`}
-                              className="h-2 flex-1 overflow-hidden rounded-full bg-[#E8E2D7]"
+                              className="h-2 flex-1 overflow-hidden rounded-full bg-[#E8E2D7] dark:bg-[#322D27]"
                             >
                               <div
                                 className={`h-full rounded-full transition-all duration-300 ${
@@ -744,7 +744,9 @@ export function CollectorSpotlightRail({
                             <span
                               data-testid={`album-progress-percent-${album.id}`}
                               className={`shrink-0 font-mono text-[12px] font-medium tabular-nums whitespace-nowrap ${
-                                isComplete ? 'text-[#7D571B]' : 'text-[#4B453E]'
+                                isComplete
+                                  ? 'text-[#7D571B] dark:text-[#E4C37A]'
+                                  : 'text-[#4B453E] dark:text-[#C4BCB0]'
                               }`}
                             >
                               {percent}%
@@ -759,7 +761,7 @@ export function CollectorSpotlightRail({
                                 type="button"
                                 onClick={() => onOpenDetail(it)}
                                 aria-label={`查看图鉴藏品「${it.title}」`}
-                                className="overflow-hidden rounded-[10px] border border-[#E4DFD5] bg-white shadow-[0_2px_6px_-2px_rgba(24,18,12,0.16)] cursor-pointer transition-transform hover:scale-[1.03]"
+                                className="overflow-hidden rounded-[10px] border border-[#E4DFD5] bg-white shadow-[0_2px_6px_-2px_rgba(24,18,12,0.16)] cursor-pointer transition-transform hover:scale-[1.03] dark:border-[#3A342D] dark:bg-[#181512]"
                               >
                                 <ArchivalImage
                                   src={it.coverUrl}
@@ -777,7 +779,7 @@ export function CollectorSpotlightRail({
                                 type="button"
                                 onClick={() => onJumpToSearch(album.tag || album.name)}
                                 aria-label={`搜片补齐「${album.name}」空缺槽位`}
-                                className="flex aspect-[3/4] w-full items-center justify-center rounded-[10px] border border-dashed border-[#CFC7B9] bg-white/80 text-[#9C9488] hover:border-[#B43B2B] hover:text-[#B43B2B] cursor-pointer transition-colors"
+                                className="flex aspect-[3/4] w-full items-center justify-center rounded-[10px] border border-dashed border-[#CFC7B9] bg-white/80 text-[#9C9488] hover:border-[#B43B2B] hover:text-[#B43B2B] cursor-pointer transition-colors dark:border-[#433C34] dark:bg-[#191613]/80 dark:text-[#8E8578] dark:hover:border-[#E4C37A] dark:hover:text-[#E4C37A]"
                               >
                                 <Plus className="h-3.5 w-3.5" aria-hidden="true" />
                               </button>
@@ -789,12 +791,12 @@ export function CollectorSpotlightRail({
                   </div>
                 ) : (
                   !showCreateAlbum && (
-                    <div className="mt-3.5 flex flex-col justify-between gap-4 rounded-2xl border border-dashed border-[#D8D0C2] bg-[#FAF8F4]/72 p-4">
+                    <div className="mt-3.5 flex flex-col justify-between gap-4 rounded-2xl border border-dashed border-[#D8D0C2] bg-[#FAF8F4]/72 p-4 dark:border-[#3E3830] dark:bg-[#231F1B]/80">
                       <div>
-                        <p className="font-editorial text-[15px] font-medium text-[#1A1816]">
+                        <p className="font-editorial text-[15px] font-medium text-[#1A1816] dark:text-[#F3EFE6]">
                           开启你的第一本专题图鉴册
                         </p>
-                        <p className="mt-1 text-xs leading-relaxed text-[#6E665C]">
+                        <p className="mt-1 text-xs leading-relaxed text-[#6E665C] dark:text-[#A59D90]">
                           按导演、题材或标签自动归集藏品，点亮空缺槽位让每一次补片更有仪式感。
                         </p>
                       </div>
@@ -803,7 +805,7 @@ export function CollectorSpotlightRail({
                         {[0, 1, 2, 3, 4].map((slot) => (
                           <div
                             key={slot}
-                            className="flex aspect-[3/4] items-center justify-center rounded-[10px] border border-dashed border-[#D8D0C2] bg-white/70 text-[#B8AFA2]"
+                            className="flex aspect-[3/4] items-center justify-center rounded-[10px] border border-dashed border-[#D8D0C2] bg-white/70 text-[#B8AFA2] dark:border-[#433C34] dark:bg-[#1A1714]/80 dark:text-[#787064]"
                           >
                             <Plus className="h-3 w-3" />
                           </div>
@@ -820,7 +822,7 @@ export function CollectorSpotlightRail({
                               targetCount: 5,
                             })
                           }
-                          className="min-h-[40px] w-full rounded-xl bg-[#1A1816] px-4 text-xs font-medium text-white whitespace-nowrap cursor-pointer transition-colors hover:bg-[#B43B2B] active:scale-[0.98]"
+                          className="min-h-[40px] w-full rounded-xl bg-[#1A1816] px-4 text-xs font-medium text-white whitespace-nowrap cursor-pointer transition-colors hover:bg-[#B43B2B] active:scale-[0.98] dark:bg-[#F3EFE6] dark:text-[#141210] dark:hover:bg-[#E4C37A]"
                         >
                           一键创建「{quickSuggestTag.name}」图鉴
                         </button>
@@ -828,7 +830,7 @@ export function CollectorSpotlightRail({
                         <button
                           type="button"
                           onClick={() => setShowCreateAlbum(true)}
-                          className="min-h-[40px] w-full rounded-xl bg-[#1A1816] px-4 text-xs font-medium text-white whitespace-nowrap cursor-pointer transition-colors hover:bg-[#B43B2B] active:scale-[0.98]"
+                          className="min-h-[40px] w-full rounded-xl bg-[#1A1816] px-4 text-xs font-medium text-white whitespace-nowrap cursor-pointer transition-colors hover:bg-[#B43B2B] active:scale-[0.98] dark:bg-[#F3EFE6] dark:text-[#141210] dark:hover:bg-[#E4C37A]"
                         >
                           新建第一本图鉴
                         </button>
@@ -849,13 +851,13 @@ export function CollectorSpotlightRail({
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1.5">
                       <Heart
-                        className="h-4 w-4 text-[#B43B2B]"
+                        className="h-4 w-4 text-[#B43B2B] dark:text-[#EB7865]"
                         aria-hidden="true"
                       />
-                      <h3 className="font-editorial text-[16px] font-medium text-[#1A1816] md:text-[15px]">
+                      <h3 className="font-editorial text-[16px] font-medium text-[#1A1816] md:text-[15px] dark:text-[#F3EFE6]">
                         挚爱精选墙
                       </h3>
-                      <span className="font-mono text-[11px] tabular-nums text-[#8C857B]">
+                      <span className="font-mono text-[11px] tabular-nums text-[#8C857B] dark:text-[#9A9184]">
                         {secondaryFavorites.length}
                       </span>
                     </div>
@@ -864,7 +866,7 @@ export function CollectorSpotlightRail({
                         <button
                           type="button"
                           onClick={onFilterFavorites}
-                          className="inline-flex min-h-[34px] items-center rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-2.5 text-xs font-medium text-[#4B453E] whitespace-nowrap cursor-pointer hover:border-[#1A1816] hover:text-[#1A1816]"
+                          className="inline-flex min-h-[34px] items-center rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-2.5 text-xs font-medium text-[#4B453E] whitespace-nowrap cursor-pointer hover:border-[#1A1816] hover:text-[#1A1816] dark:border-[#3A342D] dark:bg-[#25211D] dark:text-[#C4BCB0] dark:hover:border-[#D4AF6A] dark:hover:text-[#F3EFE6]"
                         >
                           筛选挚爱
                         </button>
@@ -873,7 +875,7 @@ export function CollectorSpotlightRail({
                         type="button"
                         onClick={() => onOpenShowcaseCustomizer('secondary')}
                         aria-label="更换右侧展示模块"
-                        className="flex h-8 w-8 items-center justify-center rounded-lg text-[#625C54] hover:bg-[#EFECE5] hover:text-[#1A1816] cursor-pointer"
+                        className="flex h-8 w-8 items-center justify-center rounded-lg text-[#625C54] hover:bg-[#EFECE5] hover:text-[#1A1816] cursor-pointer dark:text-[#A59D90] dark:hover:bg-[#2A2520] dark:hover:text-[#F3EFE6]"
                       >
                         <SlidersHorizontal className="h-3.5 w-3.5" />
                       </button>
@@ -889,7 +891,7 @@ export function CollectorSpotlightRail({
                         aria-label={`查看挚爱藏品「${fav.title}」`}
                         className="group flex flex-col text-left cursor-pointer"
                       >
-                        <div className="overflow-hidden rounded-xl border border-[#E4DFD5] bg-white shadow-[0_2px_6px_-2px_rgba(24,18,12,0.14)]">
+                        <div className="overflow-hidden rounded-xl border border-[#E4DFD5] bg-white shadow-[0_2px_6px_-2px_rgba(24,18,12,0.14)] dark:border-[#3A342D] dark:bg-[#181512]">
                           <ArchivalImage
                             src={fav.coverUrl}
                             alt={fav.title}
@@ -900,7 +902,7 @@ export function CollectorSpotlightRail({
                             imgClassName="group-hover:scale-[1.04]"
                           />
                         </div>
-                        <span className="mt-1 truncate text-[11px] font-medium text-[#1A1816] group-hover:text-[#B43B2B]">
+                        <span className="mt-1 truncate text-[11px] font-medium text-[#1A1816] group-hover:text-[#B43B2B] dark:text-[#E5DED2] dark:group-hover:text-[#F28C7B]">
                           {fav.title}
                         </span>
                       </button>
@@ -919,13 +921,13 @@ export function CollectorSpotlightRail({
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5">
                     <Quote
-                      className="h-4 w-4 text-[#8E6523]"
+                      className="h-4 w-4 text-[#8E6523] dark:text-[#E4C37A]"
                       aria-hidden="true"
                     />
-                    <h3 className="font-editorial text-[16px] font-medium text-[#1A1816] md:text-[15px]">
+                    <h3 className="font-editorial text-[16px] font-medium text-[#1A1816] md:text-[15px] dark:text-[#F3EFE6]">
                       光影金句笺
                     </h3>
-                    <span className="font-mono text-[11px] tabular-nums text-[#8C857B]">
+                    <span className="font-mono text-[11px] tabular-nums text-[#8C857B] dark:text-[#9A9184]">
                       {secondaryQuotes.length}
                     </span>
                   </div>
@@ -935,7 +937,7 @@ export function CollectorSpotlightRail({
                         type="button"
                         data-testid="secondary-quote-next-btn"
                         onClick={() => setQuoteIdx((i) => i + 1)}
-                        className="inline-flex min-h-[34px] items-center gap-1 rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-2.5 text-xs font-medium text-[#4B453E] whitespace-nowrap cursor-pointer hover:border-[#1A1816] hover:text-[#1A1816]"
+                        className="inline-flex min-h-[34px] items-center gap-1 rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-2.5 text-xs font-medium text-[#4B453E] whitespace-nowrap cursor-pointer hover:border-[#1A1816] hover:text-[#1A1816] dark:border-[#3A342D] dark:bg-[#25211D] dark:text-[#C4BCB0] dark:hover:border-[#D4AF6A] dark:hover:text-[#F3EFE6]"
                       >
                         <RefreshCw className="h-3 w-3" aria-hidden="true" />
                         <span>换一条</span>
@@ -945,7 +947,7 @@ export function CollectorSpotlightRail({
                       type="button"
                       onClick={() => onOpenShowcaseCustomizer('secondary')}
                       aria-label="更换右侧展示模块"
-                      className="flex h-8 w-8 items-center justify-center rounded-lg text-[#625C54] hover:bg-[#EFECE5] hover:text-[#1A1816] cursor-pointer"
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-[#625C54] hover:bg-[#EFECE5] hover:text-[#1A1816] cursor-pointer dark:text-[#A59D90] dark:hover:bg-[#2A2520] dark:hover:text-[#F3EFE6]"
                     >
                       <SlidersHorizontal className="h-3.5 w-3.5" />
                     </button>
@@ -953,11 +955,11 @@ export function CollectorSpotlightRail({
                 </div>
 
                 {activeQuoteEntry ? (
-                  <div className="flex flex-1 flex-col justify-between rounded-2xl border border-[#ECE6DA] bg-[#FAF8F4]/76 p-4">
-                    <p className="font-editorial text-[16px] leading-relaxed text-[#1A1816]">
+                  <div className="flex flex-1 flex-col justify-between rounded-2xl border border-[#ECE6DA] bg-[#FAF8F4]/76 p-4 dark:border-[#322D27] dark:bg-[#231F1B]">
+                    <p className="font-editorial text-[16px] leading-relaxed text-[#1A1816] dark:text-[#F3EFE6]">
                       “{activeQuoteEntry.text}”
                     </p>
-                    <div className="mt-4 flex items-center justify-between gap-2 border-t border-[#E6E0D4] pt-3">
+                    <div className="mt-4 flex items-center justify-between gap-2 border-t border-[#E6E0D4] pt-3 dark:border-[#322D27]">
                       <button
                         type="button"
                         onClick={() => onOpenDetail(activeQuoteEntry.item)}
@@ -972,10 +974,10 @@ export function CollectorSpotlightRail({
                           className="h-10 w-8 shrink-0 rounded-md"
                         />
                         <div className="min-w-0">
-                          <p className="truncate text-xs font-medium text-[#1A1816] group-hover:text-[#B43B2B]">
+                          <p className="truncate text-xs font-medium text-[#1A1816] group-hover:text-[#B43B2B] dark:text-[#F3EFE6] dark:group-hover:text-[#F28C7B]">
                             {activeQuoteEntry.item.title}
                           </p>
-                          <p className="truncate text-[11px] text-[#7A7268]">
+                          <p className="truncate text-[11px] text-[#7A7268] dark:text-[#9E9588]">
                             {activeQuoteEntry.isQuote ? '经典台词' : '观影手记'}
                             {activeQuoteEntry.item.year
                               ? ` · ${activeQuoteEntry.item.year}`
@@ -987,7 +989,7 @@ export function CollectorSpotlightRail({
                         <button
                           type="button"
                           onClick={onOpenQuotesWall}
-                          className="shrink-0 text-xs font-medium text-[#8E6523] hover:underline whitespace-nowrap cursor-pointer"
+                          className="shrink-0 text-xs font-medium text-[#8E6523] hover:underline whitespace-nowrap cursor-pointer dark:text-[#E4C37A]"
                         >
                           全部金句
                         </button>
@@ -995,8 +997,8 @@ export function CollectorSpotlightRail({
                     </div>
                   </div>
                 ) : (
-                  <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-[#D8D0C2] bg-[#FAF8F4] p-5 text-center">
-                    <p className="text-xs text-[#6E665C]">
+                  <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-[#D8D0C2] bg-[#FAF8F4] p-5 text-center dark:border-[#3E3830] dark:bg-[#231F1B]">
+                    <p className="text-xs text-[#6E665C] dark:text-[#A59D90]">
                       还没有摘录台词或手记，打开任意藏品写下第一句金句吧。
                     </p>
                   </div>
@@ -1014,13 +1016,13 @@ export function CollectorSpotlightRail({
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1.5">
                       <Clock
-                        className="h-4 w-4 text-[#8E6523]"
+                        className="h-4 w-4 text-[#8E6523] dark:text-[#E4C37A]"
                         aria-hidden="true"
                       />
-                      <h3 className="font-editorial text-[16px] font-medium text-[#1A1816] md:text-[15px]">
+                      <h3 className="font-editorial text-[16px] font-medium text-[#1A1816] md:text-[15px] dark:text-[#F3EFE6]">
                         近期入藏
                       </h3>
-                      <span className="font-mono text-[11px] tabular-nums text-[#8C857B]">
+                      <span className="font-mono text-[11px] tabular-nums text-[#8C857B] dark:text-[#9A9184]">
                         共 {items.length} 件
                       </span>
                     </div>
@@ -1028,7 +1030,7 @@ export function CollectorSpotlightRail({
                       type="button"
                       onClick={() => onOpenShowcaseCustomizer('secondary')}
                       aria-label="更换右侧展示模块"
-                      className="flex h-8 w-8 items-center justify-center rounded-lg text-[#625C54] hover:bg-[#EFECE5] hover:text-[#1A1816] cursor-pointer"
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-[#625C54] hover:bg-[#EFECE5] hover:text-[#1A1816] cursor-pointer dark:text-[#A59D90] dark:hover:bg-[#2A2520] dark:hover:text-[#F3EFE6]"
                     >
                       <SlidersHorizontal className="h-3.5 w-3.5" />
                     </button>
@@ -1040,7 +1042,7 @@ export function CollectorSpotlightRail({
                         key={rec.id}
                         type="button"
                         onClick={() => onOpenDetail(rec)}
-                        className="flex w-full items-center gap-2.5 rounded-xl border border-[#ECE6DA] bg-[#FAF9F6]/76 p-2 text-left transition-colors hover:border-[#1A1816] cursor-pointer"
+                        className="flex w-full items-center gap-2.5 rounded-xl border border-[#ECE6DA] bg-[#FAF9F6]/76 p-2 text-left transition-colors hover:border-[#1A1816] cursor-pointer dark:border-[#322D27] dark:bg-[#231F1B] dark:hover:border-[#D4AF6A]"
                       >
                         <ArchivalImage
                           src={rec.coverUrl}
@@ -1051,10 +1053,10 @@ export function CollectorSpotlightRail({
                           className="h-10 w-8 shrink-0 rounded-md"
                         />
                         <div className="min-w-0 flex-1">
-                          <p className="truncate font-editorial text-[14px] font-medium text-[#1A1816]">
+                          <p className="truncate font-editorial text-[14px] font-medium text-[#1A1816] dark:text-[#F3EFE6]">
                             {rec.title}
                           </p>
-                          <p className="truncate font-mono text-[11px] tabular-nums text-[#7A7268]">
+                          <p className="truncate font-mono text-[11px] tabular-nums text-[#7A7268] dark:text-[#9E9588]">
                             {CATEGORY_LABELS[rec.category]}
                             {rec.year ? ` · ${rec.year}` : ''}
                             {rec.rating > 0 ? ` · ${rec.rating}★` : ''}
@@ -1065,22 +1067,22 @@ export function CollectorSpotlightRail({
                   </div>
                 </div>
 
-                <dl className="grid grid-cols-3 gap-2 border-t border-[#ECE6DA] pt-3 text-center">
+                <dl className="grid grid-cols-3 gap-2 border-t border-[#ECE6DA] pt-3 text-center dark:border-[#322D27]">
                   <div>
-                    <dt className="text-[11px] text-[#7A7268]">影视</dt>
-                    <dd className="mt-0.5 font-mono text-sm font-medium tabular-nums text-[#1A1816]">
+                    <dt className="text-[11px] text-[#7A7268] dark:text-[#9E9588]">影视</dt>
+                    <dd className="mt-0.5 font-mono text-sm font-medium tabular-nums text-[#1A1816] dark:text-[#F3EFE6]">
                       {filmCount}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-[11px] text-[#7A7268]">影人</dt>
-                    <dd className="mt-0.5 font-mono text-sm font-medium tabular-nums text-[#1A1816]">
+                    <dt className="text-[11px] text-[#7A7268] dark:text-[#9E9588]">影人</dt>
+                    <dd className="mt-0.5 font-mono text-sm font-medium tabular-nums text-[#1A1816] dark:text-[#F3EFE6]">
                       {personCount}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-[11px] text-[#7A7268]">角色</dt>
-                    <dd className="mt-0.5 font-mono text-sm font-medium tabular-nums text-[#1A1816]">
+                    <dt className="text-[11px] text-[#7A7268] dark:text-[#9E9588]">角色</dt>
+                    <dd className="mt-0.5 font-mono text-sm font-medium tabular-nums text-[#1A1816] dark:text-[#F3EFE6]">
                       {characterCount}
                     </dd>
                   </div>

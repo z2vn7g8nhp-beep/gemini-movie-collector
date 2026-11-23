@@ -153,27 +153,27 @@ export function PosterWallExportModal({
       aria-modal="true"
       aria-labelledby="poster-wall-modal-title"
       data-testid="poster-wall-modal"
-      className="encounter-backdrop-in fixed inset-0 z-[70] flex items-end justify-center bg-[#141210]/70 backdrop-blur-xs md:items-center md:p-6"
+      className="encounter-backdrop-in fixed inset-0 z-[70] flex items-end justify-center bg-[#141210]/70 backdrop-blur-xs md:items-center md:p-6 dark:bg-black/78"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="drawer-panel-in flex max-h-[92dvh] w-full max-w-[560px] flex-col overflow-hidden rounded-t-3xl bg-[#F7F5F0] shadow-2xl md:rounded-3xl">
+      <div className="drawer-panel-in flex max-h-[92dvh] w-full max-w-[560px] flex-col overflow-hidden rounded-t-3xl bg-[#F7F5F0] shadow-2xl md:rounded-3xl dark:border dark:border-[#322D27] dark:bg-[#141210]">
         {/* Mobile Handle */}
         <div className="flex justify-center pt-2.5 pb-1 md:hidden" aria-hidden="true">
-          <div className="h-1.5 w-10 rounded-full bg-[#D3CCC0]" />
+          <div className="h-1.5 w-10 rounded-full bg-[#D3CCC0] dark:bg-[#423B33]" />
         </div>
 
         {/* Header */}
-        <div className="flex items-center justify-between gap-2 border-b border-[#E4DFD5] px-4 py-3 min-[420px]:px-5">
+        <div className="flex items-center justify-between gap-2 border-b border-[#E4DFD5] px-4 py-3 min-[420px]:px-5 dark:border-[#2E2924]">
           <div className="min-w-0">
             <h2
               id="poster-wall-modal-title"
-              className="font-editorial text-[19px] font-medium text-[#1A1816]"
+              className="font-editorial text-[19px] font-medium text-[#1A1816] dark:text-[#F5F1E8]"
             >
               海报墙长图工坊
             </h2>
-            <p className="mt-0.5 text-xs text-[#7A7268] tabular-nums">
+            <p className="mt-0.5 text-xs text-[#7A7268] tabular-nums dark:text-[#A59D90]">
               已选 {selectedItems.length} / {slotLimit} 件 · 导出高清 PNG 分享
             </p>
           </div>
@@ -181,7 +181,7 @@ export function PosterWallExportModal({
             type="button"
             onClick={onClose}
             aria-label="关闭海报墙工坊"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[#625C54] hover:bg-[#EAE4D9] hover:text-[#1A1816] cursor-pointer"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[#625C54] hover:bg-[#EAE4D9] hover:text-[#1A1816] cursor-pointer dark:text-[#A59D90] dark:hover:bg-[#2A2520] dark:hover:text-[#F3EFE6]"
           >
             <X className="h-5 w-5" />
           </button>
@@ -191,20 +191,20 @@ export function PosterWallExportModal({
         <div className="flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-4 min-[420px]:px-5">
           {previewUrl ? (
             <div className="space-y-3" data-testid="poster-wall-preview-wrap">
-              <div className="overflow-hidden rounded-2xl border border-[#DFD9CD] bg-[#1C1A17] p-2 shadow-sm">
+              <div className="overflow-hidden rounded-2xl border border-[#DFD9CD] bg-[#1C1A17] p-2 shadow-sm dark:border-[#322D27]">
                 <img
                   src={previewUrl}
                   alt={`${title}海报墙预览`}
                   className="mx-auto max-h-[54dvh] w-auto rounded-xl object-contain"
                 />
               </div>
-              <p className="text-center text-xs text-[#6E665C]">
+              <p className="text-center text-xs text-[#6E665C] dark:text-[#A59D90]">
                 手机端可直接长按上方图片「存储到照片」，或点击下方按钮一键保存 / 分享
               </p>
               <button
                 type="button"
                 onClick={() => setPreviewUrl(null)}
-                className="min-h-[44px] w-full rounded-xl border border-[#DCD6CB] bg-white text-sm font-medium text-[#1A1816] cursor-pointer"
+                className="min-h-[44px] w-full rounded-xl border border-[#DCD6CB] bg-white text-sm font-medium text-[#1A1816] cursor-pointer dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:hover:border-[#D4AF6A]"
               >
                 返回调整选片与版式
               </button>
@@ -215,7 +215,7 @@ export function PosterWallExportModal({
               <div>
                 <label
                   htmlFor="poster-wall-title-input"
-                  className="block text-xs font-medium text-[#4B453E]"
+                  className="block text-xs font-medium text-[#4B453E] dark:text-[#C4BCB0]"
                 >
                   海报墙标题
                 </label>
@@ -225,25 +225,25 @@ export function PosterWallExportModal({
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="例如：我的年度十佳、王家卫私人影单"
-                  className="mt-1.5 h-11 w-full rounded-xl border border-[#DCD6CB] bg-white px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:text-sm"
+                  className="mt-1.5 h-11 w-full rounded-xl border border-[#DCD6CB] bg-white px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:text-sm dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:placeholder:text-[#8E8578] dark:focus:border-[#D4AF6A]"
                 />
               </div>
 
               {/* Layout & Theme Switchers */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <span className="block text-xs font-medium text-[#4B453E]">
+                  <span className="block text-xs font-medium text-[#4B453E] dark:text-[#C4BCB0]">
                     宫格版式
                   </span>
-                  <div className="mt-1.5 grid grid-cols-2 gap-1 rounded-xl bg-[#ECE8DF] p-1">
+                  <div className="mt-1.5 grid grid-cols-2 gap-1 rounded-xl bg-[#ECE8DF] p-1 dark:bg-[#231F1B]">
                     <button
                       type="button"
                       aria-pressed={layout === '2x2'}
                       onClick={() => handleLayoutChange('2x2')}
                       className={`inline-flex min-h-[40px] items-center justify-center gap-1 rounded-lg text-xs font-medium whitespace-nowrap cursor-pointer ${
                         layout === '2x2'
-                          ? 'bg-white text-[#1A1816] shadow-xs'
-                          : 'text-[#625C54]'
+                          ? 'bg-white text-[#1A1816] shadow-xs dark:bg-[#353029] dark:text-[#F5F1E8]'
+                          : 'text-[#625C54] dark:text-[#A89F92]'
                       }`}
                     >
                       <Grid2x2 className="h-3.5 w-3.5" aria-hidden="true" />
@@ -255,8 +255,8 @@ export function PosterWallExportModal({
                       onClick={() => handleLayoutChange('3x3')}
                       className={`inline-flex min-h-[40px] items-center justify-center gap-1 rounded-lg text-xs font-medium whitespace-nowrap cursor-pointer ${
                         layout === '3x3'
-                          ? 'bg-white text-[#1A1816] shadow-xs'
-                          : 'text-[#625C54]'
+                          ? 'bg-white text-[#1A1816] shadow-xs dark:bg-[#353029] dark:text-[#F5F1E8]'
+                          : 'text-[#625C54] dark:text-[#A89F92]'
                       }`}
                     >
                       <Grid3x3 className="h-3.5 w-3.5" aria-hidden="true" />
@@ -266,18 +266,18 @@ export function PosterWallExportModal({
                 </div>
 
                 <div>
-                  <span className="block text-xs font-medium text-[#4B453E]">
+                  <span className="block text-xs font-medium text-[#4B453E] dark:text-[#C4BCB0]">
                     纸面底色
                   </span>
-                  <div className="mt-1.5 grid grid-cols-2 gap-1 rounded-xl bg-[#ECE8DF] p-1">
+                  <div className="mt-1.5 grid grid-cols-2 gap-1 rounded-xl bg-[#ECE8DF] p-1 dark:bg-[#231F1B]">
                     <button
                       type="button"
                       aria-pressed={theme === 'ivory'}
                       onClick={() => setTheme('ivory')}
                       className={`min-h-[40px] rounded-lg text-xs font-medium whitespace-nowrap cursor-pointer ${
                         theme === 'ivory'
-                          ? 'bg-white text-[#1A1816] shadow-xs'
-                          : 'text-[#625C54]'
+                          ? 'bg-white text-[#1A1816] shadow-xs dark:bg-[#F3EFE6] dark:text-[#141210]'
+                          : 'text-[#625C54] dark:text-[#A89F92]'
                       }`}
                     >
                       象牙纸白
@@ -288,8 +288,8 @@ export function PosterWallExportModal({
                       onClick={() => setTheme('darkroom')}
                       className={`min-h-[40px] rounded-lg text-xs font-medium whitespace-nowrap cursor-pointer ${
                         theme === 'darkroom'
-                          ? 'bg-[#1C1A17] text-[#F5DC9B] shadow-xs'
-                          : 'text-[#625C54]'
+                          ? 'bg-[#1C1A17] text-[#F5DC9B] shadow-xs dark:bg-[#353029] dark:text-[#F5DC9B]'
+                          : 'text-[#625C54] dark:text-[#A89F92]'
                       }`}
                     >
                       暗房黑金
@@ -300,12 +300,12 @@ export function PosterWallExportModal({
 
               {/* Selectable Thumbnail Grid */}
               <div>
-                <div className="flex items-center justify-between text-xs text-[#625C54]">
+                <div className="flex items-center justify-between text-xs text-[#625C54] dark:text-[#A59D90]">
                   <span>点选入画藏品（按点选顺序排布）</span>
                   <button
                     type="button"
                     onClick={() => setSelectedIds([])}
-                    className="min-h-[32px] px-1.5 text-xs text-[#B43B2B] cursor-pointer"
+                    className="min-h-[32px] px-1.5 text-xs text-[#B43B2B] cursor-pointer dark:text-[#F28C7B]"
                   >
                     清空重选
                   </button>
@@ -323,8 +323,8 @@ export function PosterWallExportModal({
                         onClick={() => toggleItem(it.id)}
                         className={`relative overflow-hidden rounded-xl border p-1.5 text-left transition-all cursor-pointer active:scale-[0.97] ${
                           picked
-                            ? 'border-[#B43B2B] bg-[#FDF6F4] ring-1 ring-[#B43B2B]'
-                            : 'border-[#E4DFD5] bg-white'
+                            ? 'border-[#B43B2B] bg-[#FDF6F4] ring-1 ring-[#B43B2B] dark:border-[#D95B48] dark:bg-[#2F1A17] dark:ring-[#D95B48]'
+                            : 'border-[#E4DFD5] bg-white dark:border-[#322D27] dark:bg-[#1D1A17]'
                         }`}
                       >
                         <div className="relative">
@@ -342,10 +342,10 @@ export function PosterWallExportModal({
                             </span>
                           )}
                         </div>
-                        <p className="mt-1.5 truncate text-[12px] font-medium text-[#1A1816]">
+                        <p className="mt-1.5 truncate text-[12px] font-medium text-[#1A1816] dark:text-[#F3EFE6]">
                           {it.title}
                         </p>
-                        <p className="truncate text-[10px] text-[#8C857B]">
+                        <p className="truncate text-[10px] text-[#8C857B] dark:text-[#9A9184]">
                           {CATEGORY_LABELS[it.category]}
                           {it.year ? ` · ${it.year}` : ''}
                         </p>
@@ -356,7 +356,7 @@ export function PosterWallExportModal({
               </div>
 
               {errorMsg && (
-                <p role="alert" className="text-xs font-medium text-[#B43B2B]">
+                <p role="alert" className="text-xs font-medium text-[#B43B2B] dark:text-[#F28C7B]">
                   {errorMsg}
                 </p>
               )}
@@ -365,7 +365,7 @@ export function PosterWallExportModal({
         </div>
 
         {/* Sticky Bottom CTA */}
-        <div className="border-t border-[#E4DFD5] bg-white px-4 py-3 pb-[calc(0.9rem+env(safe-area-inset-bottom))] min-[420px]:px-5">
+        <div className="border-t border-[#E4DFD5] bg-white px-4 py-3 pb-[calc(0.9rem+env(safe-area-inset-bottom))] min-[420px]:px-5 dark:border-[#2E2924] dark:bg-[#191613]">
           {previewUrl ? (
             <button
               type="button"
@@ -386,7 +386,7 @@ export function PosterWallExportModal({
               data-testid="poster-wall-generate-btn"
               disabled={rendering || selectedItems.length === 0}
               onClick={() => void handleGenerate()}
-              className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#1A1816] text-[15px] font-medium text-white cursor-pointer active:scale-[0.98] disabled:opacity-45"
+              className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#1A1816] text-[15px] font-medium text-white cursor-pointer active:scale-[0.98] disabled:opacity-45 dark:bg-[#F3EFE6] dark:text-[#141210] dark:hover:bg-[#E4C37A]"
             >
               {rendering ? (
                 <>

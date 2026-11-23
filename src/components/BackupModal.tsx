@@ -104,21 +104,21 @@ export function BackupModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="backup-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#1A1816]/50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#1A1816]/50 p-4 dark:bg-black/75"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="w-full max-w-xl border border-[#DCD6CB] bg-[#F7F5F0] shadow-2xl">
-        <div className="flex items-center justify-between border-b border-[#E4DFD5] bg-white px-6 py-4">
+      <div className="w-full max-w-xl border border-[#DCD6CB] bg-[#F7F5F0] shadow-2xl dark:border-[#322D27] dark:bg-[#141210]">
+        <div className="flex items-center justify-between border-b border-[#E4DFD5] bg-white px-6 py-4 dark:border-[#2E2924] dark:bg-[#191613]">
           <div>
             <h2
               id="backup-modal-title"
-              className="font-editorial text-xl font-semibold text-[#1A1816]"
+              className="font-editorial text-xl font-semibold text-[#1A1816] dark:text-[#F3EFE6]"
             >
               馆藏数据备份与恢复
             </h2>
-            <p className="mt-0.5 text-xs text-[#625C54]">
+            <p className="mt-0.5 text-xs text-[#625C54] dark:text-[#9E9588]">
               {shouldUseBackendApi()
                 ? '数据已自动保存至服务端与本地浏览器，无需登录第三方账号'
                 : '数据已自动保存至当前浏览器本地存储，无需登录第三方账号，可随时导出 JSON 备份'}
@@ -128,7 +128,7 @@ export function BackupModal({
             type="button"
             onClick={onClose}
             aria-label="关闭备份窗口"
-            className="flex h-10 w-10 items-center justify-center rounded-md text-[#625C54] hover:bg-[#F3EFE8] hover:text-[#1A1816] cursor-pointer"
+            className="flex h-10 w-10 items-center justify-center rounded-md text-[#625C54] hover:bg-[#F3EFE8] hover:text-[#1A1816] cursor-pointer dark:text-[#A59D90] dark:hover:bg-[#28241F] dark:hover:text-[#F3EFE6]"
           >
             <X className="h-5 w-5" />
           </button>
@@ -136,17 +136,17 @@ export function BackupModal({
 
         <div className="space-y-6 px-6 py-6">
           {/* Export */}
-          <div className="border border-[#E4DFD5] bg-white p-5">
-            <h3 className="text-sm font-medium text-[#1A1816]">
+          <div className="border border-[#E4DFD5] bg-white p-5 dark:border-[#322D27] dark:bg-[#1D1A17]">
+            <h3 className="text-sm font-medium text-[#1A1816] dark:text-[#F3EFE6]">
               导出全部馆藏（JSON）
             </h3>
-            <p className="mt-1 text-xs leading-relaxed text-[#625C54]">
+            <p className="mt-1 text-xs leading-relaxed text-[#625C54] dark:text-[#A59D90]">
               当前共收录 <span className="font-mono tabular-nums">{items.length}</span> 件影视、影人与角色档案，导出后可在任意设备随时恢复。
             </p>
             <button
               type="button"
               onClick={handleDownloadJson}
-              className="mt-4 inline-flex min-h-[40px] items-center gap-2 rounded-md bg-[#1A1816] px-4 py-2 text-xs font-medium text-white cursor-pointer transition-colors hover:bg-[#B43B2B]"
+              className="mt-4 inline-flex min-h-[40px] items-center gap-2 rounded-md bg-[#1A1816] px-4 py-2 text-xs font-medium text-white cursor-pointer transition-colors hover:bg-[#B43B2B] dark:bg-[#F3EFE6] dark:text-[#141210] dark:hover:bg-[#E4C37A]"
             >
               <Download className="h-3.5 w-3.5" aria-hidden="true" />
               下载备份文件
@@ -154,18 +154,18 @@ export function BackupModal({
           </div>
 
           {/* Import */}
-          <div className="border border-[#E4DFD5] bg-white p-5">
-            <h3 className="text-sm font-medium text-[#1A1816]">
+          <div className="border border-[#E4DFD5] bg-white p-5 dark:border-[#322D27] dark:bg-[#1D1A17]">
+            <h3 className="text-sm font-medium text-[#1A1816] dark:text-[#F3EFE6]">
               从 JSON 备份合并导入
             </h3>
-            <p className="mt-1 text-xs leading-relaxed text-[#625C54]">
+            <p className="mt-1 text-xs leading-relaxed text-[#625C54] dark:text-[#A59D90]">
               导入时会自动按分类与名称去重，不会覆盖你当前已有的馆藏笔记。
             </p>
 
             <div className="mt-4">
               <label
                 htmlFor="backup-file-upload"
-                className="inline-flex min-h-[40px] items-center gap-2 rounded-md border border-[#DCD6CB] bg-[#F7F5F0] px-4 py-2 text-xs font-medium text-[#1A1816] cursor-pointer hover:border-[#1A1816]"
+                className="inline-flex min-h-[40px] items-center gap-2 rounded-md border border-[#DCD6CB] bg-[#F7F5F0] px-4 py-2 text-xs font-medium text-[#1A1816] cursor-pointer hover:border-[#1A1816] dark:border-[#3A342D] dark:bg-[#24201C] dark:text-[#F3EFE6] dark:hover:border-[#D4AF6A]"
               >
                 <Upload className="h-3.5 w-3.5" aria-hidden="true" />
                 选择 JSON 文件导入
@@ -182,7 +182,7 @@ export function BackupModal({
             <div className="mt-4">
               <label
                 htmlFor="backup-json-paste"
-                className="block text-xs text-[#625C54]"
+                className="block text-xs text-[#625C54] dark:text-[#A59D90]"
               >
                 或直接粘贴备份 JSON 内容
               </label>
@@ -192,7 +192,7 @@ export function BackupModal({
                 value={jsonInput}
                 onChange={(e) => setJsonInput(e.target.value)}
                 placeholder='{"items": [...]}'
-                className="mt-1.5 w-full rounded-md border border-[#DCD6CB] bg-[#FAF9F6] px-3 py-2 font-mono text-xs text-[#1A1816] focus:border-[#1A1816] focus:outline-none"
+                className="mt-1.5 w-full rounded-md border border-[#DCD6CB] bg-[#FAF9F6] px-3 py-2 font-mono text-xs text-[#1A1816] focus:border-[#1A1816] focus:outline-none dark:border-[#3A342D] dark:bg-[#141210] dark:text-[#F3EFE6] dark:placeholder:text-[#7E766B] dark:focus:border-[#D4AF6A]"
               />
               <button
                 type="button"
@@ -207,12 +207,12 @@ export function BackupModal({
 
           {/* Clear All Collection */}
           {items.length > 0 && (
-            <div className="flex flex-wrap items-center justify-between gap-3 border border-[#E4DFD5] bg-white px-5 py-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 border border-[#E4DFD5] bg-white px-5 py-4 dark:border-[#322D27] dark:bg-[#1D1A17]">
               <div>
-                <h3 className="text-sm font-medium text-[#1A1816]">
+                <h3 className="text-sm font-medium text-[#1A1816] dark:text-[#F3EFE6]">
                   清空全部馆藏
                 </h3>
-                <p className="mt-0.5 text-xs text-[#625C54]">
+                <p className="mt-0.5 text-xs text-[#625C54] dark:text-[#A59D90]">
                   清除当前所有已收录条目，建议先下载 JSON 备份。
                 </p>
               </div>
@@ -220,7 +220,7 @@ export function BackupModal({
                 <button
                   type="button"
                   onClick={() => setConfirmClearAll(true)}
-                  className="min-h-[36px] rounded-md border border-[#E5BFB9] bg-[#FDF4F2] px-3.5 py-1.5 text-xs font-medium text-[#932D20] whitespace-nowrap cursor-pointer hover:bg-[#B43B2B] hover:text-white transition-colors"
+                  className="min-h-[36px] rounded-md border border-[#E5BFB9] bg-[#FDF4F2] px-3.5 py-1.5 text-xs font-medium text-[#932D20] whitespace-nowrap cursor-pointer hover:bg-[#B43B2B] hover:text-white transition-colors dark:border-[#6B3229] dark:bg-[#351B17] dark:text-[#F28C7B] dark:hover:bg-[#B43B2B] dark:hover:text-white"
                 >
                   清空全部
                 </button>
@@ -243,7 +243,7 @@ export function BackupModal({
                   <button
                     type="button"
                     onClick={() => setConfirmClearAll(false)}
-                    className="min-h-[36px] rounded-md border border-[#DCD6CB] bg-white px-3 py-1.5 text-xs text-[#4B453E] cursor-pointer"
+                    className="min-h-[36px] rounded-md border border-[#DCD6CB] bg-white px-3 py-1.5 text-xs text-[#4B453E] cursor-pointer dark:border-[#3A342D] dark:bg-[#24201C] dark:text-[#C4BCB0]"
                   >
                     取消
                   </button>
@@ -257,8 +257,8 @@ export function BackupModal({
               role={feedback.type === 'error' ? 'alert' : 'status'}
               className={`border px-4 py-3 text-xs ${
                 feedback.type === 'error'
-                  ? 'border-[#E5BFB9] bg-[#FDF4F2] text-[#932D20]'
-                  : 'border-[#C8DFD0] bg-[#F2F7F4] text-[#2A6B46]'
+                  ? 'border-[#E5BFB9] bg-[#FDF4F2] text-[#932D20] dark:border-[#6B3229] dark:bg-[#351B17] dark:text-[#F28C7B]'
+                  : 'border-[#C8DFD0] bg-[#F2F7F4] text-[#2A6B46] dark:border-[#2B523B] dark:bg-[#172B20] dark:text-[#6CC492]'
               }`}
             >
               {feedback.message}

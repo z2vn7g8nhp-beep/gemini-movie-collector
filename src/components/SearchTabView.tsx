@@ -212,12 +212,12 @@ export function SearchTabView({
   return (
     <section className="mx-auto max-w-[1100px] px-4 pt-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] min-[420px]:px-5 md:px-8 md:pt-7 md:pb-16">
       {/* Search Card */}
-      <div className="gallery-card border border-[#E4DFD5] p-4 min-[420px]:p-5 md:p-6">
+      <div className="gallery-card border border-[#E4DFD5] p-4 min-[420px]:p-5 md:p-6 dark:border-[#322D27]">
         {/* Big touch-friendly Category Segmented Control */}
         <div
           role="group"
           aria-label="选择搜索类型"
-          className="grid grid-cols-3 gap-1 rounded-xl bg-[#EFECE5] p-1"
+          className="grid grid-cols-3 gap-1 rounded-xl bg-[#EFECE5] p-1 dark:bg-[#231F1B]"
         >
           {(['film', 'person', 'character'] as ArchiveCategory[]).map((cat) => {
             const active = category === cat;
@@ -231,8 +231,8 @@ export function SearchTabView({
                 }}
                 className={`min-h-[44px] rounded-lg text-[15px] font-medium whitespace-nowrap cursor-pointer transition-colors md:min-h-[40px] md:text-sm ${
                   active
-                    ? 'bg-white text-[#1A1816] shadow-xs'
-                    : 'text-[#625C54]'
+                    ? 'bg-white text-[#1A1816] shadow-xs dark:bg-[#353029] dark:text-[#F5F1E8]'
+                    : 'text-[#625C54] dark:text-[#A59D90] dark:hover:text-[#F3EFE6]'
                 }`}
               >
                 {CATEGORY_LABELS[cat]}
@@ -251,7 +251,7 @@ export function SearchTabView({
               直连联网搜索影视、影人或角色
             </label>
             <Search
-              className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8C857B]"
+              className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8C857B] dark:text-[#8E8578]"
               aria-hidden="true"
             />
             <input
@@ -271,7 +271,7 @@ export function SearchTabView({
                     ? '搜索导演、演员，或粘贴 IMDb（nm...）/ 豆瓣影人链接…'
                     : '搜索影视角色名（如：甄嬛、苏丽珍、小丑）…'
               }
-              className="h-12 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] pl-10 pr-10 text-[16px] text-[#1A1816] placeholder:text-[#8C857B] focus:border-[#1A1816] focus:bg-white focus:outline-none md:text-[15px] [&::-webkit-search-cancel-button]:hidden"
+              className="h-12 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] pl-10 pr-10 text-[16px] text-[#1A1816] placeholder:text-[#8C857B] focus:border-[#1A1816] focus:bg-white focus:outline-none md:text-[15px] [&::-webkit-search-cancel-button]:hidden dark:border-[#3A342D] dark:bg-[#141210] dark:text-[#F3EFE6] dark:placeholder:text-[#787066] dark:focus:border-[#D4AF6A] dark:focus:bg-[#141210]"
             />
             {query && (
               <button
@@ -282,7 +282,7 @@ export function SearchTabView({
                   inputRef.current?.focus();
                 }}
                 aria-label="清空搜索内容"
-                className="absolute right-1 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-lg text-[#625C54] cursor-pointer"
+                className="absolute right-1 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-lg text-[#625C54] hover:text-[#1A1816] cursor-pointer dark:text-[#A59D90] dark:hover:text-[#F3EFE6]"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -308,8 +308,8 @@ export function SearchTabView({
             data-testid="search-history-list"
             className="mt-3 flex flex-wrap items-center gap-2"
           >
-            <span className="inline-flex shrink-0 items-center gap-1 text-[12px] font-medium text-[#7A7268]">
-              <Clock className="h-3.5 w-3.5 text-[#8C857B]" aria-hidden="true" />
+            <span className="inline-flex shrink-0 items-center gap-1 text-[12px] font-medium text-[#7A7268] dark:text-[#A59D90]">
+              <Clock className="h-3.5 w-3.5 text-[#8C857B] dark:text-[#8E8578]" aria-hidden="true" />
               <span>历史记录</span>
             </span>
             {visibleRecentSearches.map((item) => {
@@ -321,15 +321,15 @@ export function SearchTabView({
                   data-testid="search-history-item"
                   className={`inline-flex min-h-[34px] max-w-full items-center rounded-lg border pl-2.5 pr-1 text-[13px] transition-colors md:text-xs ${
                     isCurrent
-                      ? 'border-[#C9A45C] bg-[#FDFBF5] text-[#1A1816]'
-                      : 'border-[#E6E0D4] bg-[#FAF9F6] text-[#4B453E] hover:border-[#CFC5B4] hover:bg-white'
+                      ? 'border-[#C9A45C] bg-[#FDFBF5] text-[#1A1816] dark:border-[#C9A45C]/70 dark:bg-[#241E16] dark:text-[#F5F1E8]'
+                      : 'border-[#E6E0D4] bg-[#FAF9F6] text-[#4B453E] hover:border-[#CFC5B4] hover:bg-white dark:border-[#322D27] dark:bg-[#24201C] dark:text-[#D4CCC0] dark:hover:border-[#4A4239] dark:hover:bg-[#2B2621]'
                   }`}
                 >
                   <button
                     type="button"
                     onClick={() => handleQuickPick(item)}
                     aria-label={`再次检索「${item}」`}
-                    className="max-w-[180px] truncate pr-1 text-left font-medium hover:text-[#B43B2B] cursor-pointer"
+                    className="max-w-[180px] truncate pr-1 text-left font-medium hover:text-[#B43B2B] cursor-pointer dark:hover:text-[#EB7865]"
                   >
                     {item}
                   </button>
@@ -337,7 +337,7 @@ export function SearchTabView({
                     type="button"
                     onClick={() => handleRemoveRecent(item)}
                     aria-label={`移除历史记录「${item}」`}
-                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[#9C9488] transition-colors hover:bg-[#EFECE5] hover:text-[#1A1816] cursor-pointer"
+                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[#9C9488] transition-colors hover:bg-[#EFECE5] hover:text-[#1A1816] cursor-pointer dark:text-[#8E8578] dark:hover:bg-[#353029] dark:hover:text-[#F3EFE6]"
                   >
                     <X className="h-3 w-3" aria-hidden="true" />
                   </button>
@@ -348,23 +348,23 @@ export function SearchTabView({
               type="button"
               data-testid="clear-search-history-btn"
               onClick={handleClearRecent}
-              className="ml-auto inline-flex min-h-[32px] items-center rounded-lg px-2 text-[12px] text-[#8C857B] whitespace-nowrap cursor-pointer transition-colors hover:bg-[#F3EFE8] hover:text-[#1A1816]"
+              className="ml-auto inline-flex min-h-[32px] items-center rounded-lg px-2 text-[12px] text-[#8C857B] whitespace-nowrap cursor-pointer transition-colors hover:bg-[#F3EFE8] hover:text-[#1A1816] dark:text-[#9A9184] dark:hover:bg-[#2A2520] dark:hover:text-[#F3EFE6]"
             >
               清空
             </button>
           </div>
         )}
 
-        <p className="mt-3 text-[13px] leading-relaxed text-[#7A7268] md:text-[12px]">
+        <p className="mt-3 text-[13px] leading-relaxed text-[#7A7268] md:text-[12px] dark:text-[#A59D90]">
           支持中英文片名和 IMDb / 豆瓣链接。常见影片可用内置中文片名索引查询，评分、海报与简介按联网结果显示。
         </p>
 
         {/* Curated Quick-Picks */}
         {!loading && !hasSearched && (
-          <div className="mt-4 border-t border-[#F0ECE4] pt-4">
+          <div className="mt-4 border-t border-[#F0ECE4] pt-4 dark:border-[#2E2924]">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1 text-[12px] font-medium text-[#7A7268]">
-                <Sparkles className="h-3.5 w-3.5 text-[#A67C37]" aria-hidden="true" />
+              <span className="inline-flex items-center gap-1 text-[12px] font-medium text-[#7A7268] dark:text-[#A59D90]">
+                <Sparkles className="h-3.5 w-3.5 text-[#A67C37] dark:text-[#E4C37A]" aria-hidden="true" />
                 推荐检索
               </span>
               {suggestions.map((suggestion) => (
@@ -372,7 +372,7 @@ export function SearchTabView({
                   key={`${category}-${suggestion}`}
                   type="button"
                   onClick={() => handleQuickPick(suggestion)}
-                  className="inline-flex min-h-[34px] items-center rounded-lg border border-[#E4DFD5] bg-[#FAF9F6] px-2.5 text-[13px] text-[#2E2A26] transition-colors hover:border-[#1A1816] hover:bg-white cursor-pointer md:text-xs"
+                  className="inline-flex min-h-[34px] items-center rounded-lg border border-[#E4DFD5] bg-[#FAF9F6] px-2.5 text-[13px] text-[#2E2A26] transition-colors hover:border-[#1A1816] hover:bg-white cursor-pointer md:text-xs dark:border-[#322D27] dark:bg-[#24201C] dark:text-[#E2DBD0] dark:hover:border-[#D4AF6A] dark:hover:bg-[#2B2621]"
                 >
                   {suggestion}
                 </button>
@@ -386,7 +386,7 @@ export function SearchTabView({
       {error && (
         <div
           role="alert"
-          className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-[#E5BFB9] bg-[#FDF4F2] px-4 py-3 text-[13px] text-[#932D20] md:text-xs"
+          className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-[#E5BFB9] bg-[#FDF4F2] px-4 py-3 text-[13px] text-[#932D20] md:text-xs dark:border-[#6B3229] dark:bg-[#351B17] dark:text-[#F28C7B]"
         >
           <span className="min-w-0 flex-1 break-words">{error}</span>
           {query.trim() && (
@@ -410,13 +410,13 @@ export function SearchTabView({
           {[0, 1, 2, 3].map((idx) => (
             <div
               key={idx}
-              className="flex animate-pulse gap-3.5 rounded-2xl border border-[#E4DFD5] bg-white p-4"
+              className="flex animate-pulse gap-3.5 rounded-2xl border border-[#E4DFD5] bg-white p-4 dark:border-[#322D27] dark:bg-[#1D1A17]"
             >
-              <div className="h-[104px] w-[78px] shrink-0 rounded-xl bg-[#EAE4D9]" />
+              <div className="h-[104px] w-[78px] shrink-0 rounded-xl bg-[#EAE4D9] dark:bg-[#2A2520]" />
               <div className="flex-1 space-y-2.5 py-1">
-                <div className="h-4 w-2/5 rounded bg-[#EAE4D9]" />
-                <div className="h-3 w-3/5 rounded bg-[#EFECE5]" />
-                <div className="h-3 w-full rounded bg-[#EFECE5]" />
+                <div className="h-4 w-2/5 rounded bg-[#EAE4D9] dark:bg-[#2A2520]" />
+                <div className="h-3 w-3/5 rounded bg-[#EFECE5] dark:bg-[#24201C]" />
+                <div className="h-3 w-full rounded bg-[#EFECE5] dark:bg-[#24201C]" />
               </div>
             </div>
           ))}
@@ -426,8 +426,8 @@ export function SearchTabView({
       {/* Results List */}
       {!loading && hasSearched && results.length > 0 && (
         <div data-testid="online-search-results" className="mt-5">
-          <div className="mb-3 flex items-center justify-between px-1 text-[13px] text-[#625C54] md:text-xs">
-            <span className="tabular-nums font-medium text-[#1A1816]">
+          <div className="mb-3 flex items-center justify-between px-1 text-[13px] text-[#625C54] md:text-xs dark:text-[#A59D90]">
+            <span className="tabular-nums font-medium text-[#1A1816] dark:text-[#F3EFE6]">
               检索到 {results.length} 条结果
             </span>
             {activeSources.length > 0 && (
@@ -454,7 +454,7 @@ export function SearchTabView({
               return (
                 <li
                   key={item.externalId}
-                  className="gallery-card flex flex-col justify-between border border-[#E4DFD5] p-3.5 transition-colors hover:border-[#CFC7B9] min-[420px]:p-4"
+                  className="gallery-card flex flex-col justify-between border border-[#E4DFD5] p-3.5 transition-colors hover:border-[#CFC7B9] min-[420px]:p-4 dark:border-[#322D27] dark:hover:border-[#4B4339]"
                 >
                   <div className="flex gap-3.5">
                     <ArchivalImage
@@ -463,19 +463,19 @@ export function SearchTabView({
                       title={item.title}
                       category={item.category}
                       compact
-                      className="h-[112px] w-[84px] shrink-0 rounded-xl border border-[#EAE4D9] md:h-[104px] md:w-[78px]"
+                      className="h-[112px] w-[84px] shrink-0 rounded-xl border border-[#EAE4D9] md:h-[104px] md:w-[78px] dark:border-[#322D27]"
                     />
 
                     <div className="flex min-w-0 flex-1 flex-col">
-                      <h3 className="font-editorial text-[17px] font-medium leading-snug text-[#1A1816] md:text-base">
+                      <h3 className="font-editorial text-[17px] font-medium leading-snug text-[#1A1816] md:text-base dark:text-[#F5F1E8]">
                         {item.title}
                       </h3>
                       {item.originalTitle && (
-                        <p className="mt-0.5 truncate text-[13px] text-[#7A7268] md:text-xs">
+                        <p className="mt-0.5 truncate text-[13px] text-[#7A7268] md:text-xs dark:text-[#A59D90]">
                           {item.originalTitle}
                         </p>
                       )}
-                      <p className="mt-1 truncate text-[13px] text-[#625C54] md:text-xs">
+                      <p className="mt-1 truncate text-[13px] text-[#625C54] md:text-xs dark:text-[#B8AFA2]">
                         {[
                           CATEGORY_LABELS[item.category],
                           item.year,
@@ -485,7 +485,7 @@ export function SearchTabView({
                           .filter(Boolean)
                           .join(' · ')}
                       </p>
-                      <p className="mt-1.5 line-clamp-2 text-[14px] leading-relaxed text-[#4B453E] md:text-xs">
+                      <p className="mt-1.5 line-clamp-2 text-[14px] leading-relaxed text-[#4B453E] md:text-xs dark:text-[#C8C0B4]">
                         {item.summary}
                       </p>
                       <SummarySource revision={item.summaryRevision} />
@@ -493,9 +493,9 @@ export function SearchTabView({
                   </div>
 
                   {/* Full-width thumb-friendly collect action */}
-                  <div className="mt-3 flex items-center justify-end border-t border-[#F0ECE4] pt-3">
+                  <div className="mt-3 flex items-center justify-end border-t border-[#F0ECE4] pt-3 dark:border-[#2E2924]">
                     {collected ? (
-                      <span className="inline-flex min-h-[44px] w-full sm:w-auto items-center justify-center gap-1.5 rounded-xl bg-[#F2F7F4] px-4 text-[14px] font-medium text-[#2A6B46] md:min-h-[40px] md:text-xs">
+                      <span className="inline-flex min-h-[44px] w-full sm:w-auto items-center justify-center gap-1.5 rounded-xl bg-[#F2F7F4] px-4 text-[14px] font-medium text-[#2A6B46] md:min-h-[40px] md:text-xs dark:border dark:border-[#2B523B] dark:bg-[#172B20] dark:text-[#6CC492]">
                         <Check className="h-4 w-4" aria-hidden="true" />
                         已在藏馆
                       </span>
@@ -505,7 +505,7 @@ export function SearchTabView({
                         disabled={isCollecting}
                         onClick={() => void handleCollect(item)}
                         aria-label={`收录「${item.title}」到藏馆`}
-                        className="inline-flex min-h-[46px] w-full sm:w-auto items-center justify-center gap-1.5 rounded-xl bg-[#1A1816] px-5 text-[15px] font-medium text-white cursor-pointer active:scale-[0.98] transition-transform hover:bg-[#B43B2B] disabled:opacity-60 md:min-h-[44px] md:text-sm"
+                        className="inline-flex min-h-[46px] w-full sm:w-auto items-center justify-center gap-1.5 rounded-xl bg-[#1A1816] px-5 text-[15px] font-medium text-white cursor-pointer active:scale-[0.98] transition-transform hover:bg-[#B43B2B] disabled:opacity-60 md:min-h-[44px] md:text-sm dark:bg-[#F3EFE6] dark:text-[#141210] dark:hover:bg-[#E4C37A]"
                       >
                         <Plus className="h-4 w-4" aria-hidden="true" />
                         {isCollecting ? '收录中…' : '收录到藏馆'}
@@ -521,17 +521,17 @@ export function SearchTabView({
 
       {/* Empty Search Result */}
       {!loading && hasSearched && results.length === 0 && !error && (
-        <div className="mt-5 rounded-2xl border border-[#E4DFD5] bg-white px-5 py-9 text-center">
-          <p className="font-editorial text-[20px] text-[#1A1816] md:text-lg">
+        <div className="mt-5 rounded-2xl border border-[#E4DFD5] bg-white px-5 py-9 text-center dark:border-[#322D27] dark:bg-[#1D1A17]">
+          <p className="font-editorial text-[20px] text-[#1A1816] md:text-lg dark:text-[#F3EFE6]">
             未检索到「{query}」
           </p>
-          <p className="mt-2 text-[14px] leading-relaxed text-[#625C54] md:text-xs">
+          <p className="mt-2 text-[14px] leading-relaxed text-[#625C54] md:text-xs dark:text-[#A59D90]">
             可尝试切换上方的影视/影人/角色分类或换个关键词，也可以直接手动建档。
           </p>
           <button
             type="button"
             onClick={() => onJumpToManual(query.trim(), category)}
-            className="mt-4 inline-flex min-h-[46px] items-center justify-center rounded-xl bg-[#1A1816] px-5 text-[15px] font-medium text-white cursor-pointer active:scale-[0.98] md:min-h-[44px] md:text-sm"
+            className="mt-4 inline-flex min-h-[46px] items-center justify-center rounded-xl bg-[#1A1816] px-5 text-[15px] font-medium text-white cursor-pointer active:scale-[0.98] hover:bg-[#B43B2B] md:min-h-[44px] md:text-sm dark:bg-[#F3EFE6] dark:text-[#141210] dark:hover:bg-[#E4C37A]"
           >
             手动建档「{query.trim()}」
           </button>

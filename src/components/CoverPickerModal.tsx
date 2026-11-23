@@ -234,22 +234,22 @@ export function CoverPickerModal({
       aria-modal="true"
       aria-labelledby="cover-picker-title"
       data-testid="cover-picker-modal"
-      className="fixed inset-0 z-[80] flex items-end justify-center overflow-hidden bg-[#12100E]/70 backdrop-blur-xs sm:items-center sm:p-4"
+      className="fixed inset-0 z-[80] flex items-end justify-center overflow-hidden bg-[#12100E]/70 backdrop-blur-xs sm:items-center sm:p-4 dark:bg-black/78"
       onClick={(e) => {
         if (e.target === e.currentTarget && !applying) onClose();
       }}
     >
-      <div className="flex max-h-[90dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-3xl border border-[#DDD6C8] bg-[#F7F5F0] shadow-2xl sm:rounded-3xl">
+      <div className="flex max-h-[90dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-3xl border border-[#DDD6C8] bg-[#F7F5F0] shadow-2xl sm:rounded-3xl dark:border-[#322D27] dark:bg-[#141210]">
         {/* Header */}
-        <div className="flex shrink-0 items-center justify-between border-b border-[#E4DFD5] bg-[#FAF9F6] px-5 py-3.5">
+        <div className="flex shrink-0 items-center justify-between border-b border-[#E4DFD5] bg-[#FAF9F6] px-5 py-3.5 dark:border-[#2E2924] dark:bg-[#191613]">
           <div className="min-w-0">
             <h2
               id="cover-picker-title"
-              className="font-editorial text-[18px] font-medium text-[#1A1816] md:text-base"
+              className="font-editorial text-[18px] font-medium text-[#1A1816] md:text-base dark:text-[#F5F1E8]"
             >
               更换藏品封面
             </h2>
-            <p className="mt-0.5 truncate text-[13px] text-[#7A7268] md:text-xs">
+            <p className="mt-0.5 truncate text-[13px] text-[#7A7268] md:text-xs dark:text-[#A59D90]">
               {item.title}
             </p>
           </div>
@@ -258,18 +258,18 @@ export function CoverPickerModal({
             onClick={onClose}
             disabled={applying}
             aria-label="关闭换封面弹窗"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[#625C54] hover:bg-[#EAE4D9] hover:text-[#1A1816] cursor-pointer"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[#625C54] hover:bg-[#EAE4D9] hover:text-[#1A1816] cursor-pointer dark:text-[#A59D90] dark:hover:bg-[#2A2520] dark:hover:text-[#F3EFE6]"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Mode Tabs */}
-        <div className="shrink-0 border-b border-[#E8E2D7] bg-[#F7F5F0] px-5 py-2.5">
+        <div className="shrink-0 border-b border-[#E8E2D7] bg-[#F7F5F0] px-5 py-2.5 dark:border-[#2E2924] dark:bg-[#141210]">
           <div
             role="tablist"
             aria-label="换封面方式"
-            className="grid grid-cols-3 gap-1 rounded-xl bg-[#EAE4D9] p-1"
+            className="grid grid-cols-3 gap-1 rounded-xl bg-[#EAE4D9] p-1 dark:bg-[#231F1B]"
           >
             {(
               [
@@ -290,8 +290,8 @@ export function CoverPickerModal({
                   onClick={() => setTab(mode.id)}
                   className={`inline-flex min-h-[42px] items-center justify-center gap-1.5 rounded-lg px-2 text-[13px] font-medium whitespace-nowrap transition-colors cursor-pointer md:min-h-[38px] md:text-xs ${
                     active
-                      ? 'bg-white text-[#1A1816] shadow-xs'
-                      : 'text-[#625C54] hover:text-[#1A1816]'
+                      ? 'bg-white text-[#1A1816] shadow-xs dark:bg-[#353029] dark:text-[#F5F1E8]'
+                      : 'text-[#625C54] hover:text-[#1A1816] dark:text-[#A89F92] dark:hover:text-[#F3EFE6]'
                   }`}
                 >
                   <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -320,13 +320,13 @@ export function CoverPickerModal({
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="输入剧名、英文名或演员名搜海报..."
                   data-testid="cover-search-input"
-                  className="min-h-[46px] min-w-0 flex-1 rounded-xl border border-[#DCD6CB] bg-white px-3.5 text-[16px] text-[#1A1816] placeholder:text-[#9C9488] focus:border-[#1A1816] focus:outline-none md:min-h-[42px] md:text-sm"
+                  className="min-h-[46px] min-w-0 flex-1 rounded-xl border border-[#DCD6CB] bg-white px-3.5 text-[16px] text-[#1A1816] placeholder:text-[#9C9488] focus:border-[#1A1816] focus:outline-none md:min-h-[42px] md:text-sm dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:placeholder:text-[#8E8578] dark:focus:border-[#D4AF6A]"
                 />
                 <button
                   type="submit"
                   disabled={loading || !searchQuery.trim()}
                   data-testid="cover-search-submit"
-                  className="inline-flex min-h-[46px] shrink-0 items-center justify-center gap-1 rounded-xl bg-[#1A1816] px-4 text-[14px] font-medium text-[#FAF7F0] whitespace-nowrap cursor-pointer disabled:opacity-50 md:min-h-[42px] md:text-xs"
+                  className="inline-flex min-h-[46px] shrink-0 items-center justify-center gap-1 rounded-xl bg-[#1A1816] px-4 text-[14px] font-medium text-[#FAF7F0] whitespace-nowrap cursor-pointer disabled:opacity-50 md:min-h-[42px] md:text-xs dark:bg-[#F3EFE6] dark:text-[#141210] dark:hover:bg-[#E4C37A]"
                 >
                   {loading ? (
                     <Loader2 className="h-4 w-4 animate-spin md:h-3.5 md:w-3.5" />
@@ -338,7 +338,7 @@ export function CoverPickerModal({
               </form>
 
               {searchError && (
-                <p className="rounded-xl border border-[#E5BFB9] bg-[#FDF7F5] px-3 py-2 text-[13px] text-[#B43B2B] md:text-xs">
+                <p className="rounded-xl border border-[#E5BFB9] bg-[#FDF7F5] px-3 py-2 text-[13px] text-[#B43B2B] md:text-xs dark:border-[#6B3229] dark:bg-[#351B17] dark:text-[#F28C7B]">
                   {searchError}
                 </p>
               )}
@@ -348,7 +348,7 @@ export function CoverPickerModal({
                   {Array.from({ length: 6 }).map((_, idx) => (
                     <div
                       key={idx}
-                      className="aspect-[3/4] animate-pulse rounded-xl bg-[#E8E2D7]"
+                      className="aspect-[3/4] animate-pulse rounded-xl bg-[#E8E2D7] dark:bg-[#26221D]"
                     />
                   ))}
                 </div>
@@ -368,7 +368,7 @@ export function CoverPickerModal({
                         className={`group relative overflow-hidden rounded-xl border text-left transition-all cursor-pointer ${
                           isSelected
                             ? 'border-[#B43B2B] ring-2 ring-[#B43B2B]'
-                            : 'border-[#E4DFD5] hover:border-[#1A1816]'
+                            : 'border-[#E4DFD5] hover:border-[#1A1816] dark:border-[#322D27] dark:hover:border-[#D4AF6A]'
                         }`}
                       >
                         <ArchivalImage
@@ -379,8 +379,8 @@ export function CoverPickerModal({
                           compact
                           className="aspect-[3/4] w-full"
                         />
-                        <div className="bg-white px-1.5 py-1">
-                          <p className="truncate text-[11px] font-medium text-[#4B453E] md:text-[10px]">
+                        <div className="bg-white px-1.5 py-1 dark:bg-[#1D1A17]">
+                          <p className="truncate text-[11px] font-medium text-[#4B453E] md:text-[10px] dark:text-[#C4BCB0]">
                             {cand.source}
                           </p>
                         </div>
@@ -394,11 +394,11 @@ export function CoverPickerModal({
                   })}
                 </div>
               ) : (
-                <div className="rounded-2xl border border-dashed border-[#D6CEC0] bg-white/70 px-4 py-8 text-center">
-                  <p className="text-[15px] font-medium text-[#4B453E] md:text-sm">
+                <div className="rounded-2xl border border-dashed border-[#D6CEC0] bg-white/70 px-4 py-8 text-center dark:border-[#3E3830] dark:bg-[#1D1A17]/70">
+                  <p className="text-[15px] font-medium text-[#4B453E] md:text-sm dark:text-[#E5DED2]">
                     未找到直接匹配的候选图
                   </p>
-                  <p className="mt-1 text-[13px] text-[#7A7268] md:text-xs">
+                  <p className="mt-1 text-[13px] text-[#7A7268] md:text-xs dark:text-[#A59D90]">
                     可尝试搜索英文原名，或直接切换到「本地上传」选取相册剧照
                   </p>
                 </div>
@@ -426,46 +426,46 @@ export function CoverPickerModal({
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
                 data-testid="cover-upload-trigger"
-                className="flex min-h-[140px] w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[#CFC7B9] bg-white px-4 py-6 text-center transition-colors hover:border-[#1A1816] hover:bg-[#FAF9F6] cursor-pointer"
+                className="flex min-h-[140px] w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[#CFC7B9] bg-white px-4 py-6 text-center transition-colors hover:border-[#1A1816] hover:bg-[#FAF9F6] cursor-pointer dark:border-[#433C34] dark:bg-[#1D1A17] dark:hover:border-[#D4AF6A] dark:hover:bg-[#24201C]"
               >
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#F2EDE3] text-[#1A1816]">
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#F2EDE3] text-[#1A1816] dark:bg-[#2A2520] dark:text-[#E4C37A]">
                   {uploading ? (
                     <Loader2 className="h-5 w-5 animate-spin" />
                   ) : (
                     <ImagePlus className="h-5 w-5" />
                   )}
                 </span>
-                <span className="text-[15px] font-medium text-[#1A1816] md:text-sm">
+                <span className="text-[15px] font-medium text-[#1A1816] md:text-sm dark:text-[#F3EFE6]">
                   {uploading ? '正在优化图片清晰度...' : '点击从相册或本地选取海报'}
                 </span>
-                <span className="text-[13px] text-[#7A7268] md:text-xs">
+                <span className="text-[13px] text-[#7A7268] md:text-xs dark:text-[#A59D90]">
                   自动裁压至高清馆藏比例，永久保存在本地档案库
                 </span>
               </button>
 
               {uploadError && (
-                <p className="rounded-xl border border-[#E5BFB9] bg-[#FDF7F5] px-3 py-2 text-[13px] text-[#B43B2B] md:text-xs">
+                <p className="rounded-xl border border-[#E5BFB9] bg-[#FDF7F5] px-3 py-2 text-[13px] text-[#B43B2B] md:text-xs dark:border-[#6B3229] dark:bg-[#351B17] dark:text-[#F28C7B]">
                   {uploadError}
                 </p>
               )}
 
               {uploadPreview && (
-                <div className="flex items-center gap-4 rounded-2xl border border-[#E4DFD5] bg-white p-3.5">
+                <div className="flex items-center gap-4 rounded-2xl border border-[#E4DFD5] bg-white p-3.5 dark:border-[#322D27] dark:bg-[#1D1A17]">
                   <ArchivalImage
                     src={uploadPreview}
                     alt="新封面预览"
                     title={item.title}
                     category={item.category}
-                    className="aspect-[3/4] w-20 shrink-0 rounded-xl border border-[#E4DFD5]"
+                    className="aspect-[3/4] w-20 shrink-0 rounded-xl border border-[#E4DFD5] dark:border-[#3A342D]"
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="text-[13px] font-medium text-[#1A1816] md:text-xs">
+                    <p className="text-[13px] font-medium text-[#1A1816] md:text-xs dark:text-[#F3EFE6]">
                       新封面已就绪
                     </p>
-                    <p className="mt-1 font-mono text-[12px] tabular-nums text-[#7A7268] md:text-[11px]">
+                    <p className="mt-1 font-mono text-[12px] tabular-nums text-[#7A7268] md:text-[11px] dark:text-[#A59D90]">
                       {uploadMeta}
                     </p>
-                    <p className="mt-1.5 text-[12px] text-[#625C54] md:text-[11px]">
+                    <p className="mt-1.5 text-[12px] text-[#625C54] md:text-[11px] dark:text-[#B8AFA2]">
                       点击下方「应用此封面」即可立即生效
                     </p>
                   </div>
@@ -479,7 +479,7 @@ export function CoverPickerModal({
               <div>
                 <label
                   htmlFor="cover-custom-url"
-                  className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
+                  className="block text-[13px] font-medium text-[#4B453E] md:text-xs dark:text-[#C4BCB0]"
                 >
                   粘贴高清海报或人物剧照链接
                 </label>
@@ -493,27 +493,27 @@ export function CoverPickerModal({
                   }}
                   placeholder="https://..."
                   data-testid="cover-url-input"
-                  className="mt-1.5 min-h-[46px] w-full rounded-xl border border-[#DCD6CB] bg-white px-3.5 text-[16px] text-[#1A1816] placeholder:text-[#9C9488] focus:border-[#1A1816] focus:outline-none md:min-h-[44px] md:text-sm"
+                  className="mt-1.5 min-h-[46px] w-full rounded-xl border border-[#DCD6CB] bg-white px-3.5 text-[16px] text-[#1A1816] placeholder:text-[#9C9488] focus:border-[#1A1816] focus:outline-none md:min-h-[44px] md:text-sm dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:placeholder:text-[#8E8578] dark:focus:border-[#D4AF6A]"
                 />
                 {urlError && (
-                  <p className="mt-1.5 text-[13px] text-[#B43B2B] md:text-xs">{urlError}</p>
+                  <p className="mt-1.5 text-[13px] text-[#B43B2B] md:text-xs dark:text-[#F28C7B]">{urlError}</p>
                 )}
               </div>
 
               {liveUrlPreview && (
-                <div className="flex items-center gap-4 rounded-2xl border border-[#E4DFD5] bg-white p-3.5">
+                <div className="flex items-center gap-4 rounded-2xl border border-[#E4DFD5] bg-white p-3.5 dark:border-[#322D27] dark:bg-[#1D1A17]">
                   <ArchivalImage
                     src={liveUrlPreview}
                     alt="链接封面预览"
                     title={item.title}
                     category={item.category}
-                    className="aspect-[3/4] w-24 shrink-0 rounded-xl border border-[#E4DFD5]"
+                    className="aspect-[3/4] w-24 shrink-0 rounded-xl border border-[#E4DFD5] dark:border-[#3A342D]"
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="text-[13px] font-medium text-[#1A1816] md:text-xs">
+                    <p className="text-[13px] font-medium text-[#1A1816] md:text-xs dark:text-[#F3EFE6]">
                       实时预览
                     </p>
-                    <p className="mt-1 text-[12px] leading-relaxed text-[#7A7268] md:text-[11px]">
+                    <p className="mt-1 text-[12px] leading-relaxed text-[#7A7268] md:text-[11px] dark:text-[#A59D90]">
                       已自动通过馆内图床代理加载，防止防盗链失效
                     </p>
                   </div>
@@ -524,19 +524,19 @@ export function CoverPickerModal({
         </div>
 
         {/* Sticky Footer */}
-        <div className="flex shrink-0 items-center justify-between gap-2.5 border-t border-[#E4DFD5] bg-[#FAF9F6] px-5 pt-3.5 pb-[calc(0.875rem+env(safe-area-inset-bottom))] sm:pb-3.5">
+        <div className="flex shrink-0 items-center justify-between gap-2.5 border-t border-[#E4DFD5] bg-[#FAF9F6] px-5 pt-3.5 pb-[calc(0.875rem+env(safe-area-inset-bottom))] sm:pb-3.5 dark:border-[#2E2924] dark:bg-[#191613]">
           {item.coverUrl ? (
             <button
               type="button"
               onClick={handleClearCover}
               disabled={applying}
-              className="inline-flex min-h-[46px] shrink-0 items-center gap-1 rounded-xl border border-[#DCD6CB] bg-white px-3.5 text-[13px] font-medium text-[#625C54] hover:text-[#1A1816] whitespace-nowrap cursor-pointer disabled:opacity-50 md:min-h-[44px] md:text-xs"
+              className="inline-flex min-h-[46px] shrink-0 items-center gap-1 rounded-xl border border-[#DCD6CB] bg-white px-3.5 text-[13px] font-medium text-[#625C54] hover:text-[#1A1816] whitespace-nowrap cursor-pointer disabled:opacity-50 md:min-h-[44px] md:text-xs dark:border-[#3A342D] dark:bg-[#24201C] dark:text-[#C4BCB0] dark:hover:text-[#F3EFE6]"
             >
               <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
               <span>用典藏版式</span>
             </button>
           ) : (
-            <span className="text-[13px] text-[#8C857B] md:text-xs">支持随时替换</span>
+            <span className="text-[13px] text-[#8C857B] md:text-xs dark:text-[#9A9184]">支持随时替换</span>
           )}
 
           <button

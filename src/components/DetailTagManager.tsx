@@ -39,7 +39,7 @@ function HighlightedTagLabel({
   return (
     <>
       {before}
-      <mark className="bg-transparent font-semibold text-[#B43B2B]">
+      <mark className="bg-transparent font-semibold text-[#B43B2B] dark:text-[#F28C7B]">
         {match}
       </mark>
       {after}
@@ -239,16 +239,16 @@ export function DetailTagManager({
       ref={containerRef}
       aria-label="档案标签管理"
       data-testid="detail-tag-manager"
-      className="mt-6 rounded-2xl border border-[#E4DFD5] bg-white p-3.5 sm:p-4"
+      className="mt-6 rounded-2xl border border-[#E4DFD5] bg-white p-3.5 sm:p-4 dark:border-[#322D27] dark:bg-[#1D1A17]"
     >
       {/* Header */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <Tag className="h-4 w-4 text-[#7A7268] md:h-3.5 md:w-3.5" aria-hidden="true" />
-          <h3 className="text-[14px] font-medium tracking-[0.04em] text-[#1A1816] md:text-xs md:tracking-[0.06em]">
+          <Tag className="h-4 w-4 text-[#7A7268] md:h-3.5 md:w-3.5 dark:text-[#A59D90]" aria-hidden="true" />
+          <h3 className="text-[14px] font-medium tracking-[0.04em] text-[#1A1816] md:text-xs md:tracking-[0.06em] dark:text-[#F3EFE6]">
             标签管理
           </h3>
-          <span className="font-mono text-[12px] tabular-nums text-[#8C857B] md:text-[11px]">
+          <span className="font-mono text-[12px] tabular-nums text-[#8C857B] md:text-[11px] dark:text-[#9A9184]">
             {item.tags.length} / {MAX_TAGS_PER_ITEM}
           </span>
         </div>
@@ -256,7 +256,7 @@ export function DetailTagManager({
           <span
             role="status"
             aria-live="polite"
-            className="text-[12px] font-medium text-[#2A6B46] md:text-[11px]"
+            className="text-[12px] font-medium text-[#2A6B46] md:text-[11px] dark:text-[#6CC492]"
           >
             {feedback}
           </span>
@@ -281,8 +281,8 @@ export function DetailTagManager({
                   key={tag}
                   className={`inline-flex items-stretch overflow-hidden rounded-xl border transition-colors ${
                     isInspecting
-                      ? 'border-[#1A1816] bg-[#1A1816] text-white'
-                      : 'border-[#DCD6CB] bg-[#FAF9F6] text-[#1A1816]'
+                      ? 'border-[#1A1816] bg-[#1A1816] text-white dark:border-[#F3EFE6] dark:bg-[#F3EFE6] dark:text-[#141210]'
+                      : 'border-[#DCD6CB] bg-[#FAF9F6] text-[#1A1816] dark:border-[#3A342D] dark:bg-[#24201C] dark:text-[#F3EFE6]'
                   }`}
                 >
                   <button
@@ -296,14 +296,16 @@ export function DetailTagManager({
                     }}
                     className={`inline-flex min-h-[42px] items-center gap-1.5 px-3 text-[13px] font-medium whitespace-nowrap cursor-pointer transition-colors md:min-h-[40px] md:text-xs ${
                       isInspecting
-                        ? 'text-white'
-                        : 'text-[#1A1816] hover:bg-[#F0EBE1]'
+                        ? 'text-white dark:text-[#141210]'
+                        : 'text-[#1A1816] hover:bg-[#F0EBE1] dark:text-[#F3EFE6] dark:hover:bg-[#2E2923]'
                     }`}
                   >
                     <span>{tag}</span>
                     <span
                       className={`font-mono text-[12px] tabular-nums md:text-[11px] ${
-                        isInspecting ? 'text-white/75' : 'text-[#7A7268]'
+                        isInspecting
+                          ? 'text-white/75 dark:text-[#141210]/70'
+                          : 'text-[#7A7268] dark:text-[#9E9588]'
                       }`}
                     >
                       {count}
@@ -316,8 +318,8 @@ export function DetailTagManager({
                     onClick={() => void commitRemoveTag(tag)}
                     className={`flex min-h-[42px] min-w-[38px] items-center justify-center border-l cursor-pointer transition-colors disabled:opacity-40 md:min-h-[40px] md:min-w-[36px] ${
                       isInspecting
-                        ? 'border-white/20 text-white/80 hover:bg-white/10 hover:text-white'
-                        : 'border-[#E4DFD5] text-[#8C857B] hover:bg-[#EFE9DF] hover:text-[#B43B2B]'
+                        ? 'border-white/20 text-white/80 hover:bg-white/10 hover:text-white dark:border-[#141210]/15 dark:text-[#141210]/70 dark:hover:bg-[#141210]/10 dark:hover:text-[#141210]'
+                        : 'border-[#E4DFD5] text-[#8C857B] hover:bg-[#EFE9DF] hover:text-[#B43B2B] dark:border-[#3A342D] dark:text-[#9A9184] dark:hover:bg-[#312B25] dark:hover:text-[#F28C7B]'
                     }`}
                   >
                     <X className="h-3.5 w-3.5" aria-hidden="true" />
@@ -327,13 +329,13 @@ export function DetailTagManager({
             })}
           </div>
           {!activeInspectTag && (
-            <p className="mt-2 text-[12px] text-[#8C857B] md:text-[11px]">
+            <p className="mt-2 text-[12px] text-[#8C857B] md:text-[11px] dark:text-[#9A9184]">
               点击任意标签可查看或一键筛选同标签下的全部馆藏
             </p>
           )}
         </>
       ) : (
-        <p className="mt-2.5 text-[13px] leading-relaxed text-[#7A7268] md:text-xs">
+        <p className="mt-2.5 text-[13px] leading-relaxed text-[#7A7268] md:text-xs dark:text-[#A59D90]">
           暂无标签。在下方输入关键词可自动补全馆内已有标签，或直接创建新标签。
         </p>
       )}
@@ -342,12 +344,12 @@ export function DetailTagManager({
       {activeInspectTag && (
         <div
           data-testid="same-tag-panel"
-          className="mt-3.5 border-t border-[#EFECE5] pt-3.5"
+          className="mt-3.5 border-t border-[#EFECE5] pt-3.5 dark:border-[#2E2924]"
         >
           <div className="flex items-center justify-between gap-2">
-            <p className="min-w-0 truncate text-xs font-medium text-[#1A1816]">
+            <p className="min-w-0 truncate text-xs font-medium text-[#1A1816] dark:text-[#F3EFE6]">
               同标签「{activeInspectTag}」
-              <span className="ml-1 font-mono text-[11px] tabular-nums text-[#7A7268]">
+              <span className="ml-1 font-mono text-[11px] tabular-nums text-[#7A7268] dark:text-[#A59D90]">
                 共 {sameTagItems.length} 项
               </span>
             </p>
@@ -363,7 +365,7 @@ export function DetailTagManager({
             </button>
           </div>
 
-          <ul className="mt-2.5 divide-y divide-[#F0EBE2]">
+          <ul className="mt-2.5 divide-y divide-[#F0EBE2] dark:divide-[#2E2924]">
             {sameTagItems.slice(0, 6).map((match) => {
               const isCurrent = match.id === item.id;
               return (
@@ -379,10 +381,10 @@ export function DetailTagManager({
                         className="h-11 w-9 shrink-0 rounded-lg"
                       />
                       <div className="min-w-0 flex-1">
-                        <p className="truncate font-editorial text-sm font-medium text-[#1A1816]">
+                        <p className="truncate font-editorial text-sm font-medium text-[#1A1816] dark:text-[#F3EFE6]">
                           {match.title}
                         </p>
-                        <p className="text-[11px] text-[#7A7268]">
+                        <p className="text-[11px] text-[#7A7268] dark:text-[#A59D90]">
                           {CATEGORY_LABELS[match.category]}
                           {match.year ? ` · ${match.year}` : ''} · 当前档案
                         </p>
@@ -393,7 +395,7 @@ export function DetailTagManager({
                       type="button"
                       onClick={() => onSelectRelated(match)}
                       aria-label={`跳转查看同标签${CATEGORY_LABELS[match.category]}「${match.title}」`}
-                      className="flex min-h-[48px] w-full items-center gap-2.5 rounded-xl px-1.5 py-1 text-left transition-colors hover:bg-[#FAF9F6] cursor-pointer"
+                      className="flex min-h-[48px] w-full items-center gap-2.5 rounded-xl px-1.5 py-1 text-left transition-colors hover:bg-[#FAF9F6] cursor-pointer dark:hover:bg-[#26221D]"
                     >
                       <ArchivalImage
                         src={match.coverUrl}
@@ -404,10 +406,10 @@ export function DetailTagManager({
                         className="h-11 w-9 shrink-0 rounded-lg"
                       />
                       <div className="min-w-0 flex-1">
-                        <p className="truncate font-editorial text-sm font-medium text-[#1A1816]">
+                        <p className="truncate font-editorial text-sm font-medium text-[#1A1816] dark:text-[#F3EFE6]">
                           {match.title}
                         </p>
-                        <p className="truncate text-[11px] text-[#7A7268]">
+                        <p className="truncate text-[11px] text-[#7A7268] dark:text-[#A59D90]">
                           {CATEGORY_LABELS[match.category]}
                           {match.year ? ` · ${match.year}` : ''}
                           {match.subtitle &&
@@ -417,7 +419,7 @@ export function DetailTagManager({
                         </p>
                       </div>
                       <ArrowRight
-                        className="h-3.5 w-3.5 shrink-0 text-[#8C857B]"
+                        className="h-3.5 w-3.5 shrink-0 text-[#8C857B] dark:text-[#9A9184]"
                         aria-hidden="true"
                       />
                     </button>
@@ -431,7 +433,7 @@ export function DetailTagManager({
             <button
               type="button"
               onClick={() => onFilterByTag(activeInspectTag)}
-              className="mt-2 min-h-[40px] w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] text-xs font-medium text-[#3D3832] cursor-pointer"
+              className="mt-2 min-h-[40px] w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] text-xs font-medium text-[#3D3832] cursor-pointer dark:border-[#3A342D] dark:bg-[#24201C] dark:text-[#E5DED2]"
             >
               查看全部 {sameTagItems.length} 项同标签藏品
             </button>
@@ -440,7 +442,7 @@ export function DetailTagManager({
       )}
 
       {/* Add Tag Input + Live Autocomplete */}
-      <div className="mt-3.5 border-t border-[#EFECE5] pt-3.5">
+      <div className="mt-3.5 border-t border-[#EFECE5] pt-3.5 dark:border-[#2E2924]">
         <div className="flex items-center gap-2">
           <div className="relative min-w-0 flex-1">
             <label htmlFor="detail-tag-input" className="sr-only">
@@ -467,7 +469,7 @@ export function DetailTagManager({
                   ? `已达 ${MAX_TAGS_PER_ITEM} 个标签上限`
                   : '输入或选择已有标签…'
               }
-              className="h-12 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-[16px] text-[#1A1816] placeholder:text-[#8C857B] focus:border-[#1A1816] focus:bg-white focus:outline-none disabled:opacity-50 md:h-11 md:text-sm"
+              className="h-12 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-[16px] text-[#1A1816] placeholder:text-[#8C857B] focus:border-[#1A1816] focus:bg-white focus:outline-none disabled:opacity-50 md:h-11 md:text-sm dark:border-[#3A342D] dark:bg-[#181512] dark:text-[#F3EFE6] dark:placeholder:text-[#8E8578] dark:focus:border-[#D4AF6A] dark:focus:bg-[#1D1A17]"
             />
           </div>
           <button
@@ -478,7 +480,7 @@ export function DetailTagManager({
               item.tags.length >= MAX_TAGS_PER_ITEM
             }
             onClick={() => void commitAddTag(inputValue)}
-            className="inline-flex h-12 shrink-0 items-center gap-1 rounded-xl bg-[#1A1816] px-4 text-[14px] font-medium text-white whitespace-nowrap cursor-pointer active:scale-[0.97] transition-transform hover:bg-[#B43B2B] disabled:opacity-40 md:h-11 md:px-3.5 md:text-xs"
+            className="inline-flex h-12 shrink-0 items-center gap-1 rounded-xl bg-[#1A1816] px-4 text-[14px] font-medium text-white whitespace-nowrap cursor-pointer active:scale-[0.97] transition-transform hover:bg-[#B43B2B] disabled:opacity-40 md:h-11 md:px-3.5 md:text-xs dark:bg-[#F3EFE6] dark:text-[#141210] dark:hover:bg-[#E4C37A]"
           >
             <Plus className="h-4 w-4 md:h-3.5 md:w-3.5" aria-hidden="true" />
             <span>添加</span>
@@ -492,9 +494,9 @@ export function DetailTagManager({
             role="listbox"
             aria-label="已有标签补全建议"
             data-testid="tag-autocomplete-list"
-            className="mt-2 overflow-hidden rounded-xl border border-[#DCD6CB] bg-[#FAF9F6]"
+            className="mt-2 overflow-hidden rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] dark:border-[#3A342D] dark:bg-[#231F1B]"
           >
-            <div className="flex items-center justify-between border-b border-[#EAE4D9] px-3 py-2 text-[12px] text-[#7A7268] md:py-1.5 md:text-[11px]">
+            <div className="flex items-center justify-between border-b border-[#EAE4D9] px-3 py-2 text-[12px] text-[#7A7268] md:py-1.5 md:text-[11px] dark:border-[#322D27] dark:text-[#A59D90]">
               <span>
                 {normalizedInput ? '匹配的已有标签' : '馆内已有标签（点击补全）'}
               </span>
@@ -504,13 +506,13 @@ export function DetailTagManager({
                   setIsFocused(false);
                   setHighlightedIdx(-1);
                 }}
-                className="text-[12px] text-[#625C54] hover:text-[#1A1816] cursor-pointer md:text-[11px]"
+                className="text-[12px] text-[#625C54] hover:text-[#1A1816] cursor-pointer md:text-[11px] dark:text-[#B8AFA2] dark:hover:text-[#F3EFE6]"
               >
                 收起
               </button>
             </div>
 
-            <div className="divide-y divide-[#ECE7DD]">
+            <div className="divide-y divide-[#ECE7DD] dark:divide-[#2E2924]">
               {suggestions.map((sug, idx) => {
                 const isHighlighted = idx === highlightedIdx;
                 return (
@@ -523,8 +525,8 @@ export function DetailTagManager({
                     onClick={() => void commitAddTag(sug.name)}
                     className={`flex min-h-[46px] w-full items-center justify-between gap-2 px-3.5 py-2 text-left text-[14px] transition-colors cursor-pointer md:min-h-[44px] md:text-xs ${
                       isHighlighted
-                        ? 'bg-[#EFE9DF] text-[#1A1816]'
-                        : 'hover:bg-[#F3EFE8] text-[#1A1816]'
+                        ? 'bg-[#EFE9DF] text-[#1A1816] dark:bg-[#312B24] dark:text-[#FAF7F0]'
+                        : 'hover:bg-[#F3EFE8] text-[#1A1816] dark:text-[#F3EFE6] dark:hover:bg-[#2A2520]'
                     }`}
                   >
                     <span className="truncate font-medium">
@@ -533,10 +535,10 @@ export function DetailTagManager({
                         query={inputValue}
                       />
                     </span>
-                    <span className="inline-flex shrink-0 items-center gap-1.5 font-mono text-[12px] tabular-nums text-[#7A7268] md:text-[11px]">
+                    <span className="inline-flex shrink-0 items-center gap-1.5 font-mono text-[12px] tabular-nums text-[#7A7268] md:text-[11px] dark:text-[#A59D90]">
                       <span>已有 {sug.count} 项</span>
                       <Plus
-                        className="h-3.5 w-3.5 text-[#625C54]"
+                        className="h-3.5 w-3.5 text-[#625C54] dark:text-[#B8AFA2]"
                         aria-hidden="true"
                       />
                     </span>
@@ -553,21 +555,21 @@ export function DetailTagManager({
                   onClick={() => void commitAddTag(normalizedInput)}
                   className={`flex min-h-[46px] w-full items-center justify-between gap-2 px-3.5 py-2 text-left text-[14px] transition-colors cursor-pointer md:min-h-[44px] md:text-xs ${
                     highlightedIdx === suggestions.length
-                      ? 'bg-[#EFE9DF] text-[#1A1816]'
-                      : 'hover:bg-[#F3EFE8] text-[#1A1816]'
+                      ? 'bg-[#EFE9DF] text-[#1A1816] dark:bg-[#312B24] dark:text-[#FAF7F0]'
+                      : 'hover:bg-[#F3EFE8] text-[#1A1816] dark:text-[#F3EFE6] dark:hover:bg-[#2A2520]'
                   }`}
                 >
                   <span className="truncate font-medium">
                     新建标签「{normalizedInput}」
                   </span>
-                  <span className="shrink-0 text-[12px] font-medium text-[#B43B2B] md:text-[11px]">
+                  <span className="shrink-0 text-[12px] font-medium text-[#B43B2B] md:text-[11px] dark:text-[#F28C7B]">
                     立即创建
                   </span>
                 </button>
               )}
 
               {isAlreadyOnItem && suggestions.length === 0 && (
-                <p className="px-3.5 py-2.5 text-[13px] text-[#7A7268] md:text-xs">
+                <p className="px-3.5 py-2.5 text-[13px] text-[#7A7268] md:text-xs dark:text-[#A59D90]">
                   此档案已包含标签「{normalizedInput}」
                 </p>
               )}
@@ -580,7 +582,7 @@ export function DetailTagManager({
           quickPickTags.length > 0 &&
           item.tags.length < MAX_TAGS_PER_ITEM && (
             <div className="mt-2.5">
-              <p className="text-[12px] text-[#8C857B] md:text-[11px]">
+              <p className="text-[12px] text-[#8C857B] md:text-[11px] dark:text-[#9A9184]">
                 快速添加馆内已有标签：
               </p>
               <div className="mt-1.5 flex flex-wrap gap-2">
@@ -591,11 +593,11 @@ export function DetailTagManager({
                     disabled={busy}
                     onClick={() => void commitAddTag(sug.name)}
                     aria-label={`快速添加已有标签「${sug.name}」`}
-                    className="inline-flex min-h-[38px] items-center gap-1 rounded-lg border border-dashed border-[#D3CCC0] bg-[#FAF9F6] px-2.5 text-[13px] text-[#4B453E] whitespace-nowrap cursor-pointer transition-colors hover:border-[#1A1816] hover:bg-white hover:text-[#1A1816] disabled:opacity-40 md:min-h-[36px] md:text-xs"
+                    className="inline-flex min-h-[38px] items-center gap-1 rounded-lg border border-dashed border-[#D3CCC0] bg-[#FAF9F6] px-2.5 text-[13px] text-[#4B453E] whitespace-nowrap cursor-pointer transition-colors hover:border-[#1A1816] hover:bg-white hover:text-[#1A1816] disabled:opacity-40 md:min-h-[36px] md:text-xs dark:border-[#433C34] dark:bg-[#24201C] dark:text-[#C4BCB0] dark:hover:border-[#D4AF6A] dark:hover:bg-[#2C2721] dark:hover:text-[#F3EFE6]"
                   >
-                    <Plus className="h-3 w-3 text-[#8C857B]" aria-hidden="true" />
+                    <Plus className="h-3 w-3 text-[#8C857B] dark:text-[#9A9184]" aria-hidden="true" />
                     <span>{sug.name}</span>
-                    <span className="font-mono text-[11px] tabular-nums text-[#8C857B] md:text-[10px]">
+                    <span className="font-mono text-[11px] tabular-nums text-[#8C857B] md:text-[10px] dark:text-[#9A9184]">
                       {sug.count}
                     </span>
                   </button>

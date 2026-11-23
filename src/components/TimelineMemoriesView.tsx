@@ -97,28 +97,28 @@ export function TimelineMemoriesView({
         data-testid="timeline-memories-view"
         className="mx-auto max-w-[1040px] px-4 pt-6 pb-[calc(6.5rem+env(safe-area-inset-bottom))] min-[420px]:px-5 md:px-8 md:pt-8 md:pb-16"
       >
-        <div className="gallery-card border border-[#E4DFD5] px-6 py-12 text-center">
-          <p className="font-mono text-[13px] tracking-[0.14em] text-[#8C857B] md:text-xs">
+        <div className="gallery-card border border-[#E4DFD5] px-6 py-12 text-center dark:border-[#322D27]">
+          <p className="font-mono text-[13px] tracking-[0.14em] text-[#8C857B] md:text-xs dark:text-[#9A9184]">
             时间轴回忆
           </p>
-          <h2 className="mt-2 font-editorial text-[22px] font-medium text-[#1A1816] md:text-xl">
+          <h2 className="mt-2 font-editorial text-[22px] font-medium text-[#1A1816] md:text-xl dark:text-[#F3EFE6]">
             尚未开启你的光影编年
           </h2>
-          <p className="mt-2 text-[15px] leading-relaxed text-[#625C54] md:text-sm">
+          <p className="mt-2 text-[15px] leading-relaxed text-[#625C54] md:text-sm dark:text-[#A59D90]">
             每收录一部影视、一位影人或一个角色，都会在这里按收录、观影与年代留下一枚光影记忆刻度。
           </p>
           <div className="mt-6 flex flex-col gap-2.5 sm:flex-row sm:justify-center">
             <button
               type="button"
               onClick={onJumpToSearch}
-              className="min-h-[48px] rounded-xl bg-[#B43B2B] px-5 text-[15px] font-medium text-white whitespace-nowrap cursor-pointer active:scale-[0.98] md:min-h-[46px] md:text-sm"
+              className="min-h-[48px] rounded-xl bg-[#B43B2B] px-5 text-[15px] font-medium text-white whitespace-nowrap cursor-pointer active:scale-[0.98] hover:bg-[#932D20] md:min-h-[46px] md:text-sm"
             >
               联网搜索收录
             </button>
             <button
               type="button"
               onClick={onJumpToCreate}
-              className="min-h-[48px] rounded-xl border border-[#DCD6CB] bg-white px-5 text-[15px] font-medium text-[#1A1816] whitespace-nowrap cursor-pointer active:scale-[0.98] md:min-h-[46px] md:text-sm"
+              className="min-h-[48px] rounded-xl border border-[#DCD6CB] bg-white px-5 text-[15px] font-medium text-[#1A1816] whitespace-nowrap cursor-pointer active:scale-[0.98] md:min-h-[46px] md:text-sm dark:border-[#3A342D] dark:bg-[#24201C] dark:text-[#F3EFE6] dark:hover:border-[#D4AF6A]"
             >
               手动建档
             </button>
@@ -314,8 +314,8 @@ export function TimelineMemoriesView({
               onClick={() => setSelectedMonth('')}
               className={`inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-xl border px-3.5 text-[13px] font-medium whitespace-nowrap cursor-pointer transition-colors md:min-h-[42px] md:text-xs ${
                 selectedMonth === ''
-                  ? 'border-[#1A1816] bg-[#1A1816] text-white'
-                  : 'border-[#DCD6CB] bg-white text-[#4B453E] hover:border-[#1A1816]'
+                  ? 'border-[#1A1816] bg-[#1A1816] text-white dark:border-[#F3EFE6] dark:bg-[#F3EFE6] dark:text-[#141210]'
+                  : 'border-[#DCD6CB] bg-white text-[#4B453E] hover:border-[#1A1816] dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#D4CCC0] dark:hover:border-[#D4AF6A]'
               }`}
             >
               <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />
@@ -338,7 +338,7 @@ export function TimelineMemoriesView({
                   className={`inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-xl border px-3.5 text-[13px] font-medium whitespace-nowrap cursor-pointer transition-colors md:min-h-[42px] md:text-xs ${
                     active
                       ? 'border-[#B43B2B] bg-[#B43B2B] text-white'
-                      : 'border-[#DCD6CB] bg-white text-[#1A1816] hover:border-[#1A1816]'
+                      : 'border-[#DCD6CB] bg-white text-[#1A1816] hover:border-[#1A1816] dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:hover:border-[#D4AF6A]'
                   }`}
                 >
                   <span>{month.label}</span>
@@ -355,7 +355,7 @@ export function TimelineMemoriesView({
         <div
           role="group"
           aria-label="按类型筛选时间轴"
-          className="grid grid-cols-4 gap-1 rounded-xl bg-[#ECE8DF] p-1 sm:max-w-sm"
+          className="grid grid-cols-4 gap-1 rounded-xl bg-[#ECE8DF] p-1 sm:max-w-sm dark:bg-[#231F1B]"
         >
           {CAT_FILTERS.map((cat) => {
             const active = selectedCategory === cat.id;
@@ -367,8 +367,8 @@ export function TimelineMemoriesView({
                 onClick={() => setSelectedCategory(cat.id)}
                 className={`min-h-[42px] rounded-lg px-2 text-[14px] font-medium whitespace-nowrap cursor-pointer transition-colors md:min-h-[38px] md:text-xs ${
                   active
-                    ? 'bg-white text-[#1A1816] shadow-xs'
-                    : 'text-[#625C54]'
+                    ? 'bg-white text-[#1A1816] shadow-xs dark:bg-[#353029] dark:text-[#F5F1E8]'
+                    : 'text-[#625C54] dark:text-[#A59D90] dark:hover:text-[#F3EFE6]'
                 }`}
               >
                 {cat.label}
@@ -381,8 +381,8 @@ export function TimelineMemoriesView({
       {/* 3A. COLLECTED MODE */}
       {viewMode === 'collected' &&
         (timeline.visibleMonths.length === 0 ? (
-          <div className="rounded-2xl border border-[#E4DFD5] bg-white px-6 py-10 text-center">
-            <p className="text-sm font-medium text-[#1A1816]">
+          <div className="rounded-2xl border border-[#E4DFD5] bg-white px-6 py-10 text-center dark:border-[#322D27] dark:bg-[#1D1A17]">
+            <p className="text-sm font-medium text-[#1A1816] dark:text-[#F3EFE6]">
               当前月份与分类下暂无收录记录
             </p>
             <button
@@ -391,7 +391,7 @@ export function TimelineMemoriesView({
                 setSelectedMonth('');
                 setSelectedCategory('all');
               }}
-              className="mt-4 min-h-[42px] rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-4 text-xs font-medium text-[#1A1816] cursor-pointer"
+              className="mt-4 min-h-[42px] rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-4 text-xs font-medium text-[#1A1816] cursor-pointer dark:border-[#3A342D] dark:bg-[#24201C] dark:text-[#F3EFE6] dark:hover:border-[#D4AF6A]"
             >
               查看全部时间轴回忆
             </button>
@@ -406,13 +406,13 @@ export function TimelineMemoriesView({
                 className="space-y-3.5"
               >
                 {/* Monthly Review Chapter Card */}
-                <div className="gallery-card border border-[#E6E0D4] p-4">
+                <div className="gallery-card border border-[#E6E0D4] p-4 dark:border-[#322D27]">
                   <div className="flex items-baseline justify-between gap-2">
                     <div className="min-w-0">
-                      <h3 className="font-editorial text-[19px] font-medium text-[#1A1816] md:text-lg">
+                      <h3 className="font-editorial text-[19px] font-medium text-[#1A1816] md:text-lg dark:text-[#F3EFE6]">
                         {month.label}
                       </h3>
-                      <p className="mt-0.5 text-[13px] text-[#625C54] tabular-nums md:text-xs">
+                      <p className="mt-0.5 text-[13px] text-[#625C54] tabular-nums md:text-xs dark:text-[#A59D90]">
                         {[
                           month.filmCount > 0 ? `影视 ${month.filmCount}` : '',
                           month.personCount > 0 ? `影人 ${month.personCount}` : '',
@@ -427,20 +427,20 @@ export function TimelineMemoriesView({
                           .join(' · ')}
                       </p>
                     </div>
-                    <span className="shrink-0 whitespace-nowrap font-mono text-[13px] font-medium tabular-nums text-[#B43B2B] md:text-xs">
+                    <span className="shrink-0 whitespace-nowrap font-mono text-[13px] font-medium tabular-nums text-[#B43B2B] md:text-xs dark:text-[#EB7865]">
                       共 {month.totalCount} 件
                     </span>
                   </div>
 
                   {month.items.length >= 2 && (
-                    <div className="h-scroll-rail no-scrollbar mt-3 flex gap-2 border-t border-[#F0ECE3] pt-3">
+                    <div className="h-scroll-rail no-scrollbar mt-3 flex gap-2 border-t border-[#F0ECE3] pt-3 dark:border-[#2E2924]">
                       {month.items.slice(0, 8).map((mini) => (
                         <button
                           key={`strip-${mini.id}`}
                           type="button"
                           onClick={() => onSelectItem(mini)}
                           aria-label={`快速查看「${mini.title}」`}
-                          className="h-14 w-11 shrink-0 overflow-hidden rounded-lg border border-[#E4DFD5] bg-[#FAF9F6] cursor-pointer active:scale-[0.96] transition-transform"
+                          className="h-14 w-11 shrink-0 overflow-hidden rounded-lg border border-[#E4DFD5] bg-[#FAF9F6] cursor-pointer active:scale-[0.96] transition-transform dark:border-[#322D27] dark:bg-[#141210]"
                         >
                           <ArchivalImage
                             src={mini.coverUrl}
@@ -460,7 +460,7 @@ export function TimelineMemoriesView({
                 <div className="relative pl-5">
                   <div
                     aria-hidden="true"
-                    className="absolute left-[7px] top-2 bottom-2 w-px bg-[#D8D0C2]"
+                    className="absolute left-[7px] top-2 bottom-2 w-px bg-[#D8D0C2] dark:bg-[#3A342D]"
                   />
 
                   <div className="space-y-4">
@@ -469,12 +469,12 @@ export function TimelineMemoriesView({
                         <div className="relative flex items-center gap-2">
                           <span
                             aria-hidden="true"
-                            className="absolute -left-5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-[#F7F5F0] bg-[#B43B2B]"
+                            className="absolute -left-5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-[#F7F5F0] bg-[#B43B2B] dark:border-[#141210]"
                           />
-                          <span className="font-mono text-[13px] font-medium tabular-nums text-[#1A1816] md:text-xs">
+                          <span className="font-mono text-[13px] font-medium tabular-nums text-[#1A1816] md:text-xs dark:text-[#F3EFE6]">
                             {day.dayLabel}
                           </span>
-                          <span className="text-[13px] text-[#8C857B] md:text-xs">
+                          <span className="text-[13px] text-[#8C857B] md:text-xs dark:text-[#9A9184]">
                             {day.weekdayLabel}
                           </span>
                         </div>
@@ -505,10 +505,10 @@ export function TimelineMemoriesView({
                                 className={`gallery-card gallery-card-interactive flex w-full items-start gap-3.5 border p-3.5 text-left cursor-pointer active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#B43B2B] md:gap-4 md:p-4 ${
                                   isMasterpiece
                                     ? 'gallery-card-masterpiece border-[#C9A45C]/80'
-                                    : 'border-[#E6E0D4] hover:border-[#CFC7B9]'
+                                    : 'border-[#E6E0D4] hover:border-[#CFC7B9] dark:border-[#322D27] dark:hover:border-[#4B4339]'
                                 }`}
                               >
-                                <div className="gallery-cover-frame w-[66px] shrink-0 bg-[#FAF9F6] min-[420px]:w-[70px] md:w-[60px]">
+                                <div className="gallery-cover-frame w-[66px] shrink-0 bg-[#FAF9F6] min-[420px]:w-[70px] md:w-[60px] dark:bg-[#141210]">
                                   <ArchivalImage
                                     src={item.coverUrl}
                                     alt={item.title}
@@ -520,10 +520,10 @@ export function TimelineMemoriesView({
                                 </div>
 
                                 <div className="min-w-0 flex-1">
-                                  <div className="flex items-center justify-between gap-2 text-[12px] text-[#7A7268] md:text-[11px]">
+                                  <div className="flex items-center justify-between gap-2 text-[12px] text-[#7A7268] md:text-[11px] dark:text-[#A59D90]">
                                     <span className="flex min-w-0 items-center gap-1 font-mono tabular-nums truncate">
                                       <Clock
-                                        className="h-3 w-3 shrink-0 text-[#9C9488]"
+                                        className="h-3 w-3 shrink-0 text-[#9C9488] dark:text-[#8E8578]"
                                         aria-hidden="true"
                                       />
                                       <span>{parts.timeLabel}</span>
@@ -535,8 +535,8 @@ export function TimelineMemoriesView({
                                     <span
                                       className={`shrink-0 whitespace-nowrap font-mono text-[11px] tabular-nums md:text-[10px] ${
                                         isMasterpiece
-                                          ? 'font-medium text-[#8E6523]'
-                                          : 'text-[#8C857B]'
+                                          ? 'font-medium text-[#8E6523] dark:text-[#E4C37A]'
+                                          : 'text-[#8C857B] dark:text-[#9A9184]'
                                       }`}
                                     >
                                       {completeness.tierLabel}{' '}
@@ -544,7 +544,7 @@ export function TimelineMemoriesView({
                                     </span>
                                   </div>
 
-                                  <h4 className="mt-1 truncate font-editorial text-[17px] font-medium leading-snug text-[#1A1816] md:text-base">
+                                  <h4 className="mt-1 truncate font-editorial text-[17px] font-medium leading-snug text-[#1A1816] md:text-base dark:text-[#F5F1E8]">
                                     {item.title}
                                   </h4>
 
@@ -552,19 +552,19 @@ export function TimelineMemoriesView({
                                     <p
                                       className={`mt-1 line-clamp-2 text-[14px] leading-relaxed md:text-xs ${
                                         item.quote
-                                          ? 'font-editorial italic text-[#3D3832]'
-                                          : 'text-[#625C54]'
+                                          ? 'font-editorial italic text-[#3D3832] dark:text-[#E2DBD0]'
+                                          : 'text-[#625C54] dark:text-[#B8AFA2]'
                                       }`}
                                     >
                                       {item.quote ? `“${item.quote}”` : excerpt}
                                     </p>
                                   )}
 
-                                  <div className="mt-2 flex items-center flex-wrap gap-x-2 gap-y-0.5 text-[12px] text-[#7A7268] tabular-nums md:text-[11px]">
+                                  <div className="mt-2 flex items-center flex-wrap gap-x-2 gap-y-0.5 text-[12px] text-[#7A7268] tabular-nums md:text-[11px] dark:text-[#A59D90]">
                                     {item.rating > 0 && (
-                                      <span className="inline-flex items-center gap-0.5 font-mono text-[#B43B2B]">
+                                      <span className="inline-flex items-center gap-0.5 font-mono text-[#B43B2B] dark:text-[#EB7865]">
                                         <Star
-                                          className="h-3.5 w-3.5 fill-[#B43B2B] text-[#B43B2B] md:h-3 md:w-3"
+                                          className="h-3.5 w-3.5 fill-[#B43B2B] text-[#B43B2B] md:h-3 md:w-3 dark:fill-[#EB7865] dark:text-[#EB7865]"
                                           aria-hidden="true"
                                         />
                                         {item.rating}.0
@@ -596,12 +596,12 @@ export function TimelineMemoriesView({
       {/* 3B. WATCHED & REWATCH MODE */}
       {viewMode === 'watched' &&
         (watchedTimeline.months.length === 0 ? (
-          <div className="rounded-2xl border border-[#E4DFD5] bg-white px-6 py-10 text-center">
-            <Film className="mx-auto h-7 w-7 text-[#C4BCB0]" aria-hidden="true" />
-            <p className="mt-2 text-sm font-medium text-[#1A1816]">
+          <div className="rounded-2xl border border-[#E4DFD5] bg-white px-6 py-10 text-center dark:border-[#322D27] dark:bg-[#1D1A17]">
+            <Film className="mx-auto h-7 w-7 text-[#C4BCB0] dark:text-[#6E665C]" aria-hidden="true" />
+            <p className="mt-2 text-sm font-medium text-[#1A1816] dark:text-[#F3EFE6]">
               暂无观影与重温记录
             </p>
-            <p className="mt-1 text-xs leading-relaxed text-[#7A7268]">
+            <p className="mt-1 text-xs leading-relaxed text-[#7A7268] dark:text-[#A59D90]">
               打开任意影视档案详情，在「观影与重温记录」里记录日期、媒介与短感即可在此生成专属观影编年。
             </p>
           </div>
@@ -613,11 +613,11 @@ export function TimelineMemoriesView({
                 aria-label={`${month.label}观影记录`}
                 className="space-y-3"
               >
-                <div className="flex items-baseline justify-between border-b border-[#E4DFD5] pb-2">
-                  <h3 className="font-editorial text-[19px] font-medium text-[#1A1816] md:text-lg">
+                <div className="flex items-baseline justify-between border-b border-[#E4DFD5] pb-2 dark:border-[#2E2924]">
+                  <h3 className="font-editorial text-[19px] font-medium text-[#1A1816] md:text-lg dark:text-[#F3EFE6]">
                     {month.label}
                   </h3>
-                  <span className="font-mono text-[13px] tabular-nums text-[#B43B2B] md:text-xs">
+                  <span className="font-mono text-[13px] tabular-nums text-[#B43B2B] md:text-xs dark:text-[#EB7865]">
                     {month.events.length} 次观影
                   </span>
                 </div>
@@ -625,7 +625,7 @@ export function TimelineMemoriesView({
                 <div className="relative pl-5">
                   <div
                     aria-hidden="true"
-                    className="absolute left-[7px] top-2 bottom-2 w-px bg-[#D8D0C2]"
+                    className="absolute left-[7px] top-2 bottom-2 w-px bg-[#D8D0C2] dark:bg-[#3A342D]"
                   />
 
                   <div className="space-y-3">
@@ -643,7 +643,7 @@ export function TimelineMemoriesView({
                         <div key={ev.eventId} className="relative">
                           <span
                             aria-hidden="true"
-                            className={`absolute -left-5 top-4 flex h-4 w-4 items-center justify-center rounded-full border-2 border-[#F7F5F0] ${
+                            className={`absolute -left-5 top-4 flex h-4 w-4 items-center justify-center rounded-full border-2 border-[#F7F5F0] dark:border-[#141210] ${
                               ev.watchNumber > 1 ? 'bg-[#C9A45C]' : 'bg-[#B43B2B]'
                             }`}
                           />
@@ -652,9 +652,9 @@ export function TimelineMemoriesView({
                             type="button"
                             data-testid={`watched-event-${ev.eventId}`}
                             onClick={() => onSelectItem(ev.item)}
-                            className="gallery-card gallery-card-interactive flex w-full items-start gap-3.5 border border-[#E6E0D4] p-3.5 text-left cursor-pointer active:scale-[0.99] hover:border-[#CFC7B9]"
+                            className="gallery-card gallery-card-interactive flex w-full items-start gap-3.5 border border-[#E6E0D4] p-3.5 text-left cursor-pointer active:scale-[0.99] hover:border-[#CFC7B9] dark:border-[#322D27] dark:hover:border-[#4B4339]"
                           >
-                            <div className="gallery-cover-frame w-[60px] shrink-0 bg-[#FAF9F6]">
+                            <div className="gallery-cover-frame w-[60px] shrink-0 bg-[#FAF9F6] dark:bg-[#141210]">
                               <ArchivalImage
                                 src={ev.item.coverUrl}
                                 alt={ev.item.title}
@@ -666,15 +666,15 @@ export function TimelineMemoriesView({
                             </div>
 
                             <div className="min-w-0 flex-1">
-                              <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-[#7A7268] md:text-[11px]">
-                                <span className="font-mono tabular-nums text-[#1A1816]">
+                              <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-[#7A7268] md:text-[11px] dark:text-[#A59D90]">
+                                <span className="font-mono tabular-nums text-[#1A1816] dark:text-[#F3EFE6]">
                                   {ev.dayLabel} {ev.weekdayLabel}
                                 </span>
                                 <span
                                   className={`inline-flex items-center gap-1 font-mono text-[11px] font-medium ${
                                     ev.watchNumber > 1
-                                      ? 'text-[#9B7228]'
-                                      : 'text-[#B43B2B]'
+                                      ? 'text-[#9B7228] dark:text-[#E4C37A]'
+                                      : 'text-[#B43B2B] dark:text-[#EB7865]'
                                   }`}
                                 >
                                   {ev.watchNumber > 1 && (
@@ -688,30 +688,30 @@ export function TimelineMemoriesView({
                                     </>
                                   )}
                                   {!ev.isExplicitLog && (
-                                    <span className="text-[#9C9488]">· 按收录日</span>
+                                    <span className="text-[#9C9488] dark:text-[#8E8578]">· 按收录日</span>
                                   )}
                                 </span>
                               </div>
 
-                              <h4 className="mt-1 truncate font-editorial text-[17px] font-medium text-[#1A1816] md:text-base">
+                              <h4 className="mt-1 truncate font-editorial text-[17px] font-medium text-[#1A1816] md:text-base dark:text-[#F5F1E8]">
                                 {ev.item.title}
                               </h4>
 
                               {ev.note ? (
-                                <p className="mt-1 line-clamp-2 text-[14px] leading-relaxed text-[#3D3832] md:text-xs">
+                                <p className="mt-1 line-clamp-2 text-[14px] leading-relaxed text-[#3D3832] md:text-xs dark:text-[#D4CCC0]">
                                   {ev.note}
                                 </p>
                               ) : ev.item.quote ? (
-                                <p className="mt-1 line-clamp-2 font-editorial text-[14px] italic leading-relaxed text-[#625C54] md:text-xs">
+                                <p className="mt-1 line-clamp-2 font-editorial text-[14px] italic leading-relaxed text-[#625C54] md:text-xs dark:text-[#B8AFA2]">
                                   “{ev.item.quote}”
                                 </p>
                               ) : null}
 
-                              <div className="mt-1.5 flex items-center gap-2 text-[12px] text-[#8C857B] tabular-nums md:text-[11px]">
+                              <div className="mt-1.5 flex items-center gap-2 text-[12px] text-[#8C857B] tabular-nums md:text-[11px] dark:text-[#9A9184]">
                                 {ev.item.rating > 0 && (
-                                  <span className="inline-flex items-center gap-0.5 font-mono text-[#B43B2B]">
+                                  <span className="inline-flex items-center gap-0.5 font-mono text-[#B43B2B] dark:text-[#EB7865]">
                                     <Star
-                                      className="h-3 w-3 fill-[#B43B2B] text-[#B43B2B]"
+                                      className="h-3 w-3 fill-[#B43B2B] text-[#B43B2B] dark:fill-[#EB7865] dark:text-[#EB7865]"
                                       aria-hidden="true"
                                     />
                                     {ev.item.rating}.0
@@ -737,9 +737,9 @@ export function TimelineMemoriesView({
       {/* 3C. ERA / DECADE HISTORY MODE */}
       {viewMode === 'era' &&
         (eraTimeline.decades.length === 0 && eraTimeline.undatedItems.length === 0 ? (
-          <div className="rounded-2xl border border-[#E4DFD5] bg-white px-6 py-10 text-center">
-            <History className="mx-auto h-7 w-7 text-[#C4BCB0]" aria-hidden="true" />
-            <p className="mt-2 text-sm font-medium text-[#1A1816]">
+          <div className="rounded-2xl border border-[#E4DFD5] bg-white px-6 py-10 text-center dark:border-[#322D27] dark:bg-[#1D1A17]">
+            <History className="mx-auto h-7 w-7 text-[#C4BCB0] dark:text-[#6E665C]" aria-hidden="true" />
+            <p className="mt-2 text-sm font-medium text-[#1A1816] dark:text-[#F3EFE6]">
               当前分类下暂无可按年代排列的档案
             </p>
           </div>
@@ -752,16 +752,16 @@ export function TimelineMemoriesView({
                 aria-label={`${decade.label}作品`}
                 className="space-y-3"
               >
-                <div className="flex items-baseline justify-between border-b border-[#E4DFD5] pb-2">
+                <div className="flex items-baseline justify-between border-b border-[#E4DFD5] pb-2 dark:border-[#2E2924]">
                   <div className="flex items-baseline gap-2">
-                    <h3 className="font-editorial text-[20px] font-medium text-[#1A1816] md:text-lg">
+                    <h3 className="font-editorial text-[20px] font-medium text-[#1A1816] md:text-lg dark:text-[#F3EFE6]">
                       {decade.label}
                     </h3>
-                    <span className="font-mono text-[12px] text-[#8C857B] tabular-nums">
+                    <span className="font-mono text-[12px] text-[#8C857B] tabular-nums dark:text-[#9A9184]">
                       {decade.startYear}–{decade.startYear + 9}
                     </span>
                   </div>
-                  <span className="font-mono text-[13px] tabular-nums text-[#B43B2B] md:text-xs">
+                  <span className="font-mono text-[13px] tabular-nums text-[#B43B2B] md:text-xs dark:text-[#EB7865]">
                     {decade.items.length} 件
                   </span>
                 </div>
@@ -772,9 +772,9 @@ export function TimelineMemoriesView({
                       key={item.id}
                       type="button"
                       onClick={() => onSelectItem(item)}
-                      className="gallery-card gallery-card-interactive flex w-full items-center gap-3 border border-[#E6E0D4] p-3 text-left cursor-pointer active:scale-[0.99] hover:border-[#CFC7B9]"
+                      className="gallery-card gallery-card-interactive flex w-full items-center gap-3 border border-[#E6E0D4] p-3 text-left cursor-pointer active:scale-[0.99] hover:border-[#CFC7B9] dark:border-[#322D27] dark:hover:border-[#4B4339]"
                     >
-                      <div className="gallery-cover-frame w-[54px] shrink-0 bg-[#FAF9F6]">
+                      <div className="gallery-cover-frame w-[54px] shrink-0 bg-[#FAF9F6] dark:bg-[#141210]">
                         <ArchivalImage
                           src={item.coverUrl}
                           alt={item.title}
@@ -786,8 +786,8 @@ export function TimelineMemoriesView({
                       </div>
 
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 font-mono text-[12px] text-[#7A7268] tabular-nums md:text-[11px]">
-                          <span className="font-semibold text-[#B43B2B]">
+                        <div className="flex items-center gap-1.5 font-mono text-[12px] text-[#7A7268] tabular-nums md:text-[11px] dark:text-[#A59D90]">
+                          <span className="font-semibold text-[#B43B2B] dark:text-[#EB7865]">
                             {item.year}
                           </span>
                           <span aria-hidden="true">·</span>
@@ -799,14 +799,14 @@ export function TimelineMemoriesView({
                             </>
                           )}
                         </div>
-                        <h4 className="mt-0.5 truncate font-editorial text-[16px] font-medium text-[#1A1816]">
+                        <h4 className="mt-0.5 truncate font-editorial text-[16px] font-medium text-[#1A1816] dark:text-[#F5F1E8]">
                           {item.title}
                         </h4>
-                        <div className="mt-1 flex items-center gap-2 text-[12px] text-[#8C857B] tabular-nums md:text-[11px]">
+                        <div className="mt-1 flex items-center gap-2 text-[12px] text-[#8C857B] tabular-nums md:text-[11px] dark:text-[#9A9184]">
                           {item.rating > 0 && (
-                            <span className="inline-flex items-center gap-0.5 font-mono text-[#B43B2B]">
+                            <span className="inline-flex items-center gap-0.5 font-mono text-[#B43B2B] dark:text-[#EB7865]">
                               <Star
-                                className="h-3 w-3 fill-[#B43B2B] text-[#B43B2B]"
+                                className="h-3 w-3 fill-[#B43B2B] text-[#B43B2B] dark:fill-[#EB7865] dark:text-[#EB7865]"
                                 aria-hidden="true"
                               />
                               {item.rating}.0
@@ -827,11 +827,11 @@ export function TimelineMemoriesView({
 
             {eraTimeline.undatedItems.length > 0 && (
               <section aria-label="未标年份档案" className="space-y-3">
-                <div className="flex items-baseline justify-between border-b border-[#E4DFD5] pb-2">
-                  <h3 className="font-editorial text-[18px] font-medium text-[#625C54]">
+                <div className="flex items-baseline justify-between border-b border-[#E4DFD5] pb-2 dark:border-[#2E2924]">
+                  <h3 className="font-editorial text-[18px] font-medium text-[#625C54] dark:text-[#B8AFA2]">
                     未标年份档案
                   </h3>
-                  <span className="font-mono text-[12px] tabular-nums text-[#8C857B]">
+                  <span className="font-mono text-[12px] tabular-nums text-[#8C857B] dark:text-[#9A9184]">
                     {eraTimeline.undatedItems.length} 件
                   </span>
                 </div>
@@ -841,9 +841,9 @@ export function TimelineMemoriesView({
                       key={item.id}
                       type="button"
                       onClick={() => onSelectItem(item)}
-                      className="gallery-card gallery-card-interactive flex w-full items-center gap-3 border border-[#E6E0D4] p-3 text-left cursor-pointer"
+                      className="gallery-card gallery-card-interactive flex w-full items-center gap-3 border border-[#E6E0D4] p-3 text-left cursor-pointer dark:border-[#322D27] dark:hover:border-[#4B4339]"
                     >
-                      <div className="gallery-cover-frame w-[50px] shrink-0 bg-[#FAF9F6]">
+                      <div className="gallery-cover-frame w-[50px] shrink-0 bg-[#FAF9F6] dark:bg-[#141210]">
                         <ArchivalImage
                           src={item.coverUrl}
                           alt={item.title}
@@ -854,10 +854,10 @@ export function TimelineMemoriesView({
                         />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="font-mono text-[11px] text-[#8C857B]">
+                        <p className="font-mono text-[11px] text-[#8C857B] dark:text-[#9A9184]">
                           {CATEGORY_LABELS[item.category]} · {item.accessionNo}
                         </p>
-                        <h4 className="mt-0.5 truncate font-editorial text-[16px] font-medium text-[#1A1816]">
+                        <h4 className="mt-0.5 truncate font-editorial text-[16px] font-medium text-[#1A1816] dark:text-[#F5F1E8]">
                           {item.title}
                         </h4>
                       </div>

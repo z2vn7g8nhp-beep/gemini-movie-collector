@@ -108,6 +108,13 @@ import {
   DEFAULT_SHOWCASE_CONFIG,
   normalizeShowcaseConfig,
 } from './utils/showcase';
+import {
+  applyThemeToDocument,
+  loadSavedTheme,
+  saveThemePreference,
+  toggleThemeMode,
+  type ThemeMode,
+} from './utils/theme';
 
 const LOCAL_STORAGE_KEY = 'cinearchive.collection.v2';
 const COLLECTOR_STORAGE_KEY = 'cinearchive.collector.v1';
@@ -231,7 +238,17 @@ export default function App() {
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
 
   const [viewMode, setViewMode] = useState<ArchiveViewMode>(() => loadViewMode());
+  const [theme, setTheme] = useState<ThemeMode>(() => loadSavedTheme());
   const quickSearchInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    applyThemeToDocument(theme);
+    saveThemePreference(theme);
+  }, [theme]);
+
+  const handleToggleTheme = () => {
+    setTheme((prev) => toggleThemeMode(prev));
+  };
 
   // Batch curation state
   const [batchMode, setBatchMode] = useState(false);
@@ -1420,13 +1437,15 @@ export default function App() {
   }, [drawerNavList, selectedItem]);
 
   return (
-    <div className="flex min-h-[100dvh] w-full max-w-full flex-col overflow-x-clip bg-[#F7F5F0] text-[#1A1816]">
+    <div className="flex min-h-[100dvh] w-full max-w-full flex-col overflow-x-clip bg-[#F7F5F0] text-[#1A1816] transition-colors duration-200 dark:bg-[#141210] dark:text-[#F3EFE6]">
       <AppTopBar
         activeTab={activeTab}
         onSelectTab={setActiveTab}
         totalCount={stats.total}
         needsDailyCheckIn={showTopCheckInIcon}
         onQuickCheckIn={() => void handleCheckInToday()}
+        theme={theme}
+        onToggleTheme={handleToggleTheme}
       />
 
       <main className="w-full min-w-0 flex-1">
@@ -1499,9 +1518,9 @@ export default function App() {
                     type="button"
                     data-testid="studio-watchlist-blindbox-btn"
                     onClick={handleOpenWatchlistBlindBox}
-                    className="flex min-h-[54px] flex-col items-center justify-center gap-1 rounded-2xl border border-[#E4DFD5] bg-white px-1.5 py-2 text-[#1A1816] shadow-[0_1px_2px_rgba(26,24,22,0.03)] cursor-pointer active:scale-[0.97] hover:border-[#B43B2B] transition-all sm:min-h-[44px] sm:flex-row sm:gap-2"
+                    className="flex min-h-[54px] flex-col items-center justify-center gap-1 rounded-2xl border border-[#E4DFD5] bg-white px-1.5 py-2 text-[#1A1816] shadow-[0_1px_2px_rgba(26,24,22,0.03)] cursor-pointer active:scale-[0.97] hover:border-[#B43B2B] transition-all sm:min-h-[44px] sm:flex-row sm:gap-2 dark:border-[#322D27] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:hover:border-[#E06856]"
                   >
-                    <Dices className="h-4 w-4 text-[#B43B2B]" aria-hidden="true" />
+                    <Dices className="h-4 w-4 text-[#B43B2B] dark:text-[#EB7865]" aria-hidden="true" />
                     <span className="text-[12px] font-medium whitespace-nowrap">
                       今晚看啥
                     </span>
@@ -1511,9 +1530,9 @@ export default function App() {
                     type="button"
                     data-testid="studio-quotes-wall-btn"
                     onClick={() => setQuotesWallOpen(true)}
-                    className="flex min-h-[54px] flex-col items-center justify-center gap-1 rounded-2xl border border-[#E4DFD5] bg-white px-1.5 py-2 text-[#1A1816] shadow-[0_1px_2px_rgba(26,24,22,0.03)] cursor-pointer active:scale-[0.97] hover:border-[#1A1816] transition-all sm:min-h-[44px] sm:flex-row sm:gap-2"
+                    className="flex min-h-[54px] flex-col items-center justify-center gap-1 rounded-2xl border border-[#E4DFD5] bg-white px-1.5 py-2 text-[#1A1816] shadow-[0_1px_2px_rgba(26,24,22,0.03)] cursor-pointer active:scale-[0.97] hover:border-[#1A1816] transition-all sm:min-h-[44px] sm:flex-row sm:gap-2 dark:border-[#322D27] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:hover:border-[#D4AF6A]"
                   >
-                    <Quote className="h-4 w-4 text-[#A67C37]" aria-hidden="true" />
+                    <Quote className="h-4 w-4 text-[#A67C37] dark:text-[#E4C37A]" aria-hidden="true" />
                     <span className="text-[12px] font-medium whitespace-nowrap">
                       金句本
                     </span>
@@ -1523,9 +1542,9 @@ export default function App() {
                     type="button"
                     data-testid="studio-global-map-btn"
                     onClick={() => setGlobalMapOpen(true)}
-                    className="flex min-h-[54px] flex-col items-center justify-center gap-1 rounded-2xl border border-[#E4DFD5] bg-white px-1.5 py-2 text-[#1A1816] shadow-[0_1px_2px_rgba(26,24,22,0.03)] cursor-pointer active:scale-[0.97] hover:border-[#1A1816] transition-all sm:min-h-[44px] sm:flex-row sm:gap-2"
+                    className="flex min-h-[54px] flex-col items-center justify-center gap-1 rounded-2xl border border-[#E4DFD5] bg-white px-1.5 py-2 text-[#1A1816] shadow-[0_1px_2px_rgba(26,24,22,0.03)] cursor-pointer active:scale-[0.97] hover:border-[#1A1816] transition-all sm:min-h-[44px] sm:flex-row sm:gap-2 dark:border-[#322D27] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:hover:border-[#7AB59E]"
                   >
-                    <Compass className="h-4 w-4 text-[#4E7A6A]" aria-hidden="true" />
+                    <Compass className="h-4 w-4 text-[#4E7A6A] dark:text-[#7AB59E]" aria-hidden="true" />
                     <span className="text-[12px] font-medium whitespace-nowrap">
                       关系星图
                     </span>
@@ -1541,9 +1560,9 @@ export default function App() {
                         title: activeAlbum ? activeAlbum.name : '我的私人光影志',
                       })
                     }
-                    className="flex min-h-[54px] flex-col items-center justify-center gap-1 rounded-2xl border border-[#E4DFD5] bg-white px-1.5 py-2 text-[#1A1816] shadow-[0_1px_2px_rgba(26,24,22,0.03)] cursor-pointer active:scale-[0.97] hover:border-[#1A1816] transition-all sm:min-h-[44px] sm:flex-row sm:gap-2"
+                    className="flex min-h-[54px] flex-col items-center justify-center gap-1 rounded-2xl border border-[#E4DFD5] bg-white px-1.5 py-2 text-[#1A1816] shadow-[0_1px_2px_rgba(26,24,22,0.03)] cursor-pointer active:scale-[0.97] hover:border-[#1A1816] transition-all sm:min-h-[44px] sm:flex-row sm:gap-2 dark:border-[#322D27] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:hover:border-[#D4AF6A]"
                   >
-                    <Grid3x3 className="h-4 w-4 text-[#1A1816]" aria-hidden="true" />
+                    <Grid3x3 className="h-4 w-4 text-[#1A1816] dark:text-[#E8E2D7]" aria-hidden="true" />
                     <span className="text-[12px] font-medium whitespace-nowrap">
                       海报墙
                     </span>
@@ -1564,7 +1583,7 @@ export default function App() {
                     搜片名、影人、角色或筛查馆藏
                   </label>
                   <Search
-                    className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[#8C857B]"
+                    className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[#8C857B] dark:text-[#9A9184]"
                     aria-hidden="true"
                   />
                   <input
@@ -1579,21 +1598,21 @@ export default function App() {
                         ? '搜片名、影人或角色，回车直接联网收录…'
                         : '筛查馆藏，或回车全网搜片…'
                     }
-                    className="h-12 w-full rounded-2xl border border-[#DCD6CB] bg-white pl-10 pr-10 text-[16px] text-[#1A1816] shadow-[0_1px_2px_rgba(26,24,22,0.03)] placeholder:text-[#8C857B] transition-colors focus:border-[#1A1816] focus:outline-none md:h-11 md:pr-14 md:text-sm [&::-webkit-search-cancel-button]:hidden"
+                    className="h-12 w-full rounded-2xl border border-[#DCD6CB] bg-white pl-10 pr-10 text-[16px] text-[#1A1816] shadow-[0_1px_2px_rgba(26,24,22,0.03)] placeholder:text-[#8C857B] transition-colors focus:border-[#1A1816] focus:outline-none md:h-11 md:pr-14 md:text-sm dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:placeholder:text-[#8E8578] dark:focus:border-[#D4AF6A] [&::-webkit-search-cancel-button]:hidden"
                   />
                   {libraryQuery ? (
                     <button
                       type="button"
                       onClick={() => setLibraryQuery('')}
                       aria-label="清空输入"
-                      className="absolute right-1 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl text-[#625C54] hover:text-[#1A1816] cursor-pointer"
+                      className="absolute right-1 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl text-[#625C54] hover:text-[#1A1816] dark:text-[#A59D90] dark:hover:text-[#F3EFE6] cursor-pointer"
                     >
                       <X className="h-4 w-4" />
                     </button>
                   ) : (
                     <kbd
                       aria-hidden="true"
-                      className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-md border border-[#E0D9CD] bg-[#FAF8F3] px-1.5 py-0.5 font-mono text-[11px] text-[#8C857B] md:inline-block"
+                      className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-md border border-[#E0D9CD] bg-[#FAF8F3] px-1.5 py-0.5 font-mono text-[11px] text-[#8C857B] md:inline-block dark:border-[#3E3830] dark:bg-[#26221D] dark:text-[#9A9184]"
                     >
                       /
                     </kbd>
@@ -1602,7 +1621,7 @@ export default function App() {
 
                 <button
                   type="submit"
-                  className="h-12 shrink-0 rounded-2xl bg-[#1A1816] px-4 min-[420px]:px-5 text-[15px] font-medium text-white whitespace-nowrap cursor-pointer active:scale-[0.97] transition-all hover:bg-[#B43B2B] md:h-11 md:text-sm"
+                  className="h-12 shrink-0 rounded-2xl bg-[#1A1816] px-4 min-[420px]:px-5 text-[15px] font-medium text-white whitespace-nowrap cursor-pointer active:scale-[0.97] transition-all hover:bg-[#B43B2B] md:h-11 md:text-sm dark:bg-[#F3EFE6] dark:text-[#141210] dark:hover:bg-[#E4C37A]"
                 >
                   联网搜
                 </button>
@@ -1611,13 +1630,13 @@ export default function App() {
               {/* Unified Category Tabs + Filter/Sort/View Controls */}
               <div
                 className={`mt-3.5 flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between ${
-                  items.length > 0 ? 'border-b border-[#E4DFD5] pb-3.5' : ''
+                  items.length > 0 ? 'border-b border-[#E4DFD5] pb-3.5 dark:border-[#2E2924]' : ''
                 }`}
               >
                 <div
                   role="group"
                   aria-label="藏品分类"
-                  className="grid w-full grid-cols-4 gap-1 rounded-xl bg-[#ECE8DF] p-1 sm:max-w-[380px]"
+                  className="grid w-full grid-cols-4 gap-1 rounded-xl bg-[#ECE8DF] p-1 sm:max-w-[380px] dark:bg-[#231F1B]"
                 >
                   {LIBRARY_CATS.map((cat) => {
                     const active = activeCategory === cat.id;
@@ -1637,8 +1656,8 @@ export default function App() {
                         onClick={() => setActiveCategory(cat.id)}
                         className={`min-h-[42px] rounded-lg px-1.5 text-[13px] min-[420px]:text-[14px] font-medium whitespace-nowrap cursor-pointer transition-colors md:min-h-[36px] md:text-xs ${
                           active
-                            ? 'bg-white text-[#1A1816] shadow-xs'
-                            : 'text-[#625C54] hover:text-[#1A1816]'
+                            ? 'bg-white text-[#1A1816] shadow-xs dark:bg-[#353029] dark:text-[#F5F1E8]'
+                            : 'text-[#625C54] hover:text-[#1A1816] dark:text-[#A89F92] dark:hover:text-[#F3EFE6]'
                         }`}
                       >
                         {cat.label}
@@ -1668,7 +1687,7 @@ export default function App() {
                             e.target.value as 'all' | CollectionStatus
                           )
                         }
-                        className="h-11 min-w-0 w-full rounded-xl border border-[#DCD6CB] bg-white px-2.5 text-[16px] font-medium text-[#1A1816] focus:border-[#1A1816] focus:outline-none sm:h-9 sm:w-auto sm:px-3 md:text-xs"
+                        className="h-11 min-w-0 w-full rounded-xl border border-[#DCD6CB] bg-white px-2.5 text-[16px] font-medium text-[#1A1816] focus:border-[#1A1816] focus:outline-none sm:h-9 sm:w-auto sm:px-3 md:text-xs dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:focus:border-[#D4AF6A]"
                       >
                         <option value="all">全部状态</option>
                         <option value="favorite">挚爱</option>
@@ -1688,8 +1707,8 @@ export default function App() {
                             onChange={(e) => setActiveTag(e.target.value)}
                             className={`h-11 min-w-0 w-full rounded-xl border px-2.5 text-[16px] font-medium focus:outline-none sm:h-9 sm:w-auto sm:max-w-[160px] sm:px-3 md:text-xs ${
                               activeTag
-                                ? 'border-[#1A1816] bg-[#1A1816] text-white'
-                                : 'border-[#DCD6CB] bg-white text-[#1A1816] focus:border-[#1A1816]'
+                                ? 'border-[#1A1816] bg-[#1A1816] text-white dark:border-[#E4C37A] dark:bg-[#F3EFE6] dark:text-[#141210]'
+                                : 'border-[#DCD6CB] bg-white text-[#1A1816] focus:border-[#1A1816] dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:focus:border-[#D4AF6A]'
                             }`}
                           >
                             <option value="">全部标签</option>
@@ -1709,7 +1728,7 @@ export default function App() {
                         id="mobile-sort-select"
                         value={sortBy}
                         onChange={(e) => setSortBy(e.target.value as SortOption)}
-                        className="h-11 min-w-0 w-full rounded-xl border border-[#DCD6CB] bg-white px-2.5 text-[16px] font-medium text-[#1A1816] focus:border-[#1A1816] focus:outline-none sm:h-9 sm:w-auto sm:px-3 md:text-xs"
+                        className="h-11 min-w-0 w-full rounded-xl border border-[#DCD6CB] bg-white px-2.5 text-[16px] font-medium text-[#1A1816] focus:border-[#1A1816] focus:outline-none sm:h-9 sm:w-auto sm:px-3 md:text-xs dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:focus:border-[#D4AF6A]"
                       >
                         <option value="recent">最近收录</option>
                         <option value="rating">评分最高</option>
@@ -1727,8 +1746,8 @@ export default function App() {
                           onClick={() => setAdvancedFiltersOpen((v) => !v)}
                           className={`inline-flex h-9 items-center gap-1 rounded-xl border px-2.5 text-xs font-medium whitespace-nowrap cursor-pointer transition-colors ${
                             advancedFiltersOpen || activeAdvancedFilterCount > 0
-                              ? 'border-[#1A1816] bg-[#1A1816] text-white'
-                              : 'border-[#DCD6CB] bg-white text-[#4B453E] hover:border-[#1A1816]'
+                              ? 'border-[#1A1816] bg-[#1A1816] text-white dark:border-[#F3EFE6] dark:bg-[#F3EFE6] dark:text-[#141210]'
+                              : 'border-[#DCD6CB] bg-white text-[#4B453E] hover:border-[#1A1816] dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#C4BCB0] dark:hover:border-[#D4AF6A] dark:hover:text-[#F3EFE6]'
                           }`}
                         >
                           <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
@@ -1753,7 +1772,7 @@ export default function App() {
                           className={`inline-flex h-9 items-center gap-1 rounded-xl border px-2.5 text-xs font-medium whitespace-nowrap cursor-pointer transition-colors ${
                             batchMode
                               ? 'border-[#B43B2B] bg-[#B43B2B] text-white'
-                              : 'border-[#DCD6CB] bg-white text-[#4B453E] hover:border-[#1A1816]'
+                              : 'border-[#DCD6CB] bg-white text-[#4B453E] hover:border-[#1A1816] dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#C4BCB0] dark:hover:border-[#D4AF6A] dark:hover:text-[#F3EFE6]'
                           }`}
                         >
                           <CheckSquare className="h-3.5 w-3.5" aria-hidden="true" />
@@ -1765,7 +1784,7 @@ export default function App() {
                             type="button"
                             data-testid="reset-filters-inline-btn"
                             onClick={handleResetFilters}
-                            className="inline-flex h-9 items-center gap-1 rounded-xl border border-[#E5BFB9] bg-[#FDF4F2] px-2 text-xs font-medium text-[#B43B2B] whitespace-nowrap cursor-pointer transition-colors hover:bg-[#FBE6E1]"
+                            className="inline-flex h-9 items-center gap-1 rounded-xl border border-[#E5BFB9] bg-[#FDF4F2] px-2 text-xs font-medium text-[#B43B2B] whitespace-nowrap cursor-pointer transition-colors hover:bg-[#FBE6E1] dark:border-[#6B3229] dark:bg-[#351B17] dark:text-[#F28C7B] dark:hover:bg-[#46231D]"
                           >
                             <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
                             <span>重置</span>
@@ -1776,7 +1795,7 @@ export default function App() {
                       <div className="flex items-center gap-2">
                         <span
                           data-testid="stat-total"
-                          className="font-mono text-[13px] tabular-nums text-[#7A7268] shrink-0 md:text-xs"
+                          className="font-mono text-[13px] tabular-nums text-[#7A7268] shrink-0 md:text-xs dark:text-[#9A9184]"
                         >
                           {filteredItems.length} 件
                         </span>
@@ -1785,7 +1804,7 @@ export default function App() {
                         <div
                           role="group"
                           aria-label="视图切换"
-                          className="inline-flex rounded-xl bg-[#ECE8DF] p-0.5"
+                          className="inline-flex rounded-xl bg-[#ECE8DF] p-0.5 dark:bg-[#231F1B]"
                         >
                           <button
                             type="button"
@@ -1795,8 +1814,8 @@ export default function App() {
                             onClick={() => setViewMode('grid')}
                             className={`flex h-8 w-9 items-center justify-center rounded-lg cursor-pointer transition-colors ${
                               viewMode === 'grid'
-                                ? 'bg-white text-[#1A1816] shadow-xs'
-                                : 'text-[#625C54] hover:text-[#1A1816]'
+                                ? 'bg-white text-[#1A1816] shadow-xs dark:bg-[#353029] dark:text-[#F5F1E8]'
+                                : 'text-[#625C54] hover:text-[#1A1816] dark:text-[#9A9184] dark:hover:text-[#F3EFE6]'
                             }`}
                           >
                             <LayoutGrid className="h-4 w-4" aria-hidden="true" />
@@ -1809,8 +1828,8 @@ export default function App() {
                             onClick={() => setViewMode('list')}
                             className={`flex h-8 w-9 items-center justify-center rounded-lg cursor-pointer transition-colors ${
                               viewMode === 'list'
-                                ? 'bg-white text-[#1A1816] shadow-xs'
-                                : 'text-[#625C54] hover:text-[#1A1816]'
+                                ? 'bg-white text-[#1A1816] shadow-xs dark:bg-[#353029] dark:text-[#F5F1E8]'
+                                : 'text-[#625C54] hover:text-[#1A1816] dark:text-[#9A9184] dark:hover:text-[#F3EFE6]'
                             }`}
                           >
                             <List className="h-4 w-4" aria-hidden="true" />
@@ -1826,13 +1845,13 @@ export default function App() {
               {items.length > 0 && advancedFiltersOpen && (
                 <div
                   data-testid="advanced-filters-panel"
-                  className="mt-3 rounded-2xl border border-[#E4DFD5] bg-white p-3.5"
+                  className="mt-3 rounded-2xl border border-[#E4DFD5] bg-white p-3.5 dark:border-[#322D27] dark:bg-[#1D1A17]"
                 >
                   <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
                     <div>
                       <label
                         htmlFor="filter-decade"
-                        className="mb-1 block text-[11px] font-medium text-[#7A7268]"
+                        className="mb-1 block text-[11px] font-medium text-[#7A7268] dark:text-[#A59D90]"
                       >
                         上映年代
                       </label>
@@ -1843,7 +1862,7 @@ export default function App() {
                         onChange={(e) =>
                           setDecadeFilter(e.target.value as DecadeFilterOption)
                         }
-                        className="h-10 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-2.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:text-xs"
+                        className="h-10 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-2.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:text-xs dark:border-[#3A342D] dark:bg-[#24201C] dark:text-[#F3EFE6] dark:focus:border-[#D4AF6A]"
                       >
                         {DECADE_FILTER_OPTIONS.map((opt) => (
                           <option key={opt.id} value={opt.id}>
@@ -1856,7 +1875,7 @@ export default function App() {
                     <div>
                       <label
                         htmlFor="filter-region"
-                        className="mb-1 block text-[11px] font-medium text-[#7A7268]"
+                        className="mb-1 block text-[11px] font-medium text-[#7A7268] dark:text-[#A59D90]"
                       >
                         国家 / 地区
                       </label>
@@ -1865,7 +1884,7 @@ export default function App() {
                         data-testid="filter-region-select"
                         value={regionFilter}
                         onChange={(e) => setRegionFilter(e.target.value)}
-                        className="h-10 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-2.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:text-xs"
+                        className="h-10 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-2.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:text-xs dark:border-[#3A342D] dark:bg-[#24201C] dark:text-[#F3EFE6] dark:focus:border-[#D4AF6A]"
                       >
                         <option value="">全部地区</option>
                         {regionRegistry.map((reg) => (
@@ -1879,7 +1898,7 @@ export default function App() {
                     <div>
                       <label
                         htmlFor="filter-rating-bucket"
-                        className="mb-1 block text-[11px] font-medium text-[#7A7268]"
+                        className="mb-1 block text-[11px] font-medium text-[#7A7268] dark:text-[#A59D90]"
                       >
                         评分档位
                       </label>
@@ -1892,7 +1911,7 @@ export default function App() {
                             e.target.value as RatingBucketFilterOption
                           )
                         }
-                        className="h-10 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-2.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:text-xs"
+                        className="h-10 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-2.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:text-xs dark:border-[#3A342D] dark:bg-[#24201C] dark:text-[#F3EFE6] dark:focus:border-[#D4AF6A]"
                       >
                         <option value="all">全部评分</option>
                         <option value="5">五星神作</option>
@@ -1905,7 +1924,7 @@ export default function App() {
                     <div>
                       <label
                         htmlFor="filter-completeness"
-                        className="mb-1 block text-[11px] font-medium text-[#7A7268]"
+                        className="mb-1 block text-[11px] font-medium text-[#7A7268] dark:text-[#A59D90]"
                       >
                         成色进度
                       </label>
@@ -1918,7 +1937,7 @@ export default function App() {
                             e.target.value as CompletenessFilterOption
                           )
                         }
-                        className="h-10 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-2.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:text-xs"
+                        className="h-10 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-2.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:text-xs dark:border-[#3A342D] dark:bg-[#24201C] dark:text-[#F3EFE6] dark:focus:border-[#D4AF6A]"
                       >
                         <option value="all">全部成色</option>
                         <option value="masterpiece">典藏级 (5/5)</option>
@@ -1934,14 +1953,14 @@ export default function App() {
                   {activeAlbum && (
                     <div
                       data-testid="active-album-banner"
-                      className="flex flex-1 min-w-[240px] items-center justify-between gap-2 rounded-xl border border-[#C9A45C] bg-[#FFFDF9] px-3.5 py-2"
+                      className="flex flex-1 min-w-[240px] items-center justify-between gap-2 rounded-xl border border-[#C9A45C] bg-[#FFFDF9] px-3.5 py-2 dark:border-[#C9A45C]/65 dark:bg-[#221E18]"
                     >
-                      <div className="flex min-w-0 items-center gap-1.5 text-[13px] text-[#1A1816] md:text-xs">
+                      <div className="flex min-w-0 items-center gap-1.5 text-[13px] text-[#1A1816] md:text-xs dark:text-[#F3EFE6]">
                         <BookOpen
-                          className="h-4 w-4 shrink-0 text-[#A67C37]"
+                          className="h-4 w-4 shrink-0 text-[#A67C37] dark:text-[#E4C37A]"
                           aria-hidden="true"
                         />
-                        <span className="text-[#7A7268] shrink-0">图鉴筛选</span>
+                        <span className="text-[#7A7268] shrink-0 dark:text-[#A59D90]">图鉴筛选</span>
                         <span className="truncate font-medium">
                           「{activeAlbum.name}」
                         </span>
@@ -1950,7 +1969,7 @@ export default function App() {
                         type="button"
                         onClick={() => setActiveAlbumId('')}
                         aria-label="清除图鉴筛选"
-                        className="inline-flex min-h-[36px] shrink-0 items-center gap-1 rounded-lg px-2.5 text-[13px] font-medium text-[#625C54] hover:bg-[#F3EFE8] hover:text-[#1A1816] cursor-pointer md:text-xs"
+                        className="inline-flex min-h-[36px] shrink-0 items-center gap-1 rounded-lg px-2.5 text-[13px] font-medium text-[#625C54] hover:bg-[#F3EFE8] hover:text-[#1A1816] cursor-pointer md:text-xs dark:text-[#B8AFA2] dark:hover:bg-[#312B24] dark:hover:text-[#F3EFE6]"
                       >
                         <X className="h-3.5 w-3.5" aria-hidden="true" />
                         <span>清除</span>
@@ -1961,14 +1980,14 @@ export default function App() {
                   {activeTag && (
                     <div
                       data-testid="active-tag-banner"
-                      className="flex flex-1 min-w-[240px] items-center justify-between gap-2 rounded-xl border border-[#DCD6CB] bg-white px-3.5 py-2"
+                      className="flex flex-1 min-w-[240px] items-center justify-between gap-2 rounded-xl border border-[#DCD6CB] bg-white px-3.5 py-2 dark:border-[#3A342D] dark:bg-[#1D1A17]"
                     >
-                      <div className="flex min-w-0 items-center gap-1.5 text-[13px] text-[#1A1816] md:text-xs">
+                      <div className="flex min-w-0 items-center gap-1.5 text-[13px] text-[#1A1816] md:text-xs dark:text-[#F3EFE6]">
                         <Tag
-                          className="h-4 w-4 shrink-0 text-[#B43B2B]"
+                          className="h-4 w-4 shrink-0 text-[#B43B2B] dark:text-[#EB7865]"
                           aria-hidden="true"
                         />
-                        <span className="text-[#7A7268] shrink-0">标签筛选</span>
+                        <span className="text-[#7A7268] shrink-0 dark:text-[#A59D90]">标签筛选</span>
                         <span className="truncate font-medium">
                           「{activeTag}」
                         </span>
@@ -1977,7 +1996,7 @@ export default function App() {
                         type="button"
                         onClick={() => setActiveTag('')}
                         aria-label="清除标签筛选"
-                        className="inline-flex min-h-[36px] shrink-0 items-center gap-1 rounded-lg px-2.5 text-[13px] font-medium text-[#625C54] hover:bg-[#F3EFE8] hover:text-[#1A1816] cursor-pointer md:text-xs"
+                        className="inline-flex min-h-[36px] shrink-0 items-center gap-1 rounded-lg px-2.5 text-[13px] font-medium text-[#625C54] hover:bg-[#F3EFE8] hover:text-[#1A1816] cursor-pointer md:text-xs dark:text-[#B8AFA2] dark:hover:bg-[#312B24] dark:hover:text-[#F3EFE6]"
                       >
                         <X className="h-3.5 w-3.5" aria-hidden="true" />
                         <span>清除</span>
@@ -2078,6 +2097,8 @@ export default function App() {
             stats={stats}
             collector={collector}
             runtimeMode={runtimeMode}
+            theme={theme}
+            onToggleTheme={handleToggleTheme}
             onCheckInToday={handleCheckInToday}
             onReplaceAll={handleReplaceAll}
             onFilterByTag={handleFilterByTag}
@@ -2092,7 +2113,7 @@ export default function App() {
         <div
           role="status"
           aria-live="polite"
-          className={`toast-pop-in fixed left-1/2 z-50 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-2.5 rounded-xl border border-white/10 bg-[#1A1816] px-4 py-2.5 text-[13px] font-medium text-[#FAF7F0] shadow-xl md:text-xs ${
+          className={`toast-pop-in fixed left-1/2 z-50 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-2.5 rounded-xl border border-white/10 bg-[#1A1816] px-4 py-2.5 text-[13px] font-medium text-[#FAF7F0] shadow-xl md:text-xs dark:border-[#D4AF6A]/35 dark:bg-[#24201B] ${
             pendingLinkSuggestion
               ? 'top-[calc(64px+env(safe-area-inset-top))] md:top-[76px]'
               : 'bottom-[calc(76px+env(safe-area-inset-bottom))] md:bottom-6'

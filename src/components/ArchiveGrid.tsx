@@ -215,16 +215,16 @@ export function ArchiveGrid({
   if (allItems.length === 0) {
     return (
       <section className="mx-auto max-w-[1180px] px-4 pt-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] min-[420px]:px-5 md:px-8 md:pt-6 md:pb-16">
-        <div className="gallery-card overflow-hidden border border-[#E4DFD5] p-6 sm:p-8 lg:grid lg:grid-cols-12 lg:items-center lg:gap-10 lg:p-10">
+        <div className="gallery-card overflow-hidden border border-[#E4DFD5] p-6 sm:p-8 lg:grid lg:grid-cols-12 lg:items-center lg:gap-10 lg:p-10 dark:border-[#322D27]">
           {/* Left Editorial Welcome */}
           <div className="lg:col-span-7">
-            <p className="font-mono text-xs tracking-[0.14em] text-[#8C857B]">
+            <p className="font-mono text-xs tracking-[0.14em] text-[#8C857B] dark:text-[#9A9184]">
               私人光影档案馆 · ARCHIVE READY
             </p>
-            <h1 className="mt-2.5 font-editorial text-[26px] font-medium leading-tight text-[#1A1816] sm:text-[32px]">
+            <h1 className="mt-2.5 font-editorial text-[26px] font-medium leading-tight text-[#1A1816] sm:text-[32px] dark:text-[#F5F1E8]">
               为打动过你的光影、影人与角色立一座藏馆
             </h1>
-            <p className="mt-3 max-w-xl text-sm leading-relaxed text-[#625C54]">
+            <p className="mt-3 max-w-xl text-sm leading-relaxed text-[#625C54] dark:text-[#B8AFA2]">
               直连检索影片、导演、演员与经典角色，建立双向关联图谱，写下台词摘录与观影手记，并点亮专属实体藏卡与影藏勋章。
             </p>
 
@@ -239,7 +239,7 @@ export function ArchiveGrid({
               <button
                 type="button"
                 onClick={onJumpToCreate}
-                className="min-h-[46px] rounded-xl border border-[#DCD6CB] bg-white px-5 text-sm font-medium text-[#1A1816] whitespace-nowrap cursor-pointer active:scale-[0.98] transition-colors hover:border-[#1A1816]"
+                className="min-h-[46px] rounded-xl border border-[#DCD6CB] bg-white px-5 text-sm font-medium text-[#1A1816] whitespace-nowrap cursor-pointer active:scale-[0.98] transition-colors hover:border-[#1A1816] dark:border-[#3E3830] dark:bg-[#25211D] dark:text-[#F3EFE6] dark:hover:border-[#D4AF6A]"
               >
                 手动建档
               </button>
@@ -247,53 +247,53 @@ export function ArchiveGrid({
           </div>
 
           {/* Right Archival Pillars Guide */}
-          <div className="mt-7 grid grid-cols-1 gap-3 border-t border-[#ECE6DA] pt-6 sm:grid-cols-3 lg:col-span-5 lg:mt-0 lg:grid-cols-1 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-8">
-            <div className="flex items-start gap-3 rounded-2xl bg-[#FAF8F4] p-3.5">
+          <div className="mt-7 grid grid-cols-1 gap-3 border-t border-[#ECE6DA] pt-6 sm:grid-cols-3 lg:col-span-5 lg:mt-0 lg:grid-cols-1 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-8 dark:border-[#2E2924]">
+            <div className="flex items-start gap-3 rounded-2xl bg-[#FAF8F4] p-3.5 dark:bg-[#24201C]">
               <span
                 aria-hidden="true"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#1C1A17] text-[#E4C37A]"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#1C1A17] text-[#E4C37A] dark:bg-[#141210]"
               >
                 <Film className="h-4 w-4" />
               </span>
               <div className="min-w-0">
-                <p className="font-editorial text-sm font-medium text-[#1A1816]">
+                <p className="font-editorial text-sm font-medium text-[#1A1816] dark:text-[#F3EFE6]">
                   01. 影视典藏
                 </p>
-                <p className="mt-0.5 text-xs leading-relaxed text-[#6E665C]">
+                <p className="mt-0.5 text-xs leading-relaxed text-[#6E665C] dark:text-[#A89F92]">
                   直连获取中英文片名、海报与演职员，记录评分、状态与台词。
                 </p>
               </div>
             </div>
 
-            <div className="flex items-start gap-3 rounded-2xl bg-[#FAF8F4] p-3.5">
+            <div className="flex items-start gap-3 rounded-2xl bg-[#FAF8F4] p-3.5 dark:bg-[#24201C]">
               <span
                 aria-hidden="true"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#1C1A17] text-[#DFC191]"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#1C1A17] text-[#DFC191] dark:bg-[#141210]"
               >
                 <User className="h-4 w-4" />
               </span>
               <div className="min-w-0">
-                <p className="font-editorial text-sm font-medium text-[#1A1816]">
+                <p className="font-editorial text-sm font-medium text-[#1A1816] dark:text-[#F3EFE6]">
                   02. 影人脉络
                 </p>
-                <p className="mt-0.5 text-xs leading-relaxed text-[#6E665C]">
+                <p className="mt-0.5 text-xs leading-relaxed text-[#6E665C] dark:text-[#A89F92]">
                   串联导演、演员与代表作，构建专属私人电影关系图谱。
                 </p>
               </div>
             </div>
 
-            <div className="flex items-start gap-3 rounded-2xl bg-[#FAF8F4] p-3.5">
+            <div className="flex items-start gap-3 rounded-2xl bg-[#FAF8F4] p-3.5 dark:bg-[#24201C]">
               <span
                 aria-hidden="true"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#1C1A17] text-[#E7A898]"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#1C1A17] text-[#E7A898] dark:bg-[#141210]"
               >
                 <Sparkles className="h-4 w-4" />
               </span>
               <div className="min-w-0">
-                <p className="font-editorial text-sm font-medium text-[#1A1816]">
+                <p className="font-editorial text-sm font-medium text-[#1A1816] dark:text-[#F3EFE6]">
                   03. 角色小传
                 </p>
-                <p className="mt-0.5 text-xs leading-relaxed text-[#6E665C]">
+                <p className="mt-0.5 text-xs leading-relaxed text-[#6E665C] dark:text-[#A89F92]">
                   收存难忘荧幕角色与高光时刻，翻转实体藏卡与影藏勋章。
                 </p>
               </div>
@@ -307,11 +307,11 @@ export function ArchiveGrid({
   if (items.length === 0) {
     return (
       <section className="mx-auto max-w-[1180px] px-4 py-10 md:px-8">
-        <div className="mx-auto max-w-md rounded-2xl border border-[#E4DFD5] bg-[#FFFDF9] px-6 py-10 text-center">
-          <p className="font-mono text-xs tracking-[0.14em] text-[#8C857B]">
+        <div className="mx-auto max-w-md rounded-2xl border border-[#E4DFD5] bg-[#FFFDF9] px-6 py-10 text-center dark:border-[#322D27] dark:bg-[#1D1A17]">
+          <p className="font-mono text-xs tracking-[0.14em] text-[#8C857B] dark:text-[#9A9184]">
             筛查结果为空
           </p>
-          <h2 className="mt-2 font-editorial text-xl font-medium text-[#1A1816]">
+          <h2 className="mt-2 font-editorial text-xl font-medium text-[#1A1816] dark:text-[#F3EFE6]">
             {searchQuery
               ? `馆内暂无「${searchQuery}」`
               : activeAlbumName
@@ -333,7 +333,7 @@ export function ArchiveGrid({
             <button
               type="button"
               onClick={onResetFilters}
-              className="min-h-[44px] rounded-xl border border-[#DCD6CB] bg-white px-5 text-sm font-medium text-[#1A1816] cursor-pointer transition-colors hover:border-[#1A1816] active:scale-[0.98]"
+              className="min-h-[44px] rounded-xl border border-[#DCD6CB] bg-white px-5 text-sm font-medium text-[#1A1816] cursor-pointer transition-colors hover:border-[#1A1816] active:scale-[0.98] dark:border-[#3E3830] dark:bg-[#25211D] dark:text-[#F3EFE6] dark:hover:border-[#D4AF6A]"
             >
               查看全部藏品
             </button>
@@ -402,7 +402,7 @@ export function ArchiveGrid({
                       className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border ${
                         isSelected
                           ? 'border-[#B43B2B] bg-[#B43B2B] text-white'
-                          : 'border-[#CFC7B9] bg-white text-transparent'
+                          : 'border-[#CFC7B9] bg-white text-transparent dark:border-[#4D453B] dark:bg-[#25211D]'
                       }`}
                     >
                       <Check className="h-3.5 w-3.5" />
@@ -420,7 +420,7 @@ export function ArchiveGrid({
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-[11px] tabular-nums text-[#7A7268]">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-[11px] tabular-nums text-[#7A7268] dark:text-[#9E9588]">
                       <span>{item.accessionNo}</span>
                       <span aria-hidden="true">·</span>
                       <span>{CATEGORY_LABELS[item.category]}</span>
@@ -433,7 +433,7 @@ export function ArchiveGrid({
                       <span aria-hidden="true">·</span>
                       <span
                         className={
-                          isFavorite ? 'font-medium text-[#8E6523]' : undefined
+                          isFavorite ? 'font-medium text-[#8E6523] dark:text-[#E4C37A]' : undefined
                         }
                       >
                         {getStatusLabel(item.status, item.category)}
@@ -441,24 +441,24 @@ export function ArchiveGrid({
                       {isMasterpiece && (
                         <>
                           <span aria-hidden="true">·</span>
-                          <span className="font-medium text-[#8E6523]">典藏</span>
+                          <span className="font-medium text-[#8E6523] dark:text-[#E4C37A]">典藏</span>
                         </>
                       )}
                     </div>
 
                     <div className="mt-0.5 flex items-baseline gap-2">
-                      <h2 className="truncate font-editorial text-[16px] font-medium text-[#1A1816] group-hover:text-[#B43B2B] transition-colors">
+                      <h2 className="truncate font-editorial text-[16px] font-medium text-[#1A1816] group-hover:text-[#B43B2B] transition-colors dark:text-[#F3EFE6] dark:group-hover:text-[#F28C7B]">
                         {item.title}
                       </h2>
                       {item.originalTitle && (
-                        <span className="hidden truncate text-xs text-[#8C857B] sm:inline">
+                        <span className="hidden truncate text-xs text-[#8C857B] sm:inline dark:text-[#9A9184]">
                           {item.originalTitle}
                         </span>
                       )}
                     </div>
 
                     {excerpt && (
-                      <p className="mt-0.5 line-clamp-1 text-xs text-[#625C54]">
+                      <p className="mt-0.5 line-clamp-1 text-xs text-[#625C54] dark:text-[#B8AFA2]">
                         {item.quote ? `“${item.quote}”` : excerpt}
                       </p>
                     )}
@@ -469,18 +469,18 @@ export function ArchiveGrid({
                       {item.rating > 0 ? (
                         <>
                           <Star
-                            className="h-3.5 w-3.5 fill-[#B43B2B] text-[#B43B2B]"
+                            className="h-3.5 w-3.5 fill-[#B43B2B] text-[#B43B2B] dark:fill-[#EB7865] dark:text-[#EB7865]"
                             aria-hidden="true"
                           />
-                          <span className="font-medium text-[#1A1816]">
+                          <span className="font-medium text-[#1A1816] dark:text-[#F3EFE6]">
                             {item.rating}.0
                           </span>
                         </>
                       ) : (
-                        <span className="text-[#8C857B]">未评</span>
+                        <span className="text-[#8C857B] dark:text-[#9A9184]">未评</span>
                       )}
                     </span>
-                    <span className="font-mono text-[11px] tabular-nums text-[#7A7268]">
+                    <span className="font-mono text-[11px] tabular-nums text-[#7A7268] dark:text-[#9E9588]">
                       {relatedSummary || `${completeness.tierLabel} ${completeness.score}/5`}
                     </span>
                   </div>
@@ -492,7 +492,7 @@ export function ArchiveGrid({
                     onClick={() => onOpenCardModal(item)}
                     aria-label={`以实体藏卡赏析「${item.title}」`}
                     title="实体藏卡赏析"
-                    className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#E4DFD5] bg-white text-[#625C54] transition-colors hover:border-[#1A1816] hover:text-[#1A1816] cursor-pointer md:inline-flex"
+                    className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#E4DFD5] bg-white text-[#625C54] transition-colors hover:border-[#1A1816] hover:text-[#1A1816] cursor-pointer md:inline-flex dark:border-[#3A342D] dark:bg-[#25211D] dark:text-[#C4BCB0] dark:hover:border-[#D4AF6A] dark:hover:text-[#F3EFE6]"
                   >
                     <Layers className="h-4 w-4" aria-hidden="true" />
                   </button>
@@ -609,27 +609,27 @@ export function ArchiveGrid({
 
                   {/* Readable Archival Metadata */}
                   <div className="flex flex-1 flex-col px-3 pt-2.5 pb-3.5 min-[420px]:px-3.5">
-                    <p className="truncate font-mono text-[11px] text-[#7A7268] tabular-nums md:text-[10px]">
+                    <p className="truncate font-mono text-[11px] text-[#7A7268] tabular-nums md:text-[10px] dark:text-[#9E9588]">
                       <span>{metaPrefix}</span>
                       <span aria-hidden="true"> · </span>
                       <span
                         className={
-                          isFavorite ? 'font-medium text-[#8E6523]' : undefined
+                          isFavorite ? 'font-medium text-[#8E6523] dark:text-[#E4C37A]' : undefined
                         }
                       >
                         {statusLabel}
                       </span>
                     </p>
-                    <h2 className="mt-1 line-clamp-1 font-editorial text-[16px] min-[420px]:text-[17px] font-medium leading-snug text-[#1A1816] transition-colors group-hover:text-[#B43B2B] md:text-[16px]">
+                    <h2 className="mt-1 line-clamp-1 font-editorial text-[16px] min-[420px]:text-[17px] font-medium leading-snug text-[#1A1816] transition-colors group-hover:text-[#B43B2B] md:text-[16px] dark:text-[#F3EFE6] dark:group-hover:text-[#F28C7B]">
                       {item.title}
                     </h2>
                     {item.subtitle && (
-                      <p className="mt-0.5 line-clamp-1 text-[13px] text-[#625C54] md:text-xs">
+                      <p className="mt-0.5 line-clamp-1 text-[13px] text-[#625C54] md:text-xs dark:text-[#B5ACA0]">
                         {item.subtitle}
                       </p>
                     )}
 
-                    <div className="mt-auto flex items-center justify-between gap-1.5 pt-2.5 text-[12px] text-[#7A7268] md:text-[11px]">
+                    <div className="mt-auto flex items-center justify-between gap-1.5 pt-2.5 text-[12px] text-[#7A7268] md:text-[11px] dark:text-[#9E9588]">
                       <span
                         className="inline-flex shrink-0 items-center gap-1 tabular-nums"
                         aria-label={
@@ -639,10 +639,10 @@ export function ArchiveGrid({
                         {item.rating > 0 ? (
                           <>
                             <Star
-                              className="h-3.5 w-3.5 fill-[#B43B2B] text-[#B43B2B] md:h-3 md:w-3"
+                              className="h-3.5 w-3.5 fill-[#B43B2B] text-[#B43B2B] md:h-3 md:w-3 dark:fill-[#EB7865] dark:text-[#EB7865]"
                               aria-hidden="true"
                             />
-                            <span className="font-mono font-medium text-[#1A1816]">
+                            <span className="font-mono font-medium text-[#1A1816] dark:text-[#F3EFE6]">
                               {item.rating}.0
                             </span>
                           </>
@@ -653,12 +653,12 @@ export function ArchiveGrid({
                       {relatedSummary ? (
                         <span
                           data-testid={`card-relations-${item.id}`}
-                          className="truncate font-medium text-[#5A534B] tabular-nums"
+                          className="truncate font-medium text-[#5A534B] tabular-nums dark:text-[#C4BCB0]"
                         >
                           {relatedSummary}
                         </span>
                       ) : (
-                        <span className="font-mono text-[11px] tabular-nums text-[#8C857B] md:text-[10px]">
+                        <span className="font-mono text-[11px] tabular-nums text-[#8C857B] md:text-[10px] dark:text-[#9A9184]">
                           {completeness.tierLabel} {completeness.score}/5
                         </span>
                       )}
@@ -675,9 +675,9 @@ export function ArchiveGrid({
                           className={`h-[3px] rounded-full ${
                             idx < completeness.score
                               ? isMasterpiece
-                                ? 'bg-[#A67C37]'
-                                : 'bg-[#B43B2B]/80'
-                              : 'bg-[#ECE7DD]'
+                                ? 'bg-[#A67C37] dark:bg-[#D4AF6A]'
+                                : 'bg-[#B43B2B]/80 dark:bg-[#E06856]'
+                              : 'bg-[#ECE7DD] dark:bg-[#322D27]'
                           }`}
                         />
                       ))}

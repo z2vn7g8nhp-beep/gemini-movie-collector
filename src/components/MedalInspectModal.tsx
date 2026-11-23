@@ -40,14 +40,14 @@ export function MedalInspectModal({
       aria-modal="true"
       aria-labelledby="medal-inspect-title"
       data-testid="medal-inspect-modal"
-      className="fixed inset-0 z-[70] flex items-end justify-center overflow-hidden bg-[#12100E]/75 p-0 backdrop-blur-xs sm:items-center sm:p-4"
+      className="fixed inset-0 z-[70] flex items-end justify-center overflow-hidden bg-[#12100E]/75 p-0 backdrop-blur-xs sm:items-center sm:p-4 dark:bg-black/80"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="flex max-h-[90dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-3xl border border-[#3A342C] bg-[#F7F5F0] shadow-2xl sm:max-w-[400px] sm:rounded-3xl">
+      <div className="flex max-h-[90dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-3xl border border-[#3A342C] bg-[#F7F5F0] shadow-2xl sm:max-w-[400px] sm:rounded-3xl dark:border-[#3A342C] dark:bg-[#181512]">
         {/* Ceremonial Velvet Stage */}
-        <div className="relative shrink-0 bg-[#1C1A17] px-6 pt-5 pb-6 text-center text-[#F5F1E8]">
+        <div className="relative shrink-0 bg-[#1C1A17] px-6 pt-5 pb-6 text-center text-[#F5F1E8] dark:border-b dark:border-[#2E2924] dark:bg-[#13110F]">
           <div className="flex items-center justify-between">
             <span className="font-mono text-[12px] tracking-[0.1em] text-[#B8AE9E] md:text-[11px]">
               影藏勋章 · {MEDAL_CATEGORY_LABELS[medal.category]}系列
@@ -88,32 +88,32 @@ export function MedalInspectModal({
 
         {/* Archival Lore & Tier Ladder */}
         <div className="flex-1 space-y-4 overflow-y-auto overflow-x-hidden overscroll-contain px-5 pt-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:pb-5">
-          <p className="text-[14px] leading-relaxed text-[#4B453E] md:text-xs">
+          <p className="text-[14px] leading-relaxed text-[#4B453E] md:text-xs dark:text-[#C8C0B4]">
             {medal.description}
           </p>
 
           {/* Progress Bar toward current/next tier */}
           <div>
             <div className="flex items-center justify-between text-[13px] tabular-nums md:text-xs">
-              <span className="text-[#625C54]">
+              <span className="text-[#625C54] dark:text-[#A59D90]">
                 {medal.nextTarget !== null
                   ? medal.unlocked
                     ? '距下一阶晋升'
                     : '解锁进度'
                   : '已达最高殿堂阶位'}
               </span>
-              <span className="font-mono font-medium text-[#1A1816]">
+              <span className="font-mono font-medium text-[#1A1816] dark:text-[#F3EFE6]">
                 {medal.current} / {medal.target}
               </span>
             </div>
-            <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-[#E8E2D7]">
+            <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-[#E8E2D7] dark:bg-[#2A2520]">
               <div
                 className={`h-full rounded-full transition-all ${
                   medal.tier === 'crimson'
                     ? 'bg-[#B43B2B]'
                     : medal.tier === 'gold'
-                      ? 'bg-[#A67C37]'
-                      : 'bg-[#1A1816]'
+                      ? 'bg-[#A67C37] dark:bg-[#D4AF6A]'
+                      : 'bg-[#1A1816] dark:bg-[#E8E0D2]'
                 }`}
                 style={{ width: `${progressPct}%` }}
               />
@@ -121,8 +121,8 @@ export function MedalInspectModal({
           </div>
 
           {/* Tier Progression Ladder */}
-          <div className="border-t border-[#E4DFD5] pt-3.5">
-            <p className="text-[12px] font-medium tracking-[0.06em] text-[#7A7268] md:text-[11px]">
+          <div className="border-t border-[#E4DFD5] pt-3.5 dark:border-[#2E2924]">
+            <p className="text-[12px] font-medium tracking-[0.06em] text-[#7A7268] md:text-[11px] dark:text-[#A59D90]">
               晋升阶位
             </p>
             <div
@@ -139,13 +139,15 @@ export function MedalInspectModal({
                     key={stop.tier}
                     className={`rounded-xl border px-2 py-2 text-center ${
                       reached
-                        ? 'border-[#C9A45C] bg-[#FDFBF5]'
-                        : 'border-[#ECE7DD] bg-white/70'
+                        ? 'border-[#C9A45C] bg-[#FDFBF5] dark:border-[#C9A45C]/65 dark:bg-[#241E16]'
+                        : 'border-[#ECE7DD] bg-white/70 dark:border-[#2E2924] dark:bg-[#1D1A17]'
                     }`}
                   >
                     <p
                       className={`flex items-center justify-center gap-0.5 text-[12px] font-medium whitespace-nowrap md:text-[11px] ${
-                        reached ? 'text-[#8E6523]' : 'text-[#8C857B]'
+                        reached
+                          ? 'text-[#8E6523] dark:text-[#E4C37A]'
+                          : 'text-[#8C857B] dark:text-[#8E8578]'
                       }`}
                     >
                       {reached && (
@@ -153,7 +155,7 @@ export function MedalInspectModal({
                       )}
                       <span>{stop.label}</span>
                     </p>
-                    <p className="mt-0.5 font-mono text-[11px] tabular-nums text-[#7A7268] md:text-[10px]">
+                    <p className="mt-0.5 font-mono text-[11px] tabular-nums text-[#7A7268] md:text-[10px] dark:text-[#9A9184]">
                       ≥{stop.threshold}
                     </p>
                   </div>
@@ -181,7 +183,7 @@ export function MedalInspectModal({
             <button
               type="button"
               onClick={onClose}
-              className={`min-h-[46px] rounded-xl border border-[#DCD6CB] bg-white px-4 text-[14px] font-medium text-[#1A1816] whitespace-nowrap cursor-pointer md:min-h-[44px] md:text-xs ${
+              className={`min-h-[46px] rounded-xl border border-[#DCD6CB] bg-white px-4 text-[14px] font-medium text-[#1A1816] whitespace-nowrap cursor-pointer hover:border-[#1A1816] md:min-h-[44px] md:text-xs dark:border-[#3A342D] dark:bg-[#24201C] dark:text-[#F3EFE6] dark:hover:border-[#D4AF6A] ${
                 medal.tagName && onFilterByTag ? 'shrink-0' : 'w-full'
               }`}
             >

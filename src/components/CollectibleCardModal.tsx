@@ -364,24 +364,26 @@ export function CollectibleCardModal({
           <div
             data-testid="collectible-card-back"
             onClick={() => setFlipped(false)}
-            className={`card-backface-hidden card-rotate-y-180 absolute inset-0 flex flex-col overflow-hidden rounded-3xl border-2 bg-[#FAF8F3] p-5 text-[#1A1816] shadow-2xl cursor-pointer ${
-              isMasterpiece ? 'border-[#C9A45C]' : 'border-[#DCD6CB]'
+            className={`card-backface-hidden card-rotate-y-180 absolute inset-0 flex flex-col overflow-hidden rounded-3xl border-2 bg-[#FAF8F3] p-5 text-[#1A1816] shadow-2xl cursor-pointer dark:bg-[#1A1714] dark:text-[#F3EFE6] ${
+              isMasterpiece
+                ? 'border-[#C9A45C]'
+                : 'border-[#DCD6CB] dark:border-[#3A352E]'
             }`}
           >
-            <div className="flex items-center justify-between gap-2 border-b border-[#E4DFD5] pb-3">
+            <div className="flex items-center justify-between gap-2 border-b border-[#E4DFD5] pb-3 dark:border-[#2E2924]">
               <div className="min-w-0 flex-1">
-                <p className="font-mono text-[12px] tracking-[0.08em] text-[#7A7268] tabular-nums md:text-[11px]">
+                <p className="font-mono text-[12px] tracking-[0.08em] text-[#7A7268] tabular-nums md:text-[11px] dark:text-[#A59D90]">
                   {item.accessionNo} · 馆藏鉴定卡
                 </p>
-                <h3 className="mt-0.5 truncate font-editorial text-[19px] font-medium text-[#1A1816] md:text-lg">
+                <h3 className="mt-0.5 truncate font-editorial text-[19px] font-medium text-[#1A1816] md:text-lg dark:text-[#F5F1E8]">
                   {item.title}
                 </h3>
               </div>
               <span
                 className={`shrink-0 whitespace-nowrap rounded-lg border px-2 py-0.5 font-editorial text-[13px] md:text-xs ${
                   isMasterpiece
-                    ? 'border-[#A67C37] text-[#8E6523]'
-                    : 'border-[#CFC7B9] text-[#625C54]'
+                    ? 'border-[#A67C37] text-[#8E6523] dark:border-[#C9A45C] dark:text-[#E4C37A]'
+                    : 'border-[#CFC7B9] text-[#625C54] dark:border-[#3E3830] dark:text-[#B8AFA2]'
                 }`}
               >
                 {completeness.tierLabel} {completeness.score}/5
@@ -389,15 +391,15 @@ export function CollectibleCardModal({
             </div>
 
             {/* Quote / Story Excerpt */}
-            <div className="mt-3.5 border-b border-[#EFECE5] pb-3.5">
-              <p className="font-editorial text-[15px] italic leading-relaxed text-[#2E2A26] line-clamp-4 md:text-sm">
+            <div className="mt-3.5 border-b border-[#EFECE5] pb-3.5 dark:border-[#2E2924]">
+              <p className="font-editorial text-[15px] italic leading-relaxed text-[#2E2A26] line-clamp-4 md:text-sm dark:text-[#E2DBD0]">
                 {item.quote ? `“${item.quote}”` : backStory}
               </p>
             </div>
 
             {/* 5-Point Completeness Checklist */}
             <div className="mt-3.5">
-              <p className="text-[12px] font-medium tracking-[0.06em] text-[#7A7268] md:text-[11px]">
+              <p className="text-[12px] font-medium tracking-[0.06em] text-[#7A7268] md:text-[11px] dark:text-[#A59D90]">
                 典藏级打磨清单
               </p>
               <ul className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2 text-[13px] md:text-xs">
@@ -405,17 +407,19 @@ export function CollectibleCardModal({
                   <li
                     key={row.key}
                     className={`flex items-center gap-1.5 ${
-                      row.done ? 'text-[#1A1816]' : 'text-[#8C857B]'
+                      row.done
+                        ? 'text-[#1A1816] dark:text-[#F3EFE6]'
+                        : 'text-[#8C857B] dark:text-[#8E8578]'
                     }`}
                   >
                     {row.done ? (
                       <Check
-                        className="h-3.5 w-3.5 shrink-0 text-[#2A6B46]"
+                        className="h-3.5 w-3.5 shrink-0 text-[#2A6B46] dark:text-[#6CC492]"
                         aria-hidden="true"
                       />
                     ) : (
                       <Circle
-                        className="h-3.5 w-3.5 shrink-0 text-[#CBC3B6]"
+                        className="h-3.5 w-3.5 shrink-0 text-[#CBC3B6] dark:text-[#524B42]"
                         aria-hidden="true"
                       />
                     )}
@@ -426,28 +430,28 @@ export function CollectibleCardModal({
             </div>
 
             {/* Metadata Footer */}
-            <div className="mt-auto space-y-1.5 border-t border-[#E4DFD5] pt-3 text-[13px] text-[#625C54] md:text-xs">
+            <div className="mt-auto space-y-1.5 border-t border-[#E4DFD5] pt-3 text-[13px] text-[#625C54] md:text-xs dark:border-[#2E2924] dark:text-[#C4BCB0]">
               <p className="truncate">
-                <span className="text-[#8C857B]">状态：</span>
+                <span className="text-[#8C857B] dark:text-[#8E8578]">状态：</span>
                 {getStatusLabel(item.status, item.category)}
                 {item.rating > 0 ? ` · ${item.rating}.0 星` : ''}
               </p>
               {item.tags.length > 0 && (
                 <p className="truncate">
-                  <span className="text-[#8C857B]">标签：</span>
+                  <span className="text-[#8C857B] dark:text-[#8E8578]">标签：</span>
                   {item.tags.join(' · ')}
                 </p>
               )}
               {related.length > 0 && (
                 <p className="truncate">
-                  <span className="text-[#8C857B]">关联：</span>
+                  <span className="text-[#8C857B] dark:text-[#8E8578]">关联：</span>
                   {related
                     .slice(0, 3)
                     .map((r) => r.title)
                     .join(' · ')}
                 </p>
               )}
-              <p className="pt-1 font-mono text-[11px] tabular-nums text-[#8C857B] md:text-[10px]">
+              <p className="pt-1 font-mono text-[11px] tabular-nums text-[#8C857B] md:text-[10px] dark:text-[#8E8578]">
                 入藏日期：{item.createdAt.slice(0, 10)} · 点击翻回正面
               </p>
             </div>

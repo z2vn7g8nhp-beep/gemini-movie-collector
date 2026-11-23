@@ -232,16 +232,16 @@ export function ManualCreateView({
         <form
           onSubmit={handleSubmit}
           noValidate
-          className="gallery-card space-y-5 border border-[#E4DFD5] p-4 min-[420px]:p-5 sm:p-6 lg:col-span-7"
+          className="gallery-card space-y-5 border border-[#E4DFD5] p-4 min-[420px]:p-5 sm:p-6 lg:col-span-7 dark:border-[#322D27]"
         >
         <div>
-          <span className="block text-[13px] font-medium text-[#625C54] md:text-xs">
+          <span className="block text-[13px] font-medium text-[#625C54] md:text-xs dark:text-[#A59D90]">
             建档分类
           </span>
           <div
             role="group"
             aria-label="手动建档分类"
-            className="mt-2 grid grid-cols-3 gap-1 rounded-xl bg-[#EFECE5] p-1"
+            className="mt-2 grid grid-cols-3 gap-1 rounded-xl bg-[#EFECE5] p-1 dark:bg-[#231F1B]"
           >
             {(['film', 'person', 'character'] as ArchiveCategory[]).map((cat) => (
               <button
@@ -251,8 +251,8 @@ export function ManualCreateView({
                 onClick={() => setCategory(cat)}
                 className={`min-h-[44px] rounded-lg text-[15px] font-medium cursor-pointer transition-colors md:min-h-[42px] md:text-sm ${
                   category === cat
-                    ? 'bg-white text-[#1A1816] shadow-xs'
-                    : 'text-[#625C54]'
+                    ? 'bg-white text-[#1A1816] shadow-xs dark:bg-[#353029] dark:text-[#F5F1E8]'
+                    : 'text-[#625C54] dark:text-[#A59D90] dark:hover:text-[#F3EFE6]'
                 }`}
               >
                 {CATEGORY_LABELS[cat]}
@@ -265,9 +265,9 @@ export function ManualCreateView({
         <div>
           <label
             htmlFor="create-title"
-            className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
+            className="block text-[13px] font-medium text-[#4B453E] md:text-xs dark:text-[#C4BCB0]"
           >
-            名称 / 片名 <span className="text-[#B43B2B]">*</span>
+            名称 / 片名 <span className="text-[#B43B2B] dark:text-[#EB7865]">*</span>
           </label>
           <input
             id="create-title"
@@ -285,14 +285,14 @@ export function ManualCreateView({
                   ? '例如：梁朝伟'
                   : '例如：周慕云'
             }
-            className={`mt-1.5 h-12 w-full rounded-xl border bg-[#FAF9F6] px-3.5 text-[16px] text-[#1A1816] focus:bg-white focus:outline-none md:text-[15px] ${
+            className={`mt-1.5 h-12 w-full rounded-xl border bg-[#FAF9F6] px-3.5 text-[16px] text-[#1A1816] placeholder:text-[#8C857B] focus:bg-white focus:outline-none md:text-[15px] dark:bg-[#141210] dark:text-[#F3EFE6] dark:placeholder:text-[#787066] dark:focus:bg-[#141210] ${
               errors.title
-                ? 'border-[#B43B2B]'
-                : 'border-[#DCD6CB] focus:border-[#1A1816]'
+                ? 'border-[#B43B2B] dark:border-[#EB7865]'
+                : 'border-[#DCD6CB] focus:border-[#1A1816] dark:border-[#3A342D] dark:focus:border-[#D4AF6A]'
             }`}
           />
           {errors.title && (
-            <p role="alert" className="mt-1.5 text-[13px] text-[#B43B2B] md:text-xs">
+            <p role="alert" className="mt-1.5 text-[13px] text-[#B43B2B] md:text-xs dark:text-[#F28C7B]">
               {errors.title}
             </p>
           )}
@@ -302,7 +302,7 @@ export function ManualCreateView({
           <div>
             <label
               htmlFor="create-original-title"
-              className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
+              className="block text-[13px] font-medium text-[#4B453E] md:text-xs dark:text-[#C4BCB0]"
             >
               原名 / 外文名（选填）
             </label>
@@ -312,14 +312,14 @@ export function ManualCreateView({
               value={originalTitle}
               onChange={(e) => setOriginalTitle(e.target.value)}
               placeholder="选填"
-              className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none md:text-sm"
+              className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-[16px] text-[#1A1816] placeholder:text-[#8C857B] focus:border-[#1A1816] focus:bg-white focus:outline-none md:text-sm dark:border-[#3A342D] dark:bg-[#141210] dark:text-[#F3EFE6] dark:placeholder:text-[#787066] dark:focus:border-[#D4AF6A] dark:focus:bg-[#141210]"
             />
           </div>
 
           <div>
             <label
               htmlFor="create-subtitle"
-              className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
+              className="block text-[13px] font-medium text-[#4B453E] md:text-xs dark:text-[#C4BCB0]"
             >
               {category === 'film'
                 ? '导演 / 类型'
@@ -333,7 +333,7 @@ export function ManualCreateView({
               value={subtitle}
               onChange={(e) => setSubtitle(e.target.value)}
               placeholder="选填"
-              className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none md:text-sm"
+              className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-[16px] text-[#1A1816] placeholder:text-[#8C857B] focus:border-[#1A1816] focus:bg-white focus:outline-none md:text-sm dark:border-[#3A342D] dark:bg-[#141210] dark:text-[#F3EFE6] dark:placeholder:text-[#787066] dark:focus:border-[#D4AF6A] dark:focus:bg-[#141210]"
             />
           </div>
         </div>
@@ -342,7 +342,7 @@ export function ManualCreateView({
           <div>
             <label
               htmlFor="create-year"
-              className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
+              className="block text-[13px] font-medium text-[#4B453E] md:text-xs dark:text-[#C4BCB0]"
             >
               年份（4位）
             </label>
@@ -356,14 +356,14 @@ export function ManualCreateView({
                 if (errors.year) setErrors((p) => ({ ...p, year: undefined }));
               }}
               placeholder="如 2000"
-              className={`mt-1.5 h-12 w-full rounded-xl border bg-[#FAF9F6] px-3.5 font-mono text-[16px] text-[#1A1816] focus:bg-white focus:outline-none md:text-sm ${
+              className={`mt-1.5 h-12 w-full rounded-xl border bg-[#FAF9F6] px-3.5 font-mono text-[16px] text-[#1A1816] placeholder:text-[#8C857B] focus:bg-white focus:outline-none md:text-sm dark:bg-[#141210] dark:text-[#F3EFE6] dark:placeholder:text-[#787066] dark:focus:bg-[#141210] ${
                 errors.year
-                  ? 'border-[#B43B2B]'
-                  : 'border-[#DCD6CB] focus:border-[#1A1816]'
+                  ? 'border-[#B43B2B] dark:border-[#EB7865]'
+                  : 'border-[#DCD6CB] focus:border-[#1A1816] dark:border-[#3A342D] dark:focus:border-[#D4AF6A]'
               }`}
             />
             {errors.year && (
-              <p role="alert" className="mt-1 text-[13px] text-[#B43B2B] md:text-xs">
+              <p role="alert" className="mt-1 text-[13px] text-[#B43B2B] md:text-xs dark:text-[#F28C7B]">
                 {errors.year}
               </p>
             )}
@@ -372,7 +372,7 @@ export function ManualCreateView({
           <div>
             <label
               htmlFor="create-region"
-              className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
+              className="block text-[13px] font-medium text-[#4B453E] md:text-xs dark:text-[#C4BCB0]"
             >
               地区
             </label>
@@ -382,7 +382,7 @@ export function ManualCreateView({
               value={region}
               onChange={(e) => setRegion(e.target.value)}
               placeholder="如 中国 / 日本"
-              className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none md:text-sm"
+              className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-[16px] text-[#1A1816] placeholder:text-[#8C857B] focus:border-[#1A1816] focus:bg-white focus:outline-none md:text-sm dark:border-[#3A342D] dark:bg-[#141210] dark:text-[#F3EFE6] dark:placeholder:text-[#787066] dark:focus:border-[#D4AF6A] dark:focus:bg-[#141210]"
             />
           </div>
         </div>
@@ -392,7 +392,7 @@ export function ManualCreateView({
           <div>
             <label
               htmlFor="create-work"
-              className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
+              className="block text-[13px] font-medium text-[#4B453E] md:text-xs dark:text-[#C4BCB0]"
             >
               {category === 'character'
                 ? '出处影视作品'
@@ -406,7 +406,7 @@ export function ManualCreateView({
               value={relatedWorkTitle}
               onChange={(e) => setRelatedWorkTitle(e.target.value)}
               placeholder="选填"
-              className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none md:text-sm"
+              className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-[16px] text-[#1A1816] placeholder:text-[#8C857B] focus:border-[#1A1816] focus:bg-white focus:outline-none md:text-sm dark:border-[#3A342D] dark:bg-[#141210] dark:text-[#F3EFE6] dark:placeholder:text-[#787066] dark:focus:border-[#D4AF6A] dark:focus:bg-[#141210]"
             />
           </div>
 
@@ -414,7 +414,7 @@ export function ManualCreateView({
             <div>
               <label
                 htmlFor="create-actor"
-                className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
+                className="block text-[13px] font-medium text-[#4B453E] md:text-xs dark:text-[#C4BCB0]"
               >
                 饰演演员 / 声优
               </label>
@@ -424,7 +424,7 @@ export function ManualCreateView({
                 value={portrayedBy}
                 onChange={(e) => setPortrayedBy(e.target.value)}
                 placeholder="选填"
-                className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none md:text-sm"
+                className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-[16px] text-[#1A1816] placeholder:text-[#8C857B] focus:border-[#1A1816] focus:bg-white focus:outline-none md:text-sm dark:border-[#3A342D] dark:bg-[#141210] dark:text-[#F3EFE6] dark:placeholder:text-[#787066] dark:focus:border-[#D4AF6A] dark:focus:bg-[#141210]"
               />
             </div>
           )}
@@ -432,7 +432,7 @@ export function ManualCreateView({
 
         {/* Status */}
         <div>
-          <span className="block text-[13px] font-medium text-[#4B453E] md:text-xs">
+          <span className="block text-[13px] font-medium text-[#4B453E] md:text-xs dark:text-[#C4BCB0]">
             收藏状态
           </span>
           <div className="mt-2 grid grid-cols-4 gap-2">
@@ -446,8 +446,8 @@ export function ManualCreateView({
                   onClick={() => setStatus(st)}
                   className={`min-h-[44px] rounded-xl text-[13px] font-medium whitespace-nowrap cursor-pointer transition-colors md:min-h-[42px] md:text-xs ${
                     active
-                      ? 'bg-[#1A1816] text-white'
-                      : 'border border-[#DCD6CB] bg-[#FAF9F6] text-[#4B453E]'
+                      ? 'bg-[#1A1816] text-white dark:bg-[#F3EFE6] dark:text-[#141210]'
+                      : 'border border-[#DCD6CB] bg-[#FAF9F6] text-[#4B453E] dark:border-[#3A342D] dark:bg-[#24201C] dark:text-[#D4CCC0] dark:hover:border-[#D4AF6A]'
                   }`}
                 >
                   {getStatusLabel(st, category)}
@@ -459,7 +459,7 @@ export function ManualCreateView({
 
         {/* Rating Stars (44px touch targets) */}
         <div>
-          <span className="block text-[13px] font-medium text-[#4B453E] md:text-xs">
+          <span className="block text-[13px] font-medium text-[#4B453E] md:text-xs dark:text-[#C4BCB0]">
             个人评分
           </span>
           <div className="mt-2 flex items-center gap-1">
@@ -470,18 +470,18 @@ export function ManualCreateView({
                 aria-label={`评为 ${starVal} 星`}
                 aria-pressed={rating >= starVal}
                 onClick={() => setRating(rating === starVal ? 0 : starVal)}
-                className="flex h-11 w-11 items-center justify-center rounded-xl hover:bg-[#F3EFE8] cursor-pointer"
+                className="flex h-11 w-11 items-center justify-center rounded-xl hover:bg-[#F3EFE8] cursor-pointer dark:hover:bg-[#2A2520]"
               >
                 <Star
                   className={`h-6 w-6 ${
                     starVal <= rating
-                      ? 'fill-[#B43B2B] text-[#B43B2B]'
-                      : 'text-[#CFC8BC]'
+                      ? 'fill-[#B43B2B] text-[#B43B2B] dark:fill-[#EB7865] dark:text-[#EB7865]'
+                      : 'text-[#CFC8BC] dark:text-[#4F483E]'
                   }`}
                 />
               </button>
             ))}
-            <span className="ml-2 font-mono text-[13px] tabular-nums text-[#625C54] md:text-xs">
+            <span className="ml-2 font-mono text-[13px] tabular-nums text-[#625C54] md:text-xs dark:text-[#A59D90]">
               {rating > 0 ? `${rating}.0` : '未评'}
             </span>
           </div>
@@ -491,7 +491,7 @@ export function ManualCreateView({
         <div>
           <label
             htmlFor="create-cover"
-            className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
+            className="block text-[13px] font-medium text-[#4B453E] md:text-xs dark:text-[#C4BCB0]"
           >
             封面 / 剧照链接（选填，自动服务端直连代理）
           </label>
@@ -506,14 +506,14 @@ export function ManualCreateView({
               }
             }}
             placeholder="https://..."
-            className={`mt-1.5 h-12 w-full rounded-xl border bg-[#FAF9F6] px-3.5 font-mono text-[16px] text-[#1A1816] focus:bg-white focus:outline-none md:text-xs ${
+            className={`mt-1.5 h-12 w-full rounded-xl border bg-[#FAF9F6] px-3.5 font-mono text-[16px] text-[#1A1816] placeholder:text-[#8C857B] focus:bg-white focus:outline-none md:text-xs dark:bg-[#141210] dark:text-[#F3EFE6] dark:placeholder:text-[#787066] dark:focus:bg-[#141210] ${
               errors.coverUrl
-                ? 'border-[#B43B2B]'
-                : 'border-[#DCD6CB] focus:border-[#1A1816]'
+                ? 'border-[#B43B2B] dark:border-[#EB7865]'
+                : 'border-[#DCD6CB] focus:border-[#1A1816] dark:border-[#3A342D] dark:focus:border-[#D4AF6A]'
             }`}
           />
           {errors.coverUrl && (
-            <p role="alert" className="mt-1 text-[13px] text-[#B43B2B] md:text-xs">
+            <p role="alert" className="mt-1 text-[13px] text-[#B43B2B] md:text-xs dark:text-[#F28C7B]">
               {errors.coverUrl}
             </p>
           )}
@@ -523,7 +523,7 @@ export function ManualCreateView({
         <div>
           <label
             htmlFor="create-quote"
-            className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
+            className="block text-[13px] font-medium text-[#4B453E] md:text-xs dark:text-[#C4BCB0]"
           >
             经典台词 / 语录（选填）
           </label>
@@ -533,14 +533,14 @@ export function ManualCreateView({
             value={quote}
             onChange={(e) => setQuote(e.target.value)}
             placeholder="摘录一句最打动你的台词…"
-            className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none md:text-sm"
+            className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-[16px] text-[#1A1816] placeholder:text-[#8C857B] focus:border-[#1A1816] focus:bg-white focus:outline-none md:text-sm dark:border-[#3A342D] dark:bg-[#141210] dark:text-[#F3EFE6] dark:placeholder:text-[#787066] dark:focus:border-[#D4AF6A] dark:focus:bg-[#141210]"
           />
         </div>
 
         <div>
           <label
             htmlFor="create-notes"
-            className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
+            className="block text-[13px] font-medium text-[#4B453E] md:text-xs dark:text-[#C4BCB0]"
           >
             观影手记 / 简介（选填）
           </label>
@@ -550,14 +550,14 @@ export function ManualCreateView({
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="记录你的想法、剧情备忘或喜欢这个角色的原因…"
-            className="mt-1.5 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 py-3 text-[16px] leading-relaxed text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none md:text-sm"
+            className="mt-1.5 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 py-3 text-[16px] leading-relaxed text-[#1A1816] placeholder:text-[#8C857B] focus:border-[#1A1816] focus:bg-white focus:outline-none md:text-sm dark:border-[#3A342D] dark:bg-[#141210] dark:text-[#F3EFE6] dark:placeholder:text-[#787066] dark:focus:border-[#D4AF6A] dark:focus:bg-[#141210]"
           />
         </div>
 
         <div>
           <label
             htmlFor="create-tags"
-            className="block text-[13px] font-medium text-[#4B453E] md:text-xs"
+            className="block text-[13px] font-medium text-[#4B453E] md:text-xs dark:text-[#C4BCB0]"
           >
             标签（顿号或逗号分隔）
           </label>
@@ -567,7 +567,7 @@ export function ManualCreateView({
             value={tagsText}
             onChange={(e) => setTagsText(e.target.value)}
             placeholder="例如：年度挚爱、反复重刷"
-            className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:bg-white focus:outline-none md:text-sm"
+            className="mt-1.5 h-12 w-full rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-[16px] text-[#1A1816] placeholder:text-[#8C857B] focus:border-[#1A1816] focus:bg-white focus:outline-none md:text-sm dark:border-[#3A342D] dark:bg-[#141210] dark:text-[#F3EFE6] dark:placeholder:text-[#787066] dark:focus:border-[#D4AF6A] dark:focus:bg-[#141210]"
           />
         </div>
 
@@ -576,9 +576,9 @@ export function ManualCreateView({
             {liveRecommendations.length > 0 && (
               <div
                 data-testid="create-live-recommendations"
-                className="rounded-xl border border-[#E5D5BE] bg-[#FFFDF8] p-3.5"
+                className="rounded-xl border border-[#E5D5BE] bg-[#FFFDF8] p-3.5 dark:border-[#5A4930] dark:bg-[#241E16]"
               >
-                <p className="flex items-center gap-1.5 text-[13px] font-medium text-[#8E6523] md:text-xs">
+                <p className="flex items-center gap-1.5 text-[13px] font-medium text-[#8E6523] md:text-xs dark:text-[#E4C37A]">
                   <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                   <span>
                     根据作品 / 演员名称为你推荐 {liveRecommendations.length} 项未关联藏品
@@ -590,12 +590,12 @@ export function ManualCreateView({
                       key={`draft-rec-${rec.id}`}
                       type="button"
                       onClick={() => toggleRelated(rec.id)}
-                      className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg border border-[#EACDC6] bg-[#FDF2EF] px-2.5 py-1.5 text-left text-[13px] font-medium text-[#B43B2B] cursor-pointer transition-colors hover:bg-[#FBE6E1] md:min-h-[38px] md:text-xs"
+                      className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg border border-[#EACDC6] bg-[#FDF2EF] px-2.5 py-1.5 text-left text-[13px] font-medium text-[#B43B2B] cursor-pointer transition-colors hover:bg-[#FBE6E1] md:min-h-[38px] md:text-xs dark:border-[#6B3229] dark:bg-[#351B17] dark:text-[#F28C7B] dark:hover:bg-[#44221C]"
                     >
                       <Link2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                       <span>
                         {rec.title}
-                        <span className="ml-1 font-normal text-[#7A6A5F]">
+                        <span className="ml-1 font-normal text-[#7A6A5F] dark:text-[#C4A89E]">
                           （{reason}）
                         </span>
                       </span>
@@ -606,10 +606,10 @@ export function ManualCreateView({
             )}
 
             <div>
-              <span className="block text-[13px] font-medium text-[#4B453E] md:text-xs">
+              <span className="block text-[13px] font-medium text-[#4B453E] md:text-xs dark:text-[#C4BCB0]">
                 关联馆内已有藏品（选填）
               </span>
-              <div className="mt-2 flex max-h-40 flex-wrap gap-2 overflow-y-auto rounded-xl border border-[#E4DFD5] bg-[#FAF9F6] p-3">
+              <div className="mt-2 flex max-h-40 flex-wrap gap-2 overflow-y-auto rounded-xl border border-[#E4DFD5] bg-[#FAF9F6] p-3 dark:border-[#322D27] dark:bg-[#141210]">
                 {existingItems.map((ex) => {
                   const checked = selectedRelatedIds.includes(ex.id);
                   return (
@@ -621,7 +621,7 @@ export function ManualCreateView({
                       className={`min-h-[40px] rounded-lg px-3 py-1.5 text-[13px] font-medium cursor-pointer transition-colors md:min-h-[38px] md:text-xs ${
                         checked
                           ? 'bg-[#B43B2B] text-white'
-                          : 'border border-[#DCD6CB] bg-white text-[#2E2A26]'
+                          : 'border border-[#DCD6CB] bg-white text-[#2E2A26] dark:border-[#3A342D] dark:bg-[#24201C] dark:text-[#E2DBD0] dark:hover:border-[#D4AF6A]'
                       }`}
                     >
                       {CATEGORY_LABELS[ex.category]} · {ex.title}
@@ -651,21 +651,23 @@ export function ManualCreateView({
           className={`gallery-card border p-5 ${
             isMasterpiecePreview
               ? 'gallery-card-masterpiece border-[#C9A45C]'
-              : 'border-[#E4DFD5]'
+              : 'border-[#E4DFD5] dark:border-[#322D27]'
           }`}
         >
-          <div className="flex items-center justify-between gap-2 border-b border-[#EFECE4] pb-3">
+          <div className="flex items-center justify-between gap-2 border-b border-[#EFECE4] pb-3 dark:border-[#2E2924]">
             <div>
-              <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-[#8C857B]">
+              <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-[#8C857B] dark:text-[#9A9184]">
                 实时展签预览
               </p>
-              <p className="mt-0.5 text-xs text-[#625C54]">
+              <p className="mt-0.5 text-xs text-[#625C54] dark:text-[#A59D90]">
                 填写字段即刻生成你的馆藏画廊卡片
               </p>
             </div>
             <span
               className={`font-mono text-xs font-medium tabular-nums ${
-                isMasterpiecePreview ? 'text-[#8E6523]' : 'text-[#625C54]'
+                isMasterpiecePreview
+                  ? 'text-[#8E6523] dark:text-[#E4C37A]'
+                  : 'text-[#625C54] dark:text-[#B8AFA2]'
               }`}
             >
               {previewCompleteness.tierLabel} · {previewCompleteness.score}/5
@@ -673,7 +675,7 @@ export function ManualCreateView({
           </div>
 
           <div className="mt-4 flex gap-4">
-            <div className="gallery-cover-frame w-[112px] shrink-0 bg-[#FAF9F6]">
+            <div className="gallery-cover-frame w-[112px] shrink-0 bg-[#FAF9F6] dark:bg-[#141210]">
               <ArchivalImage
                 src={coverUrl.trim() || undefined}
                 alt={title.trim() || '封面预览'}
@@ -685,27 +687,27 @@ export function ManualCreateView({
             </div>
 
             <div className="min-w-0 flex-1">
-              <p className="font-mono text-[11px] text-[#7A7268] tabular-nums">
+              <p className="font-mono text-[11px] text-[#7A7268] tabular-nums dark:text-[#A59D90]">
                 {[CATEGORY_LABELS[category], year.trim(), region.trim()]
                   .filter(Boolean)
                   .join(' · ')}
               </p>
-              <h3 className="mt-1 line-clamp-2 font-editorial text-xl font-medium leading-snug text-[#1A1816]">
+              <h3 className="mt-1 line-clamp-2 font-editorial text-xl font-medium leading-snug text-[#1A1816] dark:text-[#F5F1E8]">
                 {title.trim() || '等待输入片名 / 名称…'}
               </h3>
               {(originalTitle.trim() || subtitle.trim()) && (
-                <p className="mt-1 truncate text-xs text-[#625C54]">
+                <p className="mt-1 truncate text-xs text-[#625C54] dark:text-[#B8AFA2]">
                   {originalTitle.trim() || subtitle.trim()}
                 </p>
               )}
 
-              <div className="mt-2.5 flex items-center gap-2 text-xs text-[#625C54] tabular-nums">
+              <div className="mt-2.5 flex items-center gap-2 text-xs text-[#625C54] tabular-nums dark:text-[#B8AFA2]">
                 <span>{getStatusLabel(status, category)}</span>
                 {rating > 0 && (
                   <>
                     <span aria-hidden="true">·</span>
-                    <span className="inline-flex items-center gap-0.5 font-mono font-medium text-[#B43B2B]">
-                      <Star className="h-3 w-3 fill-[#B43B2B] text-[#B43B2B]" aria-hidden="true" />
+                    <span className="inline-flex items-center gap-0.5 font-mono font-medium text-[#B43B2B] dark:text-[#EB7865]">
+                      <Star className="h-3 w-3 fill-[#B43B2B] text-[#B43B2B] dark:fill-[#EB7865] dark:text-[#EB7865]" aria-hidden="true" />
                       {rating}.0
                     </span>
                   </>
@@ -716,8 +718,8 @@ export function ManualCreateView({
                 <p
                   className={`mt-2.5 line-clamp-2 text-xs leading-relaxed ${
                     quote.trim()
-                      ? 'font-editorial italic text-[#3D3832]'
-                      : 'text-[#625C54]'
+                      ? 'font-editorial italic text-[#3D3832] dark:text-[#E2DBD0]'
+                      : 'text-[#625C54] dark:text-[#B8AFA2]'
                   }`}
                 >
                   {quote.trim() ? `“${quote.trim()}”` : notes.trim()}
@@ -725,7 +727,7 @@ export function ManualCreateView({
               )}
 
               {previewTags.length > 0 && (
-                <p className="mt-2 truncate text-[11px] text-[#7A7268]">
+                <p className="mt-2 truncate text-[11px] text-[#7A7268] dark:text-[#A59D90]">
                   {previewTags.slice(0, 4).join(' · ')}
                 </p>
               )}
@@ -733,7 +735,7 @@ export function ManualCreateView({
           </div>
 
           {/* 5-Tick Live Completeness Meter */}
-          <div className="mt-4 border-t border-[#EFECE4] pt-3.5">
+          <div className="mt-4 border-t border-[#EFECE4] pt-3.5 dark:border-[#2E2924]">
             <div className="grid grid-cols-5 gap-1">
               {[0, 1, 2, 3, 4].map((idx) => (
                 <span
@@ -743,7 +745,7 @@ export function ManualCreateView({
                       ? isMasterpiecePreview
                         ? 'bg-[#C9A45C]'
                         : 'bg-[#B43B2B]'
-                      : 'bg-[#E8E2D7]'
+                      : 'bg-[#E8E2D7] dark:bg-[#2A2520]'
                   }`}
                 />
               ))}
@@ -753,13 +755,15 @@ export function ManualCreateView({
                 <li
                   key={entry.key}
                   className={`flex items-center gap-1.5 ${
-                    entry.done ? 'text-[#1A1816]' : 'text-[#8C857B]'
+                    entry.done
+                      ? 'text-[#1A1816] dark:text-[#F3EFE6]'
+                      : 'text-[#8C857B] dark:text-[#8E8578]'
                   }`}
                 >
                   {entry.done ? (
-                    <Check className="h-3.5 w-3.5 shrink-0 text-[#2A6B46]" aria-hidden="true" />
+                    <Check className="h-3.5 w-3.5 shrink-0 text-[#2A6B46] dark:text-[#6CC492]" aria-hidden="true" />
                   ) : (
-                    <Circle className="h-3.5 w-3.5 shrink-0 text-[#CFC7B9]" aria-hidden="true" />
+                    <Circle className="h-3.5 w-3.5 shrink-0 text-[#CFC7B9] dark:text-[#524B42]" aria-hidden="true" />
                   )}
                   <span className="truncate">{entry.label}</span>
                 </li>
