@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import type { ArchiveItem } from '../types/archive';
 import {
   ALL_CATEGORIES_VISIBLE,
+  CATEGORY_DOT_COLOR,
+  GLOBAL_GRAPH_CATEGORY_LEGEND,
   buildGlobalRelationGraph,
   computeCurvedEdgeGeometry,
   computeEdgeCurveOffsets,
@@ -717,6 +719,36 @@ test('computeNodeLabelLayout optically centers category indicator dots next to C
   const latinWidth = estimateSvgLabelWidth('Tony L…', 11.2);
   const cjkWidth = estimateSvgLabelWidth('梁朝伟周慕云…', 11.2);
   assert.ok(latinWidth > 0 && latinWidth < cjkWidth);
+});
+
+test('GLOBAL_GRAPH_CATEGORY_LEGEND maps all three archive categories consistently with node styles', () => {
+  assert.deepEqual(
+    GLOBAL_GRAPH_CATEGORY_LEGEND.map((entry) => entry.category),
+    ['film', 'person', 'character']
+  );
+  assert.deepEqual(
+    GLOBAL_GRAPH_CATEGORY_LEGEND.map((entry) => entry.label),
+    ['影视', '影人', '角色']
+  );
+
+  const uniqueFills = new Set(GLOBAL_GRAPH_CATEGORY_LEGEND.map((e) => e.nodeFill));
+  const uniqueDots = new Set(GLOBAL_GRAPH_CATEGORY_LEGEND.map((e) => e.dotColor));
+  assert.equal(uniqueFills.size, 3);
+  assert.equal(uniqueDots.size, 3);
+
+  for (const entry of GLOBAL_GRAPH_CATEGORY_LEGEND) {
+    assert.ok(entry.colorName.length >= 2);
+    assert.ok(entry.description.length >= 2);
+    assert.equal(entry.dotColor, CATEGORY_DOT_COLOR[entry.category]);
+    assert.equal(
+      entry.nodeFill,
+      getNodeVisualStyle(entry.category, 3, 'idle').fill
+    );
+    assert.equal(
+      entry.nodeStroke,
+      getNodeVisualStyle(entry.category, 2, 'idle').stroke
+    );
+  }
 });
 
 

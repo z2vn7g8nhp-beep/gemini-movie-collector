@@ -25,6 +25,8 @@ import {
 } from '../utils/filmographyInference';
 import {
   ALL_CATEGORIES_VISIBLE,
+  CATEGORY_DOT_COLOR,
+  GLOBAL_GRAPH_CATEGORY_LEGEND,
   buildGlobalRelationGraph,
   computeCurvedEdgeGeometry,
   computeEdgeCurveOffsets,
@@ -59,12 +61,6 @@ interface GlobalRelationMapModalProps {
   onLinkPairs?: (pairs: Array<[string, string]>) => Promise<void> | void;
 }
 
-const CATEGORY_DOT_COLOR: Record<ArchiveCategory, string> = {
-  film: '#D85745',
-  person: '#E4C37A',
-  character: '#7AB59E',
-};
-
 const CAT_FILTERS: Array<{ id: 'all' | ArchiveCategory; label: string }> = [
   { id: 'all', label: '全馆' },
   { id: 'film', label: '影视' },
@@ -72,15 +68,11 @@ const CAT_FILTERS: Array<{ id: 'all' | ArchiveCategory; label: string }> = [
   { id: 'character', label: '角色' },
 ];
 
-const CANVAS_CATEGORY_TOGGLES: Array<{
-  id: ArchiveCategory;
-  label: string;
-  dotColor: string;
-}> = [
-  { id: 'film', label: '影视', dotColor: '#CA3C28' },
-  { id: 'person', label: '影人', dotColor: '#DBB768' },
-  { id: 'character', label: '角色', dotColor: '#66AD95' },
-];
+const CANVAS_CATEGORY_TOGGLES = GLOBAL_GRAPH_CATEGORY_LEGEND.map((entry) => ({
+  id: entry.category,
+  label: entry.label,
+  dotColor: entry.nodeFill,
+}));
 
 export function GlobalRelationMapModal({
   open,
@@ -1762,11 +1754,11 @@ export function GlobalRelationMapModal({
             </svg>
           )}
 
-          {/* Top-Left Interactive On-Canvas Category Visibility Toggles + Edge Legend */}
+          {/* Top-Left Interactive On-Canvas Category Visibility Toggles */}
           {allItems.length > 0 && (
             <div
-              data-testid="global-graph-legend"
-              className="pointer-events-auto absolute left-3 top-3 z-10 flex max-w-[calc(100%-4.5rem)] flex-wrap items-center gap-x-2 gap-y-1.5 rounded-xl border border-white/12 bg-[#161411]/92 px-2 py-1.5 text-[11px] text-[#CFC7B9] shadow-lg backdrop-blur-xs sm:px-2.5"
+              data-testid="global-graph-visibility-bar"
+              className="pointer-events-auto absolute left-3 top-3 z-10 flex max-w-[calc(100%-4.5rem)] flex-wrap items-center gap-1 rounded-xl border border-white/12 bg-[#161411]/92 px-2 py-1.5 text-[11px] text-[#CFC7B9] shadow-lg backdrop-blur-xs sm:px-2.5"
             >
               <div
                 role="group"
@@ -1840,21 +1832,6 @@ export function GlobalRelationMapModal({
                   </button>
                 )}
               </div>
-
-              <span className="pointer-events-none hidden items-center gap-2 border-l border-white/15 pl-2.5 text-[#BDB5A8] sm:inline-flex">
-                <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                  <span className="inline-block h-[2.5px] w-3.5 rounded-full bg-[#E4C37A]" />
-                  直连
-                </span>
-                <span className="inline-flex items-center gap-1 text-[#9EE0C9] whitespace-nowrap">
-                  <span className="inline-block h-0 w-3.5 border-t-2 border-dashed border-[#7CC6AE]" />
-                  自动发现
-                </span>
-                <span className="hidden items-center gap-1 whitespace-nowrap md:inline-flex">
-                  <span className="inline-block h-0 w-3.5 border-t border-dotted border-[#CFC7B9]" />
-                  共签
-                </span>
-              </span>
             </div>
           )}
 
@@ -1886,6 +1863,75 @@ export function GlobalRelationMapModal({
             </button>
           </div>
         </div>
+
+        {/* Dedicated Node Category Color Legend & Edge Key Bar */}
+        <section
+          aria-label="节点分类颜色图例"
+          data-testid="global-graph-legend"
+          className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 border-t border-white/10 bg-[#151310] px-4 py-2 text-[11px] text-[#CFC7B9] min-[420px]:px-5"
+        >
+          <div
+            data-testid="global-graph-category-legend"
+            className="flex flex-wrap items-center gap-x-3.5 gap-y-1"
+          >
+            <span className="shrink-0 font-mono text-[10px] tracking-wider text-[#9E9587]">
+              节点图例
+            </span>
+            {GLOBAL_GRAPH_CATEGORY_LEGEND.map((entry) => {
+              const isHidden = !visibleCategories[entry.category];
+              return (
+                <span
+                  key={`legend-${entry.category}`}
+                  data-testid={`legend-item-${entry.category}`}
+                  className={`inline-flex items-center gap-1.5 whitespace-nowrap transition-opacity ${
+                    isHidden ? 'opacity-55' : 'opacity-100'
+                  }`}
+                >
+                  <span
+                    aria-hidden="true"
+                    className="inline-block h-3 w-3 shrink-0 rounded-full border-[1.5px]"
+                    style={{
+                      backgroundColor: entry.nodeFill,
+                      borderColor: entry.nodeStroke,
+                    }}
+                  />
+                  <span className="font-medium text-[#FAF7F0]">{entry.label}</span>
+                  <span className="text-[#BDB5A8]">{entry.colorName}</span>
+                  <span className="hidden text-[#8C857B] md:inline">
+                    · {entry.description}
+                  </span>
+                </span>
+              );
+            })}
+          </div>
+
+          <div
+            aria-label="连线类型图例"
+            className="hidden items-center gap-2.5 border-l border-white/12 pl-3 text-[#BDB5A8] sm:inline-flex"
+          >
+            <span className="inline-flex items-center gap-1 whitespace-nowrap">
+              <span
+                aria-hidden="true"
+                className="inline-block h-[2.5px] w-3.5 rounded-full bg-[#E4C37A]"
+              />
+              直连
+            </span>
+            <span className="inline-flex items-center gap-1 text-[#9EE0C9] whitespace-nowrap">
+              <span
+                aria-hidden="true"
+                className="inline-block h-0 w-3.5 border-t-2 border-dashed border-[#7CC6AE]"
+              />
+              自动发现
+            </span>
+            <span className="hidden items-center gap-1 whitespace-nowrap lg:inline-flex">
+              <span
+                aria-hidden="true"
+                className="inline-block h-0 w-3.5 border-t border-dotted border-[#CFC7B9]"
+              />
+              共签
+            </span>
+          </div>
+        </section>
 
         {/* Bottom Inspector / Shortest-Path / 2-Hop Explorer */}
         <GlobalGraphInspector

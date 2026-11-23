@@ -306,6 +306,52 @@ const NODE_TIER_PALETTE: Record<
   },
 };
 
+export interface CategoryLegendEntry {
+  category: ArchiveCategory;
+  label: string;
+  colorName: string;
+  description: string;
+  dotColor: string;
+  nodeFill: string;
+  nodeStroke: string;
+}
+
+export const CATEGORY_DOT_COLOR: Record<ArchiveCategory, string> = {
+  film: '#D85745',
+  person: '#E4C37A',
+  character: '#7AB59E',
+};
+
+export const GLOBAL_GRAPH_CATEGORY_LEGEND: readonly CategoryLegendEntry[] = [
+  {
+    category: 'film',
+    label: '影视',
+    colorName: '朱砂红',
+    description: '电影 · 剧集',
+    dotColor: CATEGORY_DOT_COLOR.film,
+    nodeFill: NODE_TIER_PALETTE.film[3].fill,
+    nodeStroke: NODE_TIER_PALETTE.film[2].stroke,
+  },
+  {
+    category: 'person',
+    label: '影人',
+    colorName: '琥珀金',
+    description: '导演 · 演员',
+    dotColor: CATEGORY_DOT_COLOR.person,
+    nodeFill: NODE_TIER_PALETTE.person[3].fill,
+    nodeStroke: NODE_TIER_PALETTE.person[2].stroke,
+  },
+  {
+    category: 'character',
+    label: '角色',
+    colorName: '青瓷绿',
+    description: '银幕角色',
+    dotColor: CATEGORY_DOT_COLOR.character,
+    nodeFill: NODE_TIER_PALETTE.character[3].fill,
+    nodeStroke: NODE_TIER_PALETTE.character[2].stroke,
+  },
+] as const;
+
 /**
  * Maps an edge's relation kind, strength, and interaction state to stroke thickness,
  * color richness, dash cadence, opacity, and subtle glow halo parameters.
