@@ -81,6 +81,18 @@ function writeStoredCollection(items: ServerArchiveItem[]): void {
   );
 }
 
+interface ServerShowcaseConfig {
+  primaryMode: 'daily' | 'pinned' | 'favorites' | 'watching' | 'custom';
+  pinnedItemId?: string;
+  customLabel?: string;
+  customTitle?: string;
+  customSubtitle?: string;
+  customQuote?: string;
+  customCoverUrl?: string;
+  customLinkItemId?: string;
+  secondaryMode: 'albums' | 'favorites' | 'quotes' | 'recent' | 'hidden';
+}
+
 interface ServerCollectorState {
   checkInDates: string[];
   albums: Array<{
@@ -92,6 +104,64 @@ interface ServerCollectorState {
     targetCount: number;
     createdAt: string;
   }>;
+  showcase?: ServerShowcaseConfig;
+}
+
+const VALID_PRIMARY_SHOWCASE = new Set([
+  'daily',
+  'pinned',
+  'favorites',
+  'watching',
+  'custom',
+]);
+const VALID_SECONDARY_SHOWCASE = new Set([
+  'albums',
+  'favorites',
+  'quotes',
+  'recent',
+  'hidden',
+]);
+
+function sanitizeServerShowcase(raw: unknown): ServerShowcaseConfig | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const obj = raw as Record<string, unknown>;
+  const primaryMode = VALID_PRIMARY_SHOWCASE.has(String(obj.primaryMode))
+    ? (obj.primaryMode as ServerShowcaseConfig['primaryMode'])
+    : 'daily';
+  const secondaryMode = VALID_SECONDARY_SHOWCASE.has(String(obj.secondaryMode))
+    ? (obj.secondaryMode as ServerShowcaseConfig['secondaryMode'])
+    : 'albums';
+
+  const result: ServerShowcaseConfig = { primaryMode, secondaryMode };
+  const pickStr = (v: unknown, maxLen: number) =>
+    typeof v === 'string' && v.trim() ? v.trim().slice(0, maxLen) : undefined;
+
+  const pinnedItemId = pickStr(obj.pinnedItemId, 120);
+  if (pinnedItemId) result.pinnedItemId = pinnedItemId;
+  const customLabel = pickStr(obj.customLabel, 24);
+  if (customLabel) result.customLabel = customLabel;
+  const customTitle = pickStr(obj.customTitle, 80);
+  if (customTitle) result.customTitle = customTitle;
+  const customSubtitle = pickStr(obj.customSubtitle, 100);
+  if (customSubtitle) result.customSubtitle = customSubtitle;
+  const customQuote = pickStr(obj.customQuote, 240);
+  if (customQuote) result.customQuote = customQuote;
+  const customLinkItemId = pickStr(obj.customLinkItemId, 120);
+  if (customLinkItemId) result.customLinkItemId = customLinkItemId;
+  if (typeof obj.customCoverUrl === 'string') {
+    const trimmed = obj.customCoverUrl.trim();
+    if (
+      trimmed &&
+      trimmed.length <= 1_500_000 &&
+      (trimmed.startsWith('https://') ||
+        trimmed.startsWith('http://') ||
+        trimmed.startsWith('/') ||
+        trimmed.startsWith('data:image/'))
+    ) {
+      result.customCoverUrl = trimmed;
+    }
+  }
+  return result;
 }
 
 function readStoredCollectorState(): ServerCollectorState {
@@ -101,11 +171,13 @@ function readStoredCollectorState(): ServerCollectorState {
     }
     const raw = fs.readFileSync(COLLECTOR_FILE, 'utf-8');
     const parsed = JSON.parse(raw);
+    const showcase = sanitizeServerShowcase(parsed?.showcase);
     return {
       checkInDates: Array.isArray(parsed?.checkInDates)
         ? parsed.checkInDates.filter((d: unknown): d is string => typeof d === 'string')
         : [],
       albums: Array.isArray(parsed?.albums) ? parsed.albums : [],
+      ...(showcase ? { showcase } : {}),
     };
   } catch {
     return { checkInDates: [], albums: [] };
@@ -273,9 +345,11 @@ async function createServer() {
             )
         )
       : [];
+    const showcase = sanitizeServerShowcase(req.body?.showcase);
     const next: ServerCollectorState = {
       checkInDates: Array.from(new Set(checkInDates)).sort(),
       albums,
+      ...(showcase ? { showcase } : {}),
     };
     writeStoredCollectorState(next);
     res.json(next);

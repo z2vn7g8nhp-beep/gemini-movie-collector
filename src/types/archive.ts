@@ -142,7 +142,34 @@ export interface CollectorAlbum {
   createdAt: string;
 }
 
+export type ShowcasePrimaryMode =
+  | 'daily'
+  | 'pinned'
+  | 'favorites'
+  | 'watching'
+  | 'custom';
+
+export type ShowcaseSecondaryMode =
+  | 'albums'
+  | 'favorites'
+  | 'quotes'
+  | 'recent'
+  | 'hidden';
+
+export interface ShowcaseConfig {
+  primaryMode: ShowcasePrimaryMode;
+  pinnedItemId?: string;
+  customLabel?: string;
+  customTitle?: string;
+  customSubtitle?: string;
+  customQuote?: string;
+  customCoverUrl?: string;
+  customLinkItemId?: string;
+  secondaryMode: ShowcaseSecondaryMode;
+}
+
 export interface CollectorState {
   checkInDates: string[];
   albums: CollectorAlbum[];
+  showcase?: ShowcaseConfig;
 }

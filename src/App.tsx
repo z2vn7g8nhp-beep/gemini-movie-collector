@@ -34,6 +34,7 @@ import {
   type EncounterMode,
 } from './components/RandomEncounterModal';
 import { SearchTabView } from './components/SearchTabView';
+import { ShowcaseCustomizerModal } from './components/ShowcaseCustomizerModal';
 import { TimelineMemoriesView } from './components/TimelineMemoriesView';
 import { detectRuntimeMode, getRuntimeModeSync } from './services/archiveApi';
 import type {
@@ -47,6 +48,7 @@ import type {
   DecadeFilterOption,
   OnlineSearchResult,
   RatingBucketFilterOption,
+  ShowcaseConfig,
   SortOption,
 } from './types/archive';
 import {
@@ -101,6 +103,10 @@ import {
   getAdjacentArchiveItem,
 } from './utils/uiHelpers';
 import { buildQuickStatusNotice } from './utils/quickStatusMenu';
+import {
+  DEFAULT_SHOWCASE_CONFIG,
+  normalizeShowcaseConfig,
+} from './utils/showcase';
 
 const LOCAL_STORAGE_KEY = 'cinearchive.collection.v2';
 const COLLECTOR_STORAGE_KEY = 'cinearchive.collector.v1';
@@ -153,6 +159,9 @@ function loadLocalCollector(): CollectorState {
         ? parsed.checkInDates
         : [],
       albums: Array.isArray(parsed?.albums) ? parsed.albums : [],
+      ...(parsed?.showcase
+        ? { showcase: normalizeShowcaseConfig(parsed.showcase) }
+        : {}),
     };
   } catch {
     return EMPTY_COLLECTOR;
@@ -254,6 +263,10 @@ export default function App() {
   }>({ open: false });
   const [quotesWallOpen, setQuotesWallOpen] = useState(false);
   const [globalMapOpen, setGlobalMapOpen] = useState(false);
+  const [showcaseCustomizerOpen, setShowcaseCustomizerOpen] = useState(false);
+  const [showcaseCustomizerTab, setShowcaseCustomizerTab] = useState<
+    'primary' | 'secondary'
+  >('primary');
   const [editingAlbum, setEditingAlbum] = useState<CollectorAlbum | null>(null);
   const [pendingLinkSuggestion, setPendingLinkSuggestion] = useState<{
     sourceItemId: string;
@@ -379,10 +392,18 @@ export default function App() {
             const serverAlbums = Array.isArray(cData.albums)
               ? cData.albums
               : [];
-            if (serverDates.length > 0 || serverAlbums.length > 0) {
-              const nextCollector = {
+            const serverShowcase = cData.showcase
+              ? normalizeShowcaseConfig(cData.showcase)
+              : undefined;
+            if (
+              serverDates.length > 0 ||
+              serverAlbums.length > 0 ||
+              serverShowcase
+            ) {
+              const nextCollector: CollectorState = {
                 checkInDates: serverDates,
                 albums: serverAlbums,
+                ...(serverShowcase ? { showcase: serverShowcase } : {}),
               };
               if (
                 JSON.stringify(loadedCollector) !== JSON.stringify(nextCollector)
@@ -496,6 +517,7 @@ export default function App() {
       posterWallConfig.open ||
       quotesWallOpen ||
       globalMapOpen ||
+      showcaseCustomizerOpen ||
       editingAlbum
   );
   useEffect(() => {
@@ -784,6 +806,46 @@ export default function App() {
     };
     await persistCollector(nextState);
     setNotice(`已更新专题图鉴「${updated.name}」`);
+  };
+
+  const handleSaveShowcase = async (nextConfig: ShowcaseConfig) => {
+    const normalized = normalizeShowcaseConfig(nextConfig);
+    const nextState: CollectorState = {
+      ...collector,
+      showcase: normalized,
+    };
+    await persistCollector(nextState);
+    setNotice('已更新藏馆顶部展示区内容');
+  };
+
+  const handleTogglePinShowcase = async (target: ArchiveItem) => {
+    const current = normalizeShowcaseConfig(collector.showcase);
+    const alreadyPinned =
+      current.primaryMode === 'pinned' && current.pinnedItemId === target.id;
+    const nextShowcase: ShowcaseConfig = alreadyPinned
+      ? {
+          ...current,
+          primaryMode: 'daily',
+          pinnedItemId: undefined,
+        }
+      : {
+          ...current,
+          primaryMode: 'pinned',
+          pinnedItemId: target.id,
+          customTitle: undefined,
+          customSubtitle: undefined,
+          customCoverUrl: undefined,
+          customLinkItemId: undefined,
+        };
+    await persistCollector({
+      ...collector,
+      showcase: normalizeShowcaseConfig(nextShowcase),
+    });
+    setNotice(
+      alreadyPinned
+        ? `已取消「${target.title}」顶栏置顶，恢复每日藏签`
+        : `已将「${target.title}」设为藏馆顶部主展位`
+    );
   };
 
   const handleToggleBatchSelect = (id: string) => {
@@ -1318,7 +1380,9 @@ export default function App() {
   // When CollectorSpotlightRail (library with items) or Profile passport card is visible,
   // it already hosts the primary check-in action.
   const hasInPageCheckInCta =
-    (activeTab === 'library' && items.length > 0) || activeTab === 'profile';
+    (activeTab === 'library' &&
+      (items.length > 0 || collector.showcase?.primaryMode === 'custom')) ||
+    activeTab === 'profile';
   const showDailyBanner =
     hydrated && dailyReminder.shouldShowBanner && !hasInPageCheckInCta;
   const showTopCheckInIcon =
@@ -1380,7 +1444,7 @@ export default function App() {
           <>
             {/* Collector Daily Ritual & Themed Albums Shelf */}
             <CollectorSpotlightRail
-              items={items}
+              items={displayItems}
               collector={collector}
               activeAlbumId={activeAlbumId}
               onCheckInToday={handleCheckInToday}
@@ -1403,6 +1467,15 @@ export default function App() {
               }
               onJumpToSearch={jumpToSearch}
               onJumpToProfile={() => setActiveTab('profile')}
+              onOpenShowcaseCustomizer={(tab = 'primary') => {
+                setShowcaseCustomizerTab(tab);
+                setShowcaseCustomizerOpen(true);
+              }}
+              onFilterFavorites={() => {
+                setStatusFilter('favorite');
+                setActiveAlbumId('');
+              }}
+              onOpenQuotesWall={() => setQuotesWallOpen(true)}
             />
 
             {/* Compact Mobile-First Gallery Studio Strip */}
@@ -2063,6 +2136,12 @@ export default function App() {
           setSelectedItemId(null);
           setCardModalItemId(it.id);
         }}
+        isPinnedToShowcase={Boolean(
+          selectedItem &&
+            collector.showcase?.primaryMode === 'pinned' &&
+            collector.showcase?.pinnedItemId === selectedItem.id
+        )}
+        onTogglePinShowcase={(it) => void handleTogglePinShowcase(it)}
         onOpenGlobalMap={() => {
           setSelectedItemId(null);
           setGlobalMapOpen(true);
@@ -2162,6 +2241,15 @@ export default function App() {
             title: alb.name,
           });
         }}
+      />
+
+      <ShowcaseCustomizerModal
+        open={showcaseCustomizerOpen}
+        initialTab={showcaseCustomizerTab}
+        config={collector.showcase ?? DEFAULT_SHOWCASE_CONFIG}
+        allItems={displayItems}
+        onClose={() => setShowcaseCustomizerOpen(false)}
+        onSave={handleSaveShowcase}
       />
     </div>
   );

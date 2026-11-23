@@ -11,6 +11,7 @@ import {
   Layers,
   Link2,
   Loader2,
+  Pin,
   Plus,
   RefreshCw,
   RotateCcw,
@@ -87,6 +88,8 @@ interface DetailDrawerProps {
   onSelectRelated: (item: ArchiveItem) => void;
   onFilterByTag: (tag: string) => void;
   onOpenCardModal?: (item: ArchiveItem) => void;
+  isPinnedToShowcase?: boolean;
+  onTogglePinShowcase?: (item: ArchiveItem) => void;
   onJumpToMedalHall?: () => void;
   onOpenGlobalMap?: () => void;
   onUpdateItem: (id: string, patch: Partial<ArchiveItem>) => Promise<void>;
@@ -127,6 +130,8 @@ export function DetailDrawer({
   onSelectRelated,
   onFilterByTag,
   onOpenCardModal,
+  isPinnedToShowcase = false,
+  onTogglePinShowcase,
   onJumpToMedalHall,
   onOpenGlobalMap,
   onUpdateItem,
@@ -695,6 +700,27 @@ export function DetailDrawer({
                   <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
+            )}
+            {onTogglePinShowcase && (
+              <button
+                type="button"
+                data-testid="drawer-pin-showcase-btn"
+                aria-pressed={isPinnedToShowcase}
+                onClick={() => onTogglePinShowcase(item)}
+                aria-label={
+                  isPinnedToShowcase
+                    ? `取消「${item.title}」的顶栏展位置顶`
+                    : `将「${item.title}」设为顶栏主展位`
+                }
+                className={`inline-flex h-9 items-center gap-1 rounded-xl border px-2.5 text-[13px] font-medium whitespace-nowrap cursor-pointer transition-colors md:text-xs ${
+                  isPinnedToShowcase
+                    ? 'border-[#1A1816] bg-[#1A1816] text-[#F5DC9B]'
+                    : 'border-[#DCD6CB] bg-white text-[#1A1816] hover:border-[#1A1816]'
+                }`}
+              >
+                <Pin className="h-3.5 w-3.5" aria-hidden="true" />
+                <span>{isPinnedToShowcase ? '已置顶' : '置顶展位'}</span>
+              </button>
             )}
             {onOpenCardModal && (
               <button
