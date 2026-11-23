@@ -18,7 +18,6 @@ import { AlbumCuratorModal } from './components/AlbumCuratorModal';
 import { ArchiveGrid, type ArchiveViewMode } from './components/ArchiveGrid';
 import { BatchActionBar } from './components/BatchActionBar';
 import { CollectibleCardModal } from './components/CollectibleCardModal';
-import { CollectionStatsCapsule } from './components/CollectionStatsCapsule';
 import { CollectorSpotlightRail } from './components/CollectorSpotlightRail';
 import { DailyCheckInBanner } from './components/DailyCheckInBanner';
 import { DetailDrawer } from './components/DetailDrawer';
@@ -1412,6 +1411,21 @@ export default function App() {
     setLocatedItemId(null);
   };
 
+  const handleFilterByCategory = (category: ArchiveCategory) => {
+    setSelectedItemId(null);
+    setActiveTab('library');
+    setActiveCategory(category);
+    setStatusFilter('all');
+    setActiveAlbumId('');
+    setActiveTag('');
+    setLibraryQuery('');
+    setDecadeFilter('all');
+    setRegionFilter('');
+    setRatingBucketFilter('all');
+    setCompletenessFilter('all');
+    setLocatedItemId(null);
+  };
+
   const handleJumpToAlbumFromDrawer = (
     albumId: string,
     focusItemId: string
@@ -1553,14 +1567,6 @@ export default function App() {
 
         {activeTab === 'library' && (
           <>
-            {/* Real-Time Collection Distribution Capsule (Recharts PieChart) */}
-            <CollectionStatsCapsule
-              items={displayItems}
-              activeCategory={activeCategory}
-              onSelectCategory={setActiveCategory}
-              onJumpToSearch={() => jumpToSearch()}
-            />
-
             {/* Collector Daily Ritual & Themed Albums Shelf */}
             <CollectorSpotlightRail
               items={displayItems}
@@ -2245,6 +2251,8 @@ export default function App() {
             onCheckInToday={handleCheckInToday}
             onReplaceAll={handleReplaceAll}
             onFilterByTag={handleFilterByTag}
+            onFilterByCategory={handleFilterByCategory}
+            onJumpToSearch={() => jumpToSearch()}
           />
         )}
       </main>

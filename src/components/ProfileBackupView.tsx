@@ -12,6 +12,7 @@ import {
   Upload,
 } from 'lucide-react';
 import type {
+  ArchiveCategory,
   ArchiveItem,
   ArchiveStats,
   CollectorState,
@@ -39,6 +40,7 @@ import {
 } from '../utils/doubanRelay';
 import { ArchivalSealStamp } from './ArchivalSealStamp';
 import { CinemaMedalSvg } from './CinemaMedalSvg';
+import { CollectionStatsCapsule } from './CollectionStatsCapsule';
 import { MedalInspectModal } from './MedalInspectModal';
 import { PWAInstallButton } from './PWAInstallButton';
 
@@ -52,6 +54,8 @@ interface ProfileBackupViewProps {
   onCheckInToday: () => Promise<void>;
   onReplaceAll: (items: ArchiveItem[]) => Promise<void>;
   onFilterByTag?: (tag: string) => void;
+  onFilterByCategory?: (category: ArchiveCategory) => void;
+  onJumpToSearch?: () => void;
 }
 
 export function ProfileBackupView({
@@ -64,6 +68,8 @@ export function ProfileBackupView({
   onCheckInToday,
   onReplaceAll,
   onFilterByTag,
+  onFilterByCategory,
+  onJumpToSearch,
 }: ProfileBackupViewProps) {
   const [jsonInput, setJsonInput] = useState('');
   const [importing, setImporting] = useState(false);
@@ -310,27 +316,12 @@ export function ProfileBackupView({
         </div>
       </div>
 
-      {/* 3. Category Breakdown Compact Strip */}
-      <div className="grid grid-cols-3 gap-2.5">
-        <div className="gallery-card border border-[#E4DFD5] p-3.5 text-center dark:border-[#322D27]">
-          <p className="font-mono text-[22px] font-medium tabular-nums text-[#1A1816] md:text-xl dark:text-[#F5F1E8]">
-            {stats.film}
-          </p>
-          <p className="mt-0.5 text-[13px] text-[#625C54] md:text-xs dark:text-[#A59D90]">影视作品</p>
-        </div>
-        <div className="gallery-card border border-[#E4DFD5] p-3.5 text-center dark:border-[#322D27]">
-          <p className="font-mono text-[22px] font-medium tabular-nums text-[#1A1816] md:text-xl dark:text-[#F5F1E8]">
-            {stats.person}
-          </p>
-          <p className="mt-0.5 text-[13px] text-[#625C54] md:text-xs dark:text-[#A59D90]">影人档案</p>
-        </div>
-        <div className="gallery-card border border-[#E4DFD5] p-3.5 text-center dark:border-[#322D27]">
-          <p className="font-mono text-[22px] font-medium tabular-nums text-[#1A1816] md:text-xl dark:text-[#F5F1E8]">
-            {stats.character}
-          </p>
-          <p className="mt-0.5 text-[13px] text-[#625C54] md:text-xs dark:text-[#A59D90]">角色图鉴</p>
-        </div>
-      </div>
+      {/* 3. Real-Time Collection Distribution Donut & Category Breakdown */}
+      <CollectionStatsCapsule
+        items={items}
+        onSelectCategory={onFilterByCategory}
+        onJumpToSearch={onJumpToSearch}
+      />
 
       {/* 3.5 Gallery Appearance / Dark Mode Switcher Card */}
       {onToggleTheme && (
