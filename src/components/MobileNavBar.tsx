@@ -116,9 +116,17 @@ export function AppTopBar({
         <button
           type="button"
           onClick={() => onSelectTab('library')}
-          className="min-w-0 truncate font-editorial text-[20px] font-semibold tracking-[0.06em] text-[#1A1816] whitespace-nowrap cursor-pointer dark:text-[#F3EFE6]"
+          className="flex min-w-0 items-center gap-2 font-editorial text-[19px] font-semibold tracking-[0.08em] text-[#1A1816] whitespace-nowrap cursor-pointer dark:text-[#F3EFE6]"
         >
-          {TAB_TITLES[activeTab]}
+          {activeTab === 'library' && (
+            <span
+              aria-hidden="true"
+              className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-[4px] border border-[#B43B2B]/80 font-editorial text-[10px] font-semibold leading-none text-[#B43B2B] dark:border-[#EB7865]/80 dark:text-[#EB7865]"
+            >
+              影
+            </span>
+          )}
+          <span className="truncate">{TAB_TITLES[activeTab]}</span>
         </button>
 
         <div className="flex shrink-0 items-center gap-1.5">
@@ -130,7 +138,7 @@ export function AppTopBar({
               aria-pressed={isDark}
               aria-label={isDark ? '切换为浅色宣纸模式' : '切换为深色暗房模式'}
               title={isDark ? '切换浅色模式' : '切换深色模式'}
-              className="inline-flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-xl border border-[#DCD6CB] bg-white text-[#4B453E] cursor-pointer active:scale-[0.96] transition-colors hover:border-[#1A1816] hover:text-[#1A1816] dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#E4C37A] dark:hover:border-[#D4AF6A]"
+              className="inline-flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-lg border border-transparent text-[#5E574E] cursor-pointer active:scale-[0.96] transition-colors hover:border-[#DCD6CB] hover:bg-white hover:text-[#1A1816] dark:text-[#D4AF6A] dark:hover:border-[#3A342D] dark:hover:bg-[#1D1A17]"
             >
               {isDark ? (
                 <Sun className="h-4 w-4" aria-hidden="true" />
@@ -148,7 +156,7 @@ export function AppTopBar({
               onClick={onQuickCheckIn}
               aria-label="今日尚未巡馆盖章，点击立即盖章"
               title="今日尚未巡馆盖章，点击立即盖章"
-              className="inline-flex h-[38px] items-center gap-1 rounded-xl border border-[#EACDC6] bg-[#FDF2EF] px-2.5 text-[12px] font-medium text-[#B43B2B] whitespace-nowrap shrink-0 cursor-pointer active:scale-[0.97] transition-colors hover:bg-[#FBE6E1] dark:border-[#6B3229] dark:bg-[#351B17] dark:text-[#F28C7B] dark:hover:bg-[#46231D]"
+              className="inline-flex h-[36px] items-center gap-1 rounded-lg border border-[#E5C5BD] bg-[#FDF5F2] px-2.5 text-[12px] font-medium text-[#B43B2B] whitespace-nowrap shrink-0 cursor-pointer active:scale-[0.97] transition-colors hover:bg-[#FBE8E3] dark:border-[#6B3229] dark:bg-[#2F1814] dark:text-[#F28C7B] dark:hover:bg-[#3F201A]"
             >
               <Stamp className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               <span>盖章</span>
@@ -159,7 +167,7 @@ export function AppTopBar({
             <button
               type="button"
               onClick={() => onSelectTab('search')}
-              className="inline-flex h-[38px] items-center justify-center rounded-xl bg-[#B43B2B] px-3 text-[13px] font-medium text-white whitespace-nowrap shrink-0 cursor-pointer active:scale-[0.97] transition-colors hover:bg-[#932D20]"
+              className="inline-flex h-[36px] items-center justify-center rounded-lg bg-[#B43B2B] px-3 text-[13px] font-medium text-white whitespace-nowrap shrink-0 cursor-pointer active:scale-[0.97] transition-colors hover:bg-[#932D20]"
             >
               联网搜
             </button>
@@ -172,16 +180,22 @@ export function AppTopBar({
       </div>
 
       {/* Desktop 3-Zone Top Bar (md+): Wordmark — 5 Nav Links — Theme & Primary Action */}
-      <div className="mx-auto hidden h-16 max-w-[1180px] items-center justify-between gap-8 px-8 md:flex">
+      <div className="mx-auto hidden h-[62px] max-w-[1180px] items-center justify-between gap-8 px-8 md:flex">
         <button
           type="button"
           onClick={() => onSelectTab('library')}
-          className="font-editorial text-[22px] font-semibold tracking-[0.08em] text-[#1A1816] whitespace-nowrap shrink-0 cursor-pointer transition-opacity hover:opacity-80 dark:text-[#F3EFE6]"
+          className="flex items-center gap-2.5 font-editorial text-[21px] font-semibold tracking-[0.1em] text-[#1A1816] whitespace-nowrap shrink-0 cursor-pointer transition-opacity hover:opacity-80 dark:text-[#F3EFE6]"
         >
-          光影志
+          <span
+            aria-hidden="true"
+            className="inline-flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[4px] border border-[#B43B2B]/80 font-editorial text-[11px] font-semibold leading-none text-[#B43B2B] dark:border-[#EB7865]/80 dark:text-[#EB7865]"
+          >
+            影
+          </span>
+          <span>光影志</span>
         </button>
 
-        <nav aria-label="主导航" className="flex items-center gap-8">
+        <nav aria-label="主导航" className="flex items-center gap-9">
           {TABS.map(({ id, label }) => {
             const active = activeTab === id;
             return (
@@ -190,10 +204,10 @@ export function AppTopBar({
                 type="button"
                 aria-current={active ? 'page' : undefined}
                 onClick={() => onSelectTab(id)}
-                className={`relative py-2 text-sm font-medium whitespace-nowrap shrink-0 cursor-pointer transition-colors ${
+                className={`relative py-2 text-[14px] font-medium tracking-[0.03em] whitespace-nowrap shrink-0 cursor-pointer transition-colors ${
                   active
                     ? 'text-[#1A1816] dark:text-[#FAF7F0]'
-                    : 'text-[#625C54] hover:text-[#1A1816] dark:text-[#A59D90] dark:hover:text-[#F3EFE6]'
+                    : 'text-[#6E675E] hover:text-[#1A1816] dark:text-[#A59D90] dark:hover:text-[#F3EFE6]'
                 }`}
               >
                 <span>{label}</span>
@@ -204,7 +218,7 @@ export function AppTopBar({
                 )}
                 <span
                   aria-hidden="true"
-                  className={`absolute inset-x-0 -bottom-[1px] h-[2px] rounded-full bg-[#B43B2B] dark:bg-[#EB7865] transition-all duration-200 ${
+                  className={`absolute inset-x-0 -bottom-[1px] h-[2px] bg-[#B43B2B] dark:bg-[#EB7865] transition-all duration-200 ${
                     active ? 'opacity-100 scale-x-100' : 'opacity-0 scale-x-50'
                   }`}
                 />
@@ -222,7 +236,7 @@ export function AppTopBar({
               aria-pressed={isDark}
               aria-label={isDark ? '切换为浅色宣纸模式' : '切换为深色暗房模式'}
               title={isDark ? '切换为浅色模式' : '切换为深色模式'}
-              className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-[#DCD6CB] bg-white px-3 text-xs font-medium text-[#4B453E] whitespace-nowrap shrink-0 cursor-pointer transition-colors hover:border-[#1A1816] hover:text-[#1A1816] active:scale-[0.97] dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#E4C37A] dark:hover:border-[#D4AF6A] dark:hover:text-[#F5DC9B]"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-transparent px-2.5 text-xs font-medium text-[#625C54] whitespace-nowrap shrink-0 cursor-pointer transition-colors hover:border-[#DCD6CB] hover:bg-white/80 hover:text-[#1A1816] active:scale-[0.97] dark:text-[#D4AF6A] dark:hover:border-[#3A342D] dark:hover:bg-[#1D1A17] dark:hover:text-[#F5DC9B]"
             >
               {isDark ? (
                 <>
@@ -245,7 +259,7 @@ export function AppTopBar({
               data-testid="topbar-checkin-icon-desktop"
               onClick={onQuickCheckIn}
               aria-label="今日尚未巡馆盖章，点击立即盖章"
-              className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-[#EACDC6] bg-[#FDF2EF] px-3 text-xs font-medium text-[#B43B2B] whitespace-nowrap shrink-0 cursor-pointer transition-colors hover:bg-[#FBE6E1] dark:border-[#6B3229] dark:bg-[#351B17] dark:text-[#F28C7B] dark:hover:bg-[#46231D]"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#E5C5BD] bg-[#FDF5F2] px-3 text-xs font-medium text-[#B43B2B] whitespace-nowrap shrink-0 cursor-pointer transition-colors hover:bg-[#FBE8E3] dark:border-[#6B3229] dark:bg-[#2F1814] dark:text-[#F28C7B] dark:hover:bg-[#3F201A]"
             >
               <Stamp className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               <span>今日盖章</span>
@@ -255,7 +269,7 @@ export function AppTopBar({
           <button
             type="button"
             onClick={() => onSelectTab('search')}
-            className="h-10 rounded-xl bg-[#B43B2B] px-4 text-sm font-medium text-white whitespace-nowrap shrink-0 cursor-pointer transition-colors hover:bg-[#932D20] active:scale-[0.98]"
+            className="h-9 rounded-lg bg-[#B43B2B] px-4 text-[13px] font-medium tracking-[0.02em] text-white whitespace-nowrap shrink-0 cursor-pointer transition-colors hover:bg-[#932D20] active:scale-[0.98]"
           >
             联网收录
           </button>

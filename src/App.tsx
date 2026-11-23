@@ -1312,8 +1312,10 @@ export default function App() {
     }
   };
 
-  const jumpToSearch = (prefillQuery?: string) => {
-    setPendingSearchCategory(activeCategory === 'all' ? 'film' : activeCategory);
+  const jumpToSearch = (prefillQuery?: string, cat?: ArchiveCategory) => {
+    setPendingSearchCategory(
+      cat ?? (activeCategory === 'all' ? 'film' : activeCategory)
+    );
     if (prefillQuery && prefillQuery.trim()) {
       setPendingSearchQuery(prefillQuery.trim());
     }
@@ -1613,23 +1615,26 @@ export default function App() {
               onOpenQuotesWall={() => setQuotesWallOpen(true)}
             />
 
-            {/* Compact Mobile-First Gallery Studio Strip */}
+            {/* Unified Curatorial Atelier Ribbon (Single Architectural Surface, Zero Floating Pill Soup) */}
             {items.length > 0 && (
               <section
                 aria-label="策展与视觉工坊"
                 data-testid="gallery-studio-bar"
-                className="mx-auto max-w-[1180px] px-4 pt-3 min-[420px]:px-5 md:px-8"
+                className="mx-auto max-w-[1180px] px-4 pt-3.5 min-[420px]:px-5 md:px-8 md:pt-4"
               >
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-4 divide-x divide-[#EAE4D8] overflow-hidden rounded-xl border border-[#E5DFD3] bg-[#FFFDF9]/92 shadow-[0_1px_2px_rgba(26,24,22,0.025)] dark:divide-[#2C2721] dark:border-[#2F2A24] dark:bg-[#1B1815]/92">
                   <button
                     type="button"
                     data-testid="studio-watchlist-blindbox-btn"
                     onClick={handleOpenWatchlistBlindBox}
-                    className="flex min-h-[54px] flex-col items-center justify-center gap-1 rounded-2xl border border-[#E4DFD5] bg-white px-1.5 py-2 text-[#1A1816] shadow-[0_1px_2px_rgba(26,24,22,0.03)] cursor-pointer active:scale-[0.97] hover:border-[#B43B2B] transition-all sm:min-h-[44px] sm:flex-row sm:gap-2 dark:border-[#322D27] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:hover:border-[#E06856]"
+                    className="group flex min-h-[54px] flex-col items-center justify-center gap-1 px-2 py-2 text-[#1A1816] cursor-pointer transition-colors hover:bg-[#F7F3EA] active:bg-[#EFEAE0] sm:min-h-[46px] sm:flex-row sm:gap-2.5 sm:px-3 dark:text-[#F3EFE6] dark:hover:bg-[#231F1A]"
                   >
-                    <Dices className="h-4 w-4 text-[#B43B2B] dark:text-[#EB7865]" aria-hidden="true" />
-                    <span className="text-[12px] font-medium whitespace-nowrap">
-                      今晚看啥
+                    <Dices className="h-4 w-4 shrink-0 text-[#B43B2B] dark:text-[#EB7865]" aria-hidden="true" />
+                    <span className="flex items-baseline gap-1.5 whitespace-nowrap">
+                      <span className="text-[12px] font-medium sm:text-[13px]">今晚看啥</span>
+                      <span className="hidden text-[11px] text-[#8C857B] lg:inline dark:text-[#9A9184]">
+                        盲盒选片
+                      </span>
                     </span>
                   </button>
 
@@ -1637,11 +1642,14 @@ export default function App() {
                     type="button"
                     data-testid="studio-quotes-wall-btn"
                     onClick={() => setQuotesWallOpen(true)}
-                    className="flex min-h-[54px] flex-col items-center justify-center gap-1 rounded-2xl border border-[#E4DFD5] bg-white px-1.5 py-2 text-[#1A1816] shadow-[0_1px_2px_rgba(26,24,22,0.03)] cursor-pointer active:scale-[0.97] hover:border-[#1A1816] transition-all sm:min-h-[44px] sm:flex-row sm:gap-2 dark:border-[#322D27] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:hover:border-[#D4AF6A]"
+                    className="group flex min-h-[54px] flex-col items-center justify-center gap-1 px-2 py-2 text-[#1A1816] cursor-pointer transition-colors hover:bg-[#F7F3EA] active:bg-[#EFEAE0] sm:min-h-[46px] sm:flex-row sm:gap-2.5 sm:px-3 dark:text-[#F3EFE6] dark:hover:bg-[#231F1A]"
                   >
-                    <Quote className="h-4 w-4 text-[#A67C37] dark:text-[#E4C37A]" aria-hidden="true" />
-                    <span className="text-[12px] font-medium whitespace-nowrap">
-                      金句本
+                    <Quote className="h-4 w-4 shrink-0 text-[#9B7228] dark:text-[#E4C37A]" aria-hidden="true" />
+                    <span className="flex items-baseline gap-1.5 whitespace-nowrap">
+                      <span className="text-[12px] font-medium sm:text-[13px]">金句本</span>
+                      <span className="hidden text-[11px] text-[#8C857B] lg:inline dark:text-[#9A9184]">
+                        台词摘录
+                      </span>
                     </span>
                   </button>
 
@@ -1652,11 +1660,14 @@ export default function App() {
                       setGlobalMapInitialId(null);
                       setGlobalMapOpen(true);
                     }}
-                    className="flex min-h-[54px] flex-col items-center justify-center gap-1 rounded-2xl border border-[#E4DFD5] bg-white px-1.5 py-2 text-[#1A1816] shadow-[0_1px_2px_rgba(26,24,22,0.03)] cursor-pointer active:scale-[0.97] hover:border-[#1A1816] transition-all sm:min-h-[44px] sm:flex-row sm:gap-2 dark:border-[#322D27] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:hover:border-[#7AB59E]"
+                    className="group flex min-h-[54px] flex-col items-center justify-center gap-1 px-2 py-2 text-[#1A1816] cursor-pointer transition-colors hover:bg-[#F7F3EA] active:bg-[#EFEAE0] sm:min-h-[46px] sm:flex-row sm:gap-2.5 sm:px-3 dark:text-[#F3EFE6] dark:hover:bg-[#231F1A]"
                   >
-                    <Compass className="h-4 w-4 text-[#4E7A6A] dark:text-[#7AB59E]" aria-hidden="true" />
-                    <span className="text-[12px] font-medium whitespace-nowrap">
-                      关系星图
+                    <Compass className="h-4 w-4 shrink-0 text-[#467362] dark:text-[#7AB59E]" aria-hidden="true" />
+                    <span className="flex items-baseline gap-1.5 whitespace-nowrap">
+                      <span className="text-[12px] font-medium sm:text-[13px]">关系星图</span>
+                      <span className="hidden text-[11px] text-[#8C857B] lg:inline dark:text-[#9A9184]">
+                        影史脉络
+                      </span>
                     </span>
                   </button>
 
@@ -1670,30 +1681,33 @@ export default function App() {
                         title: activeAlbum ? activeAlbum.name : '我的私人光影志',
                       })
                     }
-                    className="flex min-h-[54px] flex-col items-center justify-center gap-1 rounded-2xl border border-[#E4DFD5] bg-white px-1.5 py-2 text-[#1A1816] shadow-[0_1px_2px_rgba(26,24,22,0.03)] cursor-pointer active:scale-[0.97] hover:border-[#1A1816] transition-all sm:min-h-[44px] sm:flex-row sm:gap-2 dark:border-[#322D27] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:hover:border-[#D4AF6A]"
+                    className="group flex min-h-[54px] flex-col items-center justify-center gap-1 px-2 py-2 text-[#1A1816] cursor-pointer transition-colors hover:bg-[#F7F3EA] active:bg-[#EFEAE0] sm:min-h-[46px] sm:flex-row sm:gap-2.5 sm:px-3 dark:text-[#F3EFE6] dark:hover:bg-[#231F1A]"
                   >
-                    <Grid3x3 className="h-4 w-4 text-[#1A1816] dark:text-[#E8E2D7]" aria-hidden="true" />
-                    <span className="text-[12px] font-medium whitespace-nowrap">
-                      海报墙
+                    <Grid3x3 className="h-4 w-4 shrink-0 text-[#3F3A34] dark:text-[#DDD6C9]" aria-hidden="true" />
+                    <span className="flex items-baseline gap-1.5 whitespace-nowrap">
+                      <span className="text-[12px] font-medium sm:text-[13px]">海报墙</span>
+                      <span className="hidden text-[11px] text-[#8C857B] lg:inline dark:text-[#9A9184]">
+                        拼图导出
+                      </span>
                     </span>
                   </button>
                 </div>
               </section>
             )}
 
-            {/* Top Search + Category + Filter Control Zone */}
-            <section className="mx-auto max-w-[1180px] px-4 pt-3.5 pb-2 min-[420px]:px-5 md:px-8 md:pt-4">
-              {/* Prominent Dual-Purpose Search Bar (Filter Library OR Submit to Online Search) */}
+            {/* Archival Catalog Search + Editorial Category & Filter Bar */}
+            <section className="mx-auto max-w-[1180px] px-4 pt-4 pb-2 min-[420px]:px-5 md:px-8 md:pt-5">
+              {/* Integrated Search Bar (Filter Library OR Submit to Online Search) */}
               <form
                 onSubmit={handleQuickBarSubmit}
-                className="flex min-w-0 items-center gap-2.5"
+                className="flex min-w-0 items-center gap-2"
               >
                 <div className="relative min-w-0 flex-1">
                   <label htmlFor="library-quick-search" className="sr-only">
                     搜片名、影人、角色或筛查馆藏
                   </label>
                   <Search
-                    className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[#8C857B] dark:text-[#9A9184]"
+                    className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8C857B] dark:text-[#9A9184]"
                     aria-hidden="true"
                   />
                   <input
@@ -1705,24 +1719,24 @@ export default function App() {
                     onChange={(e) => setLibraryQuery(e.target.value)}
                     placeholder={
                       items.length === 0
-                        ? '搜片名、影人或角色，回车直接联网收录…'
+                        ? '输入片名、导演、演员或角色，按回车即刻全网收录…'
                         : '筛查馆藏，或回车全网搜片…'
                     }
-                    className="h-12 w-full rounded-2xl border border-[#DCD6CB] bg-white pl-10 pr-10 text-[16px] text-[#1A1816] shadow-[0_1px_2px_rgba(26,24,22,0.03)] placeholder:text-[#8C857B] transition-colors focus:border-[#1A1816] focus:outline-none md:h-11 md:pr-14 md:text-sm dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:placeholder:text-[#8E8578] dark:focus:border-[#D4AF6A] [&::-webkit-search-cancel-button]:hidden"
+                    className="h-11 w-full rounded-xl border border-[#DFD9CE] bg-[#FFFDF9] pl-10 pr-10 text-[16px] text-[#1A1816] placeholder:text-[#8E867B] transition-colors focus:border-[#1A1816] focus:bg-white focus:outline-none md:h-10 md:pr-12 md:text-[13px] dark:border-[#342F28] dark:bg-[#1B1815] dark:text-[#F3EFE6] dark:placeholder:text-[#857D71] dark:focus:border-[#D4AF6A] [&::-webkit-search-cancel-button]:hidden"
                   />
                   {libraryQuery ? (
                     <button
                       type="button"
                       onClick={() => setLibraryQuery('')}
                       aria-label="清空输入"
-                      className="absolute right-1 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl text-[#625C54] hover:text-[#1A1816] dark:text-[#A59D90] dark:hover:text-[#F3EFE6] cursor-pointer"
+                      className="absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-[#625C54] hover:text-[#1A1816] dark:text-[#A59D90] dark:hover:text-[#F3EFE6] cursor-pointer"
                     >
                       <X className="h-4 w-4" />
                     </button>
                   ) : (
                     <kbd
                       aria-hidden="true"
-                      className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-md border border-[#E0D9CD] bg-[#FAF8F3] px-1.5 py-0.5 font-mono text-[11px] text-[#8C857B] md:inline-block dark:border-[#3E3830] dark:bg-[#26221D] dark:text-[#9A9184]"
+                      className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border border-[#E4DDD1] bg-[#FAF8F3] px-1.5 py-0.5 font-mono text-[10px] text-[#8C857B] md:inline-block dark:border-[#3A342C] dark:bg-[#24201B] dark:text-[#9A9184]"
                     >
                       /
                     </kbd>
@@ -1731,56 +1745,68 @@ export default function App() {
 
                 <button
                   type="submit"
-                  className="h-12 shrink-0 rounded-2xl bg-[#1A1816] px-4 min-[420px]:px-5 text-[15px] font-medium text-white whitespace-nowrap cursor-pointer active:scale-[0.97] transition-all hover:bg-[#B43B2B] md:h-11 md:text-sm dark:bg-[#F3EFE6] dark:text-[#141210] dark:hover:bg-[#E4C37A]"
+                  className={`h-11 shrink-0 rounded-xl px-4 text-[14px] font-medium whitespace-nowrap cursor-pointer active:scale-[0.97] transition-colors md:h-10 md:px-4 md:text-[13px] ${
+                    libraryQuery.trim().length > 0
+                      ? 'bg-[#1A1816] text-white hover:bg-[#B43B2B] dark:bg-[#E4C37A] dark:text-[#161310] dark:hover:bg-[#EED291]'
+                      : 'border border-[#D5CEC2] bg-[#FFFDF9] text-[#2A2622] hover:border-[#1A1816] hover:bg-white dark:border-[#3A332C] dark:bg-[#211E1A] dark:text-[#ECE6DC] dark:hover:border-[#E4C37A] dark:hover:text-[#FAF7F0]'
+                  }`}
                 >
                   联网搜
                 </button>
               </form>
 
-              {/* Unified Category Tabs + Filter/Sort/View Controls */}
-              <div
-                className={`mt-3.5 flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between ${
-                  items.length > 0 ? 'border-b border-[#E4DFD5] pb-3.5 dark:border-[#2E2924]' : ''
-                }`}
-              >
-                <div
-                  role="group"
-                  aria-label="藏品分类"
-                  className="grid w-full grid-cols-4 gap-1 rounded-xl bg-[#ECE8DF] p-1 sm:max-w-[380px] dark:bg-[#231F1B]"
-                >
-                  {LIBRARY_CATS.map((cat) => {
-                    const active = activeCategory === cat.id;
-                    const count =
-                      cat.id === 'all'
-                        ? stats.total
-                        : cat.id === 'film'
-                          ? stats.film
-                          : cat.id === 'person'
-                            ? stats.person
-                            : stats.character;
-                    return (
-                      <button
-                        key={cat.id}
-                        type="button"
-                        aria-pressed={active}
-                        onClick={() => setActiveCategory(cat.id)}
-                        className={`min-h-[42px] rounded-lg px-1.5 text-[13px] min-[420px]:text-[14px] font-medium whitespace-nowrap cursor-pointer transition-colors md:min-h-[36px] md:text-xs ${
-                          active
-                            ? 'bg-white text-[#1A1816] shadow-xs dark:bg-[#353029] dark:text-[#F5F1E8]'
-                            : 'text-[#625C54] hover:text-[#1A1816] dark:text-[#A89F92] dark:hover:text-[#F3EFE6]'
-                        }`}
-                      >
-                        {cat.label}
-                        <span className="ml-1 font-mono text-[12px] tabular-nums opacity-75 md:text-[11px]">
-                          {count}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
+              {/* Editorial Underline Category Tabs + Quiet Filter/Sort/View Controls (Only when archive has items) */}
+              {items.length > 0 && (
+                <div className="mt-4 flex flex-col gap-3 border-b border-[#E4DFD5] pb-3 lg:flex-row lg:items-end lg:justify-between lg:pb-0 dark:border-[#2E2924]">
+                  <div
+                    role="group"
+                    aria-label="藏品分类"
+                    className="flex items-center gap-6 overflow-x-auto no-scrollbar border-b border-[#ECE6DA] lg:border-b-0 dark:border-[#2A2520]"
+                  >
+                    {LIBRARY_CATS.map((cat) => {
+                      const active = activeCategory === cat.id;
+                      const count =
+                        cat.id === 'all'
+                          ? stats.total
+                          : cat.id === 'film'
+                            ? stats.film
+                            : cat.id === 'person'
+                              ? stats.person
+                              : stats.character;
+                      return (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          aria-pressed={active}
+                          onClick={() => setActiveCategory(cat.id)}
+                          className={`relative pb-2.5 pt-1 text-[14px] font-medium tracking-[0.02em] whitespace-nowrap shrink-0 cursor-pointer transition-colors md:pb-3 md:text-[13px] ${
+                            active
+                              ? 'text-[#1A1816] dark:text-[#FAF7F0]'
+                              : 'text-[#746C61] hover:text-[#1A1816] dark:text-[#9E9588] dark:hover:text-[#F3EFE6]'
+                          }`}
+                        >
+                          <span>{cat.label}</span>
+                          <span
+                            className={`ml-1.5 font-mono text-[11px] tabular-nums ${
+                              active
+                                ? 'text-[#B43B2B] dark:text-[#E4C37A]'
+                                : 'text-[#9A9287] dark:text-[#7D756A]'
+                            }`}
+                          >
+                            {count}
+                          </span>
+                          <span
+                            aria-hidden="true"
+                            className={`absolute inset-x-0 -bottom-[1px] h-[2px] bg-[#B43B2B] dark:bg-[#E4C37A] transition-all duration-200 ${
+                              active ? 'opacity-100 scale-x-100' : 'opacity-0 scale-x-50'
+                            }`}
+                          />
+                        </button>
+                      );
+                    })}
+                  </div>
 
-                {items.length > 0 && (
-                  <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between lg:justify-end">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between lg:justify-end lg:pb-2">
                     <div
                       className={`grid w-full min-w-0 gap-2 sm:flex sm:w-auto sm:items-center ${
                         tagRegistry.length > 0 ? 'grid-cols-3' : 'grid-cols-2'
@@ -1797,7 +1823,7 @@ export default function App() {
                             e.target.value as 'all' | CollectionStatus
                           )
                         }
-                        className="h-11 min-w-0 w-full rounded-xl border border-[#DCD6CB] bg-white px-2.5 text-[16px] font-medium text-[#1A1816] focus:border-[#1A1816] focus:outline-none sm:h-9 sm:w-auto sm:px-3 md:text-xs dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:focus:border-[#D4AF6A]"
+                        className="h-10 min-w-0 w-full rounded-lg border border-[#E2DCD1] bg-[#FFFDF9] px-2.5 text-[16px] font-medium text-[#2A2622] focus:border-[#1A1816] focus:outline-none sm:h-8 sm:w-auto sm:px-2.5 md:text-xs dark:border-[#342F28] dark:bg-[#1B1815] dark:text-[#E8E2D7] dark:focus:border-[#D4AF6A]"
                       >
                         <option value="all">全部状态</option>
                         <option value="favorite">挚爱</option>
@@ -1815,10 +1841,10 @@ export default function App() {
                             id="mobile-tag-filter"
                             value={activeTag}
                             onChange={(e) => setActiveTag(e.target.value)}
-                            className={`h-11 min-w-0 w-full rounded-xl border px-2.5 text-[16px] font-medium focus:outline-none sm:h-9 sm:w-auto sm:max-w-[160px] sm:px-3 md:text-xs ${
+                            className={`h-10 min-w-0 w-full rounded-lg border px-2.5 text-[16px] font-medium focus:outline-none sm:h-8 sm:w-auto sm:max-w-[156px] sm:px-2.5 md:text-xs ${
                               activeTag
                                 ? 'border-[#1A1816] bg-[#1A1816] text-white dark:border-[#E4C37A] dark:bg-[#F3EFE6] dark:text-[#141210]'
-                                : 'border-[#DCD6CB] bg-white text-[#1A1816] focus:border-[#1A1816] dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:focus:border-[#D4AF6A]'
+                                : 'border-[#E2DCD1] bg-[#FFFDF9] text-[#2A2622] focus:border-[#1A1816] dark:border-[#342F28] dark:bg-[#1B1815] dark:text-[#E8E2D7] dark:focus:border-[#D4AF6A]'
                             }`}
                           >
                             <option value="">全部标签</option>
@@ -1838,7 +1864,7 @@ export default function App() {
                         id="mobile-sort-select"
                         value={sortBy}
                         onChange={(e) => setSortBy(e.target.value as SortOption)}
-                        className="h-11 min-w-0 w-full rounded-xl border border-[#DCD6CB] bg-white px-2.5 text-[16px] font-medium text-[#1A1816] focus:border-[#1A1816] focus:outline-none sm:h-9 sm:w-auto sm:px-3 md:text-xs dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:focus:border-[#D4AF6A]"
+                        className="h-10 min-w-0 w-full rounded-lg border border-[#E2DCD1] bg-[#FFFDF9] px-2.5 text-[16px] font-medium text-[#2A2622] focus:border-[#1A1816] focus:outline-none sm:h-8 sm:w-auto sm:px-2.5 md:text-xs dark:border-[#342F28] dark:bg-[#1B1815] dark:text-[#E8E2D7] dark:focus:border-[#D4AF6A]"
                       >
                         <option value="recent">最近收录</option>
                         <option value="rating">评分最高</option>
@@ -1854,10 +1880,10 @@ export default function App() {
                           data-testid="toggle-advanced-filters-btn"
                           aria-expanded={advancedFiltersOpen}
                           onClick={() => setAdvancedFiltersOpen((v) => !v)}
-                          className={`inline-flex h-9 items-center gap-1 rounded-xl border px-2.5 text-xs font-medium whitespace-nowrap cursor-pointer transition-colors ${
+                          className={`inline-flex h-8 items-center gap-1 rounded-lg border px-2.5 text-xs font-medium whitespace-nowrap cursor-pointer transition-colors ${
                             advancedFiltersOpen || activeAdvancedFilterCount > 0
                               ? 'border-[#1A1816] bg-[#1A1816] text-white dark:border-[#F3EFE6] dark:bg-[#F3EFE6] dark:text-[#141210]'
-                              : 'border-[#DCD6CB] bg-white text-[#4B453E] hover:border-[#1A1816] dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#C4BCB0] dark:hover:border-[#D4AF6A] dark:hover:text-[#F3EFE6]'
+                              : 'border-[#E2DCD1] bg-[#FFFDF9] text-[#564F47] hover:border-[#1A1816] hover:text-[#1A1816] dark:border-[#342F28] dark:bg-[#1B1815] dark:text-[#BDB5A8] dark:hover:border-[#D4AF6A] dark:hover:text-[#F3EFE6]'
                           }`}
                         >
                           <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
@@ -1879,10 +1905,10 @@ export default function App() {
                               return !prev;
                             });
                           }}
-                          className={`inline-flex h-9 items-center gap-1 rounded-xl border px-2.5 text-xs font-medium whitespace-nowrap cursor-pointer transition-colors ${
+                          className={`inline-flex h-8 items-center gap-1 rounded-lg border px-2.5 text-xs font-medium whitespace-nowrap cursor-pointer transition-colors ${
                             batchMode
                               ? 'border-[#B43B2B] bg-[#B43B2B] text-white'
-                              : 'border-[#DCD6CB] bg-white text-[#4B453E] hover:border-[#1A1816] dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#C4BCB0] dark:hover:border-[#D4AF6A] dark:hover:text-[#F3EFE6]'
+                              : 'border-[#E2DCD1] bg-[#FFFDF9] text-[#564F47] hover:border-[#1A1816] hover:text-[#1A1816] dark:border-[#342F28] dark:bg-[#1B1815] dark:text-[#BDB5A8] dark:hover:border-[#D4AF6A] dark:hover:text-[#F3EFE6]'
                           }`}
                         >
                           <CheckSquare className="h-3.5 w-3.5" aria-hidden="true" />
@@ -1894,7 +1920,7 @@ export default function App() {
                             type="button"
                             data-testid="reset-filters-inline-btn"
                             onClick={handleResetFilters}
-                            className="inline-flex h-9 items-center gap-1 rounded-xl border border-[#E5BFB9] bg-[#FDF4F2] px-2 text-xs font-medium text-[#B43B2B] whitespace-nowrap cursor-pointer transition-colors hover:bg-[#FBE6E1] dark:border-[#6B3229] dark:bg-[#351B17] dark:text-[#F28C7B] dark:hover:bg-[#46231D]"
+                            className="inline-flex h-8 items-center gap-1 rounded-lg border border-[#E5BFB9] bg-[#FDF4F2] px-2 text-xs font-medium text-[#B43B2B] whitespace-nowrap cursor-pointer transition-colors hover:bg-[#FBE6E1] dark:border-[#6B3229] dark:bg-[#351B17] dark:text-[#F28C7B] dark:hover:bg-[#46231D]"
                           >
                             <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
                             <span>重置</span>
@@ -1905,7 +1931,7 @@ export default function App() {
                       <div className="flex items-center gap-2">
                         <span
                           data-testid="stat-total"
-                          className="font-mono text-[13px] tabular-nums text-[#7A7268] shrink-0 md:text-xs dark:text-[#9A9184]"
+                          className="font-mono text-[12px] tabular-nums text-[#857D72] shrink-0 dark:text-[#9A9184]"
                         >
                           {filteredItems.length} 件
                         </span>
@@ -1914,7 +1940,7 @@ export default function App() {
                         <div
                           role="group"
                           aria-label="视图切换"
-                          className="inline-flex rounded-xl bg-[#ECE8DF] p-0.5 dark:bg-[#231F1B]"
+                          className="inline-flex rounded-lg border border-[#E2DCD1] bg-[#F2EEE6] p-0.5 dark:border-[#322D27] dark:bg-[#211D19]"
                         >
                           <button
                             type="button"
@@ -1922,13 +1948,13 @@ export default function App() {
                             aria-pressed={viewMode === 'grid'}
                             aria-label="画廊网格视图"
                             onClick={() => setViewMode('grid')}
-                            className={`flex h-8 w-9 items-center justify-center rounded-lg cursor-pointer transition-colors ${
+                            className={`flex h-7 w-8 items-center justify-center rounded-md cursor-pointer transition-colors ${
                               viewMode === 'grid'
-                                ? 'bg-white text-[#1A1816] shadow-xs dark:bg-[#353029] dark:text-[#F5F1E8]'
-                                : 'text-[#625C54] hover:text-[#1A1816] dark:text-[#9A9184] dark:hover:text-[#F3EFE6]'
+                                ? 'bg-white text-[#1A1816] shadow-2xs dark:bg-[#353029] dark:text-[#F5F1E8]'
+                                : 'text-[#6E665C] hover:text-[#1A1816] dark:text-[#9A9184] dark:hover:text-[#F3EFE6]'
                             }`}
                           >
-                            <LayoutGrid className="h-4 w-4" aria-hidden="true" />
+                            <LayoutGrid className="h-3.5 w-3.5" aria-hidden="true" />
                           </button>
                           <button
                             type="button"
@@ -1936,20 +1962,20 @@ export default function App() {
                             aria-pressed={viewMode === 'list'}
                             aria-label="名录列表视图"
                             onClick={() => setViewMode('list')}
-                            className={`flex h-8 w-9 items-center justify-center rounded-lg cursor-pointer transition-colors ${
+                            className={`flex h-7 w-8 items-center justify-center rounded-md cursor-pointer transition-colors ${
                               viewMode === 'list'
-                                ? 'bg-white text-[#1A1816] shadow-xs dark:bg-[#353029] dark:text-[#F5F1E8]'
-                                : 'text-[#625C54] hover:text-[#1A1816] dark:text-[#9A9184] dark:hover:text-[#F3EFE6]'
+                                ? 'bg-white text-[#1A1816] shadow-2xs dark:bg-[#353029] dark:text-[#F5F1E8]'
+                                : 'text-[#6E665C] hover:text-[#1A1816] dark:text-[#9A9184] dark:hover:text-[#F3EFE6]'
                             }`}
                           >
-                            <List className="h-4 w-4" aria-hidden="true" />
+                            <List className="h-3.5 w-3.5" aria-hidden="true" />
                           </button>
                         </div>
                       </div>
                     </div>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
 
               {/* Collapsible Multi-Dimensional Faceted Filters */}
               {items.length > 0 && advancedFiltersOpen && (
