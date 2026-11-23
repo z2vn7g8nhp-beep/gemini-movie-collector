@@ -29,6 +29,7 @@ import {
   computeCurvedEdgeGeometry,
   computeEdgeCurveOffsets,
   computeFocusCamera,
+  computeNodeLabelLayout,
   computeSmartEdgeLabelPoint,
   countNodesByCategory,
   createCategoryVisibilityForFilter,
@@ -1701,33 +1702,59 @@ export function GlobalRelationMapModal({
                         </g>
                       )}
 
-                      {/* Crisp Node Title Label */}
-                      <text
-                        x={node.x}
-                        y={node.y + node.radius + 15}
-                        textAnchor="middle"
-                        fill={labelFill}
-                        fontSize={
+                      {/* Crisp Node Title Label with Colored Category Indicator Dot */}
+                      {(() => {
+                        const labelFontSize =
                           isFocused || isPathNode
                             ? 12.5
                             : visualTier === 3
                               ? 12
-                              : 11.2
-                        }
-                        fontWeight={
-                          isFocused || isPathNode || visualTier === 3
-                            ? 600
-                            : isDirectNeighbor || visualTier === 2
-                              ? 500
-                              : 400
-                        }
-                        stroke="#141210"
-                        strokeWidth={3.2}
-                        paintOrder="stroke"
-                        className="pointer-events-none select-none"
-                      >
-                        {shortTitle}
-                      </text>
+                              : 11.2;
+                        const dotRadius = isFocused || isPathNode ? 3.2 : 2.8;
+                        const labelLayout = computeNodeLabelLayout(
+                          node.x,
+                          node.y,
+                          node.radius,
+                          shortTitle,
+                          labelFontSize,
+                          dotRadius
+                        );
+                        return (
+                          <g className="pointer-events-none select-none">
+                            <circle
+                              cx={labelLayout.dotCx}
+                              cy={labelLayout.dotCy}
+                              r={labelLayout.dotRadius}
+                              fill={CATEGORY_DOT_COLOR[node.item.category]}
+                              stroke="#141210"
+                              strokeWidth={2.2}
+                              paintOrder="stroke"
+                              data-testid={`node-category-dot-${node.id}`}
+                              data-node-category-dot={node.item.category}
+                              aria-hidden="true"
+                            />
+                            <text
+                              x={labelLayout.textX}
+                              y={labelLayout.textY}
+                              textAnchor="start"
+                              fill={labelFill}
+                              fontSize={labelFontSize}
+                              fontWeight={
+                                isFocused || isPathNode || visualTier === 3
+                                  ? 600
+                                  : isDirectNeighbor || visualTier === 2
+                                    ? 500
+                                    : 400
+                              }
+                              stroke="#141210"
+                              strokeWidth={3.2}
+                              paintOrder="stroke"
+                            >
+                              {shortTitle}
+                            </text>
+                          </g>
+                        );
+                      })()}
                     </g>
                   );
                 })}

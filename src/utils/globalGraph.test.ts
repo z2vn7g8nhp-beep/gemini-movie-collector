@@ -7,10 +7,12 @@ import {
   computeCurvedEdgeGeometry,
   computeEdgeCurveOffsets,
   computeFocusCamera,
+  computeNodeLabelLayout,
   computeSmartEdgeLabelPoint,
   countNodesByCategory,
   createCategoryVisibilityForFilter,
   describeRelationBetween,
+  estimateSvgLabelWidth,
   filterGraphByVisibleCategories,
   findShortestGraphPath,
   getEdgeVisualStyle,
@@ -692,5 +694,30 @@ test('toggleCategoryVisibilityState toggles cleanly in all mode and promotes sin
     character: false,
   });
 });
+
+test('computeNodeLabelLayout optically centers category indicator dots next to CJK and Latin node labels', () => {
+  const cjk = computeNodeLabelLayout(200, 150, 22, '花样年华', 12, 3, 4.5);
+  assert.equal(cjk.estimatedTextWidth, 48);
+  assert.equal(cjk.textY, 187);
+  // Dot sits strictly to the left of the text with exact non-overlapping gap
+  assert.ok(Math.abs(cjk.textX - (cjk.dotCx + cjk.dotRadius) - 4.5) < 0.01);
+  // Combined [dot + gap + text] span is centered around nodeX = 200
+  const leftEdge = cjk.dotCx - cjk.dotRadius;
+  const rightEdge = cjk.textX + cjk.estimatedTextWidth;
+  assert.ok(Math.abs((leftEdge + rightEdge) / 2 - 200) < 0.05);
+  // Dot aligns vertically with glyph optical center above baseline
+  assert.ok(cjk.dotCy < cjk.textY && cjk.dotCy > cjk.textY - 6);
+
+  // Wider label shifts dotCx further left symmetrically
+  const longer = computeNodeLabelLayout(200, 150, 22, '花样年华完整…', 12, 3, 4.5);
+  assert.ok(longer.dotCx < cjk.dotCx);
+  assert.ok(longer.estimatedTextWidth > cjk.estimatedTextWidth);
+
+  // Latin and narrow glyphs estimate smaller width than equal-length CJK
+  const latinWidth = estimateSvgLabelWidth('Tony L…', 11.2);
+  const cjkWidth = estimateSvgLabelWidth('梁朝伟周慕云…', 11.2);
+  assert.ok(latinWidth > 0 && latinWidth < cjkWidth);
+});
+
 
 

@@ -2416,3 +2416,74 @@ export function filterGraphByVisibleCategories(
   };
 }
 
+export interface NodeLabelLayout {
+  dotCx: number;
+  dotCy: number;
+  dotRadius: number;
+  textX: number;
+  textY: number;
+  estimatedTextWidth: number;
+  totalWidth: number;
+  gap: number;
+}
+
+/**
+ * Estimates the rendered pixel width of a short SVG text label across CJK ideographs,
+ * Latin glyphs, digits, and ellipsis so inline indicator dots can be optically centered
+ * without colliding with the text.
+ */
+export function estimateSvgLabelWidth(text: string, fontSize: number): number {
+  let units = 0;
+  for (const ch of Array.from(text)) {
+    if (/[\u2E80-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]/.test(ch)) {
+      units += 1.0;
+    } else if (ch === '…') {
+      units += 0.85;
+    } else if (/[ilI1.,:;|!'`\s]/.test(ch)) {
+      units += 0.34;
+    } else if (/[WM@#%&]/.test(ch)) {
+      units += 0.84;
+    } else if (/[A-Z0-9]/.test(ch)) {
+      units += 0.64;
+    } else {
+      units += 0.56;
+    }
+  }
+  return +(units * fontSize).toFixed(2);
+}
+
+/**
+ * Computes optically centered coordinates for a node's inline category indicator dot
+ * and title label (`[dot] [gap] [text]` with `textAnchor="start"` so the gap between
+ * dot and first glyph stays collision-free regardless of font metrics).
+ */
+export function computeNodeLabelLayout(
+  nodeX: number,
+  nodeY: number,
+  nodeRadius: number,
+  labelText: string,
+  fontSize: number,
+  dotRadius = 3,
+  gap = 4.5
+): NodeLabelLayout {
+  const estimatedTextWidth = estimateSvgLabelWidth(labelText, fontSize);
+  const totalWidth = dotRadius * 2 + gap + estimatedTextWidth;
+  const startX = nodeX - totalWidth / 2;
+  const textY = nodeY + nodeRadius + 15;
+  const dotCx = +(startX + dotRadius).toFixed(2);
+  const dotCy = +(textY - fontSize * 0.35).toFixed(2);
+  const textX = +(startX + dotRadius * 2 + gap).toFixed(2);
+
+  return {
+    dotCx,
+    dotCy,
+    dotRadius,
+    textX,
+    textY,
+    estimatedTextWidth,
+    totalWidth: +totalWidth.toFixed(2),
+    gap,
+  };
+}
+
+
