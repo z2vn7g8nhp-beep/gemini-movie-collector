@@ -579,14 +579,12 @@ html.dark {
   }
 }
 
-/* Dark Mode Sidebar / Detail Drawer Panel: subtle gilded fluorescent edge seam */
+/* Dark Mode Sidebar / Detail Drawer Panel: crisp gilded edge seam with lightweight compositor shadow */
 .dark .archive-sidebar-panel {
   border-top: 1px solid rgba(212, 175, 106, 0.34);
   box-shadow:
-    0 -1px 0 rgba(212, 175, 106, 0.16),
-    0 -10px 28px -8px rgba(212, 175, 106, 0.22),
-    inset 0 1px 0 rgba(245, 219, 156, 0.15),
-    0 -18px 44px -10px rgba(0, 0, 0, 0.72);
+    inset 0 1px 0 rgba(245, 219, 156, 0.14),
+    0 -14px 32px -10px rgba(0, 0, 0, 0.68);
 }
 
 .dark .archive-sidebar-panel::before {
@@ -611,11 +609,8 @@ html.dark {
     border-top: 0;
     border-left: 1px solid rgba(212, 175, 106, 0.36);
     box-shadow:
-      -1px 0 0 rgba(212, 175, 106, 0.18),
-      -12px 0 32px -10px rgba(212, 175, 106, 0.24),
       inset 1px 0 0 rgba(245, 219, 156, 0.14),
-      inset 14px 0 26px -20px rgba(212, 175, 106, 0.18),
-      -24px 0 56px -14px rgba(0, 0, 0, 0.78);
+      -18px 0 38px -14px rgba(0, 0, 0, 0.72);
   }
 
   .dark .archive-sidebar-panel::before {
@@ -823,6 +818,174 @@ html.dark {
   .drawer-panel-in {
     animation: drawerSlideRight 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
   }
+}
+
+/* DetailDrawer: GPU-composited short-travel glide (bottom sheet on mobile, right drawer on desktop) */
+@keyframes detailBackdropIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes detailBackdropOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes detailSheetInMobile {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 24px, 0);
+  }
+  38% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes detailSheetOutMobile {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(0, 16px, 0);
+  }
+}
+
+@keyframes detailDrawerInDesktop {
+  0% {
+    opacity: 0;
+    transform: translate3d(24px, 0, 0);
+  }
+  38% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes detailDrawerOutDesktop {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(16px, 0, 0);
+  }
+}
+
+@keyframes detailContentSwitchNext {
+  from {
+    opacity: 0;
+    transform: translate3d(10px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes detailContentSwitchPrev {
+  from {
+    opacity: 0;
+    transform: translate3d(-10px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes detailContentSwitchNeutral {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes detailBarSlideIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes detailLightboxScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.detail-drawer-backdrop-in {
+  animation: detailBackdropIn 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.detail-drawer-backdrop-out {
+  animation: detailBackdropOut 145ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+.detail-drawer-panel-in {
+  animation: detailSheetInMobile 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.detail-drawer-panel-out {
+  animation: detailSheetOutMobile 155ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+@media (min-width: 768px) {
+  .detail-drawer-panel-in {
+    animation: detailDrawerInDesktop 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .detail-drawer-panel-out {
+    animation: detailDrawerOutDesktop 155ms cubic-bezier(0.4, 0, 1, 1) both;
+  }
+}
+
+.detail-content-switch-next {
+  animation: detailContentSwitchNext 150ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.detail-content-switch-prev {
+  animation: detailContentSwitchPrev 150ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.detail-content-switch-neutral {
+  animation: detailContentSwitchNeutral 140ms ease-out both;
+}
+
+.detail-drawer-bar-in {
+  animation: detailBarSlideIn 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.detail-lightbox-in {
+  animation: detailLightboxScaleIn 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .toast-pop-in {

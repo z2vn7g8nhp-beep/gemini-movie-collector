@@ -2,81 +2,109 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   DRAWER_TIMINGS,
-  getDrawerBackdropVariants,
-  getDrawerContentVariants,
-  getDrawerMetaFadeVariants,
-  getDrawerPanelVariants,
+  completeDrawerExit,
+  getContentSwitchClass,
+  getDrawerExitDurationMs,
+  getDrawerMotionClasses,
+  getSecondaryHydrateDelayMs,
   getSwitchOffsetX,
+  resolveNextDrawerPresence,
 } from './drawerMotion';
 
-test('getDrawerPanelVariants slides smoothly from right edge when motion is enabled', () => {
-  const variants = getDrawerPanelVariants(false);
-  assert.equal(variants.closed.x, '100%');
-  assert.equal(variants.open.x, 0);
-  assert.equal(variants.open.opacity, 1);
-  assert.equal(variants.open.transition.duration, DRAWER_TIMINGS.panelEnterSec);
-  assert.equal(variants.closed.transition.duration, DRAWER_TIMINGS.panelExitSec);
+test('resolveNextDrawerPresence opens immediately from closed state', () => {
+  const next = resolveNextDrawerPresence(
+    { phase: 'closed', renderedItemId: null },
+    'film-1',
+    false
+  );
+  assert.deepEqual(next, { phase: 'open', renderedItemId: 'film-1' });
 });
 
-test('getDrawerPanelVariants disables horizontal slide when reduced motion is preferred', () => {
-  const variants = getDrawerPanelVariants(true);
-  assert.equal(variants.closed.x, 0);
-  assert.equal(variants.open.x, 0);
-  assert.ok(variants.open.transition.duration <= 0.02);
-  assert.ok(variants.closed.transition.duration <= 0.02);
+test('resolveNextDrawerPresence enters closing phase while retaining item id on close', () => {
+  const closing = resolveNextDrawerPresence(
+    { phase: 'open', renderedItemId: 'film-1' },
+    null,
+    false
+  );
+  assert.deepEqual(closing, { phase: 'closing', renderedItemId: 'film-1' });
+
+  const closed = completeDrawerExit(closing);
+  assert.deepEqual(closed, { phase: 'closed', renderedItemId: null });
 });
 
-test('getDrawerBackdropVariants fades backdrop in and out smoothly', () => {
-  const normal = getDrawerBackdropVariants(false);
-  assert.equal(normal.closed.opacity, 0);
-  assert.equal(normal.open.opacity, 1);
-  assert.ok(normal.open.transition.duration > 0.15);
+test('resolveNextDrawerPresence cancels closing immediately if user selects another archive mid-exit', () => {
+  const closing = resolveNextDrawerPresence(
+    { phase: 'open', renderedItemId: 'film-1' },
+    null,
+    false
+  );
+  const reopened = resolveNextDrawerPresence(closing, 'film-2', false);
+  assert.deepEqual(reopened, { phase: 'open', renderedItemId: 'film-2' });
 
-  const reduced = getDrawerBackdropVariants(true);
-  assert.ok(reduced.open.transition.duration <= 0.02);
+  // Stale exit timer completion must not close an active open drawer
+  assert.deepEqual(completeDrawerExit(reopened), {
+    phase: 'open',
+    renderedItemId: 'film-2',
+  });
 });
 
-test('getSwitchOffsetX computes directional subtle offsets for prev/next/neutral transitions', () => {
-  assert.equal(getSwitchOffsetX('next', 'enter', false), DRAWER_TIMINGS.contentDriftPx);
-  assert.equal(getSwitchOffsetX('next', 'exit', false), -DRAWER_TIMINGS.contentDriftPx);
-  assert.equal(getSwitchOffsetX('prev', 'enter', false), -DRAWER_TIMINGS.contentDriftPx);
-  assert.equal(getSwitchOffsetX('prev', 'exit', false), DRAWER_TIMINGS.contentDriftPx);
-  assert.equal(getSwitchOffsetX('neutral', 'enter', false), 0);
-  assert.equal(getSwitchOffsetX('neutral', 'exit', false), 0);
-  assert.equal(getSwitchOffsetX('next', 'enter', true), 0);
-  assert.equal(getSwitchOffsetX('prev', 'exit', true), 0);
+test('resolveNextDrawerPresence closes immediately when reduced motion is enabled', () => {
+  const closed = resolveNextDrawerPresence(
+    { phase: 'open', renderedItemId: 'film-1' },
+    null,
+    true
+  );
+  assert.deepEqual(closed, { phase: 'closed', renderedItemId: null });
+  assert.equal(getDrawerExitDurationMs(true), 0);
+  assert.equal(getDrawerExitDurationMs(false), DRAWER_TIMINGS.panelExitMs);
 });
 
-test('getDrawerContentVariants produces subtle fade-out and fade-in transitions for prev/next switching', () => {
-  const variants = getDrawerContentVariants(false);
-  const nextEnter = variants.enter('next');
-  const nextExit = variants.exit('next');
-  assert.equal(nextEnter.opacity, 0);
-  assert.ok(nextEnter.x > 0);
-  assert.equal(nextExit.opacity, 0);
-  assert.ok(nextExit.x < 0);
-  assert.equal(variants.center.opacity, 1);
-  assert.equal(variants.center.x, 0);
-
-  const prevEnter = variants.enter('prev');
-  const prevExit = variants.exit('prev');
-  assert.ok(prevEnter.x < 0);
-  assert.ok(prevExit.x > 0);
-
-  const reduced = getDrawerContentVariants(true);
-  assert.equal(reduced.enter('next').opacity, 1);
-  assert.equal(reduced.enter('next').x, 0);
-  assert.equal(reduced.exit('prev').opacity, 1);
-  assert.equal(reduced.exit('prev').x, 0);
+test('getDrawerMotionClasses maps open and closing phases to compositor CSS animation classes', () => {
+  assert.deepEqual(getDrawerMotionClasses('open', false), {
+    backdrop: 'detail-drawer-backdrop-in',
+    panel: 'detail-drawer-panel-in',
+  });
+  assert.deepEqual(getDrawerMotionClasses('closing', false), {
+    backdrop: 'detail-drawer-backdrop-out',
+    panel: 'detail-drawer-panel-out',
+  });
+  assert.deepEqual(getDrawerMotionClasses('open', true), {
+    backdrop: '',
+    panel: '',
+  });
+  assert.deepEqual(getDrawerMotionClasses('closed', false), {
+    backdrop: '',
+    panel: '',
+  });
 });
 
-test('getDrawerMetaFadeVariants fades header metadata cleanly', () => {
-  const normal = getDrawerMetaFadeVariants(false);
-  assert.equal(normal.enter.opacity, 0);
-  assert.equal(normal.center.opacity, 1);
-  assert.equal(normal.exit.opacity, 0);
+test('getSecondaryHydrateDelayMs defers heavy below-the-fold hydration only on initial animated open', () => {
+  assert.equal(
+    getSecondaryHydrateDelayMs(false, false),
+    DRAWER_TIMINGS.secondaryHydrateDelayMs
+  );
+  assert.equal(getSecondaryHydrateDelayMs(false, true), 0);
+  assert.equal(getSecondaryHydrateDelayMs(true, false), 0);
+});
 
-  const reduced = getDrawerMetaFadeVariants(true);
-  assert.equal(reduced.enter.opacity, 1);
-  assert.equal(reduced.exit.opacity, 1);
+test('getContentSwitchClass and getSwitchOffsetX produce directional classes only when switching items', () => {
+  assert.equal(getContentSwitchClass('next', false, true), '');
+  assert.equal(
+    getContentSwitchClass('next', false, false),
+    'detail-content-switch-next'
+  );
+  assert.equal(
+    getContentSwitchClass('prev', false, false),
+    'detail-content-switch-prev'
+  );
+  assert.equal(
+    getContentSwitchClass('neutral', false, false),
+    'detail-content-switch-neutral'
+  );
+  assert.equal(getContentSwitchClass('next', true, false), '');
+
+  assert.equal(getSwitchOffsetX('next', false), DRAWER_TIMINGS.contentDriftPx);
+  assert.equal(getSwitchOffsetX('prev', false), -DRAWER_TIMINGS.contentDriftPx);
+  assert.equal(getSwitchOffsetX('neutral', false), 0);
+  assert.equal(getSwitchOffsetX('next', true), 0);
 });

@@ -1,6 +1,12 @@
 import { SummarySource } from './SummarySource';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import {
+  startTransition,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   Check,
   ChevronDown,
@@ -69,11 +75,15 @@ import { DetailRelationGraph } from './DetailRelationGraph';
 import { DetailTagManager } from './DetailTagManager';
 import { WatchLogSection } from './WatchLogSection';
 import {
+  type DrawerPhase,
+  type DrawerPresenceState,
   type DrawerSwitchDirection,
-  getDrawerBackdropVariants,
-  getDrawerContentVariants,
-  getDrawerMetaFadeVariants,
-  getDrawerPanelVariants,
+  completeDrawerExit,
+  getContentSwitchClass,
+  getDrawerExitDurationMs,
+  getDrawerMotionClasses,
+  getSecondaryHydrateDelayMs,
+  resolveNextDrawerPresence,
 } from '../utils/drawerMotion';
 import {
   type DossierSectionId,
@@ -142,26 +152,102 @@ const STATUS_CHOICES: CollectionStatus[] = [
   'watchlist',
 ];
 
+function usePrefersReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(() =>
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return;
+    }
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const onChange = (e: MediaQueryListEvent) => setReduced(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  return reduced;
+}
+
 interface DetailDrawerShellProps extends Omit<DetailDrawerProps, 'item'> {
   item: ArchiveItem;
+  phase: DrawerPhase;
+  prefersReducedMotion: boolean;
 }
 
 export function DetailDrawer(props: DetailDrawerProps) {
+  const prefersReducedMotion = usePrefersReducedMotion();
+  const incomingId = props.item?.id ?? null;
+
+  const [presence, setPresence] = useState<DrawerPresenceState>(() =>
+    props.item
+      ? { phase: 'open', renderedItemId: props.item.id }
+      : { phase: 'closed', renderedItemId: null }
+  );
+  const [prevIncomingId, setPrevIncomingId] = useState<string | null>(incomingId);
+  const [cachedItem, setCachedItem] = useState<ArchiveItem | null>(props.item);
+
+  if (props.item && props.item !== cachedItem) {
+    setCachedItem(props.item);
+  }
+
+  if (incomingId !== prevIncomingId) {
+    setPrevIncomingId(incomingId);
+    const nextPresence = resolveNextDrawerPresence(
+      presence,
+      incomingId,
+      prefersReducedMotion
+    );
+    if (
+      nextPresence.phase !== presence.phase ||
+      nextPresence.renderedItemId !== presence.renderedItemId
+    ) {
+      setPresence(nextPresence);
+    }
+  }
+
+  useEffect(() => {
+    if (presence.phase !== 'closing') return;
+    const exitMs = getDrawerExitDurationMs(prefersReducedMotion);
+    if (exitMs <= 0) {
+      setPresence((prev) => completeDrawerExit(prev));
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setPresence((prev) => completeDrawerExit(prev));
+    }, exitMs);
+    return () => window.clearTimeout(timer);
+  }, [presence.phase, prefersReducedMotion]);
+
+  const activeItem =
+    props.item ??
+    (presence.phase === 'closing' &&
+    cachedItem &&
+    cachedItem.id === presence.renderedItemId
+      ? cachedItem
+      : null);
+
+  if (presence.phase === 'closed' || !activeItem) {
+    return null;
+  }
+
   return (
-    <AnimatePresence>
-      {props.item ? (
-        <DetailDrawerShell
-          key="detail-drawer-shell"
-          {...props}
-          item={props.item}
-        />
-      ) : null}
-    </AnimatePresence>
+    <DetailDrawerShell
+      {...props}
+      item={activeItem}
+      phase={presence.phase}
+      prefersReducedMotion={prefersReducedMotion}
+    />
   );
 }
 
 function DetailDrawerShell({
   item: savedItem,
+  phase,
+  prefersReducedMotion,
   allItems,
   albums = [],
   positionLabel,
@@ -184,42 +270,62 @@ function DetailDrawerShell({
   onUnlinkItems,
   onQuickCreateRelated,
 }: DetailDrawerShellProps) {
-  const prefersReducedMotion = Boolean(useReducedMotion());
   const [switchDirection, setSwitchDirection] =
     useState<DrawerSwitchDirection>('neutral');
+  const [hasSwitchedItem, setHasSwitchedItem] = useState(false);
+  const [bodyHydrated, setBodyHydrated] = useState(() => prefersReducedMotion);
+  const pendingSectionJumpRef = useRef<DossierSectionId | null>(null);
 
-  const backdropVariants = useMemo(
-    () => getDrawerBackdropVariants(prefersReducedMotion),
-    [prefersReducedMotion]
+  const motionClasses = useMemo(
+    () => getDrawerMotionClasses(phase, prefersReducedMotion),
+    [phase, prefersReducedMotion]
   );
-  const panelVariants = useMemo(
-    () => getDrawerPanelVariants(prefersReducedMotion),
-    [prefersReducedMotion]
+
+  const contentSwitchClass = useMemo(
+    () =>
+      getContentSwitchClass(
+        switchDirection,
+        prefersReducedMotion,
+        !hasSwitchedItem
+      ),
+    [switchDirection, prefersReducedMotion, hasSwitchedItem]
   );
-  const contentVariants = useMemo(
-    () => getDrawerContentVariants(prefersReducedMotion),
-    [prefersReducedMotion]
-  );
-  const metaFadeVariants = useMemo(
-    () => getDrawerMetaFadeVariants(prefersReducedMotion),
-    [prefersReducedMotion]
-  );
+
+  // Hydrate heavy below-the-fold sections & background relation lookups right after
+  // the 220ms entry glide completes so Frame 0 stays locked at 60/120fps.
+  useEffect(() => {
+    if (bodyHydrated) return;
+    const delayMs = getSecondaryHydrateDelayMs(prefersReducedMotion, false);
+    if (delayMs <= 0) {
+      setBodyHydrated(true);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      startTransition(() => {
+        setBodyHydrated(true);
+      });
+    }, delayMs);
+    return () => window.clearTimeout(timer);
+  }, [bodyHydrated, prefersReducedMotion]);
 
   const handlePrevItem = useCallback(() => {
     if (!onPrevItem) return;
     setSwitchDirection('prev');
+    setHasSwitchedItem(true);
     onPrevItem();
   }, [onPrevItem]);
 
   const handleNextItem = useCallback(() => {
     if (!onNextItem) return;
     setSwitchDirection('next');
+    setHasSwitchedItem(true);
     onNextItem();
   }, [onNextItem]);
 
   const onSelectRelated = useCallback(
     (target: ArchiveItem) => {
       setSwitchDirection('neutral');
+      setHasSwitchedItem(true);
       onSelectRelatedProp(target);
     },
     [onSelectRelatedProp]
@@ -231,14 +337,14 @@ function DetailDrawerShell({
   const needsProfile = Boolean(imdbId && !hasCjkCharacters(savedItem.summary || ''));
   useEffect(() => {
     setResolvedFilm(null);
-    if (!imdbId || !needsProfile) return;
+    if (!bodyHydrated || phase !== 'open' || !imdbId || !needsProfile) return;
     let active = true;
     searchOnline(imdbId, 'film').then(({ results }) => {
       const match = results.find(row => row.externalId === 'imdb-' + imdbId && row.summaryRevision);
       if (active && match) setResolvedFilm(match);
     }).catch(() => {});
     return () => { active = false; };
-  }, [savedItem.id, imdbId, needsProfile]);
+  }, [savedItem.id, imdbId, needsProfile, bodyHydrated, phase]);
 
   const item = useMemo(() => {
     if (!imdbId || !needsProfile || resolvedFilm?.externalId !== 'imdb-' + imdbId) return savedItem;
@@ -317,8 +423,12 @@ function DetailDrawerShell({
     setCharBio(p?.bio || fallbackSummary || '');
   };
 
+  const prevSyncedItemIdRef = useRef<string>(item.id);
+
   useEffect(() => {
     if (!item) return;
+    if (prevSyncedItemIdRef.current === item.id) return;
+    prevSyncedItemIdRef.current = item.id;
     setSyncedItemId(item.id);
     setRating(item.rating);
     setStatus(item.status);
@@ -342,7 +452,9 @@ function DetailDrawerShell({
     setPosterLightboxOpen(false);
     setHoverRating(null);
     setSummaryExpanded(false);
+    activeSectionRef.current = 'overview';
     setActiveSection('overview');
+    bodyScrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
     if (progressBarRef.current) {
       progressBarRef.current.style.width = '0%';
     }
@@ -372,6 +484,7 @@ function DetailDrawerShell({
 
   // Auto-enrich Character Dossier from Wikipedia / Wikidata / exact Bangumi ID
   useEffect(() => {
+    if (!bodyHydrated || phase !== 'open') return;
     if (!item || item.category !== 'character') {
       setDossierLoading(false);
       return;
@@ -448,11 +561,12 @@ function DetailDrawerShell({
       controller.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [item?.id, dossierReloadTick]);
+  }, [item?.id, dossierReloadTick, bodyHydrated, phase]);
 
   // Auto-discover online cast / characters / filmography for Films & People (skipped for Characters!)
   // Uses persistent localStorage cache so re-opening the app or detail drawer displays immediately without reloading.
   useEffect(() => {
+    if (!bodyHydrated || phase !== 'open') return;
     if (!item || item.category === 'character') {
       setOnlineRelations(EMPTY_RELATIONS);
       setRelationsLoading(false);
@@ -531,7 +645,7 @@ function DetailDrawerShell({
       controller.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [item?.id, relationsReloadTick]);
+  }, [item?.id, relationsReloadTick, bodyHydrated, phase]);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -596,15 +710,17 @@ function DetailDrawerShell({
     [relatedItems]
   );
   const smartRecommendations = useMemo(
-    () => findRecommendedUnlinkedItems(item, allItems, 5),
-    [item, allItems]
+    () => (bodyHydrated ? findRecommendedUnlinkedItems(item, allItems, 5) : []),
+    [bodyHydrated, item, allItems]
   );
   const linkableCandidates = useMemo(
     () =>
-      allItems.filter(
-        (other) => other.id !== item.id && !relatedIdSet.has(other.id)
-      ),
-    [allItems, item.id, relatedIdSet]
+      bodyHydrated
+        ? allItems.filter(
+            (other) => other.id !== item.id && !relatedIdSet.has(other.id)
+          )
+        : [],
+    [bodyHydrated, allItems, item.id, relatedIdSet]
   );
 
   // Configure two contextual online relation tabs depending on item category
@@ -665,35 +781,76 @@ function DetailDrawerShell({
   const quickCreateTargets: ArchiveCategory[] =
     item.category === 'film' ? ['person', 'character'] : ['film', 'character'];
 
+  const scrollToSectionNow = useCallback((id: DossierSectionId) => {
+    if (id === 'overview') {
+      bodyScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    } else if (id === 'relations') {
+      relationsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else if (id === 'notes') {
+      editFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      graphSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!bodyHydrated || !pendingSectionJumpRef.current) return;
+    const target = pendingSectionJumpRef.current;
+    pendingSectionJumpRef.current = null;
+    requestAnimationFrame(() => {
+      scrollToSectionNow(target);
+    });
+  }, [bodyHydrated, scrollToSectionNow]);
+
   const handleJumpToTop = () => {
     setActiveSection('overview');
-    bodyScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    scrollToSectionNow('overview');
   };
 
   const handleJumpToRelations = () => {
     setActiveSection('relations');
-    relationsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (!bodyHydrated) {
+      pendingSectionJumpRef.current = 'relations';
+      setBodyHydrated(true);
+      return;
+    }
+    scrollToSectionNow('relations');
   };
 
   const handleJumpToEditNotes = () => {
     setActiveSection('notes');
     setEditTab('notes');
+    if (!bodyHydrated) {
+      pendingSectionJumpRef.current = 'notes';
+      setBodyHydrated(true);
+      return;
+    }
     requestAnimationFrame(() => {
-      editFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      scrollToSectionNow('notes');
     });
   };
 
   const handleJumpToEditSpecs = () => {
     setActiveSection('notes');
     setEditTab('dossier');
+    if (!bodyHydrated) {
+      pendingSectionJumpRef.current = 'notes';
+      setBodyHydrated(true);
+      return;
+    }
     requestAnimationFrame(() => {
-      editFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      scrollToSectionNow('notes');
     });
   };
 
   const handleJumpToGraph = () => {
     setActiveSection('graph');
-    graphSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (!bodyHydrated) {
+      pendingSectionJumpRef.current = 'graph';
+      setBodyHydrated(true);
+      return;
+    }
+    scrollToSectionNow('graph');
   };
 
   const handleJumpToSection = (id: DossierSectionId) => {
@@ -704,6 +861,10 @@ function DetailDrawerShell({
   };
 
   const handleBodyScroll = useCallback(() => {
+    const scrollEl = bodyScrollRef.current;
+    if (scrollEl && scrollEl.scrollTop > 12 && !bodyHydrated) {
+      setBodyHydrated(true);
+    }
     if (scrollRafRef.current !== null) return;
     scrollRafRef.current = window.requestAnimationFrame(() => {
       scrollRafRef.current = null;
@@ -737,7 +898,7 @@ function DetailDrawerShell({
         setActiveSection(nextActive);
       }
     });
-  }, []);
+  }, [bodyHydrated]);
 
   const handleQuickRating = (starVal: number) => {
     const nextRating = rating === starVal ? 0 : starVal;
@@ -869,25 +1030,24 @@ function DetailDrawerShell({
   };
 
   return (
-    <motion.div
+    <div
       role="dialog"
       aria-modal="true"
       aria-labelledby="detail-drawer-title"
       data-testid="detail-drawer-backdrop"
-      variants={backdropVariants}
-      initial="closed"
-      animate="open"
-      exit="closed"
-      className="fixed inset-0 z-50 flex items-end justify-center overflow-hidden bg-[#1A1816]/55 backdrop-blur-[2px] md:items-stretch md:justify-end dark:bg-black/72"
+      data-state={phase}
+      className={`fixed inset-0 z-50 flex items-end justify-center overflow-hidden bg-[#161310]/48 md:items-stretch md:justify-end dark:bg-black/68 ${motionClasses.backdrop} ${
+        phase === 'closing' ? 'pointer-events-none' : ''
+      }`}
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (phase !== 'closing' && e.target === e.currentTarget) onClose();
       }}
     >
-      {/* Mobile Bottom Sheet (rounded-t-3xl) -> Side Drawer on Desktop; smoothly slides in from right */}
-      <motion.div
+      {/* Mobile Bottom Sheet -> Side Drawer on Desktop; pure GPU-composited short-travel glide */}
+      <div
         data-testid="detail-drawer-panel"
-        variants={panelVariants}
-        className="archive-sidebar-panel relative flex max-h-[92dvh] w-full max-w-full flex-col overflow-hidden rounded-t-3xl bg-[#F7F5F0] shadow-2xl will-change-transform md:h-full md:max-h-full md:max-w-[600px] md:rounded-none md:border-l md:border-[#DFD9CD] dark:bg-[#141210]"
+        data-state={phase}
+        className={`archive-sidebar-panel relative flex max-h-[92dvh] w-full max-w-full flex-col overflow-hidden rounded-t-3xl bg-[#F7F5F0] shadow-[0_-14px_34px_-12px_rgba(20,16,12,0.28)] [contain:layout_style] will-change-transform md:h-full md:max-h-full md:max-w-[600px] md:rounded-none md:border-l md:border-[#DFD9CD] md:shadow-[-18px_0_38px_-14px_rgba(20,16,12,0.24)] dark:bg-[#141210] ${motionClasses.panel}`}
       >
         {/* Mobile Drag Handle */}
         <div
@@ -900,26 +1060,24 @@ function DetailDrawerShell({
         {/* Sticky Sheet Header */}
         <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[#E4DFD5] bg-[#F7F5F0]/95 px-4 py-2.5 min-[420px]:px-5 dark:border-[#2E2924] dark:bg-[#141210]/95">
           <div className="min-w-0 flex-1 overflow-hidden">
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.div
-                key={item.id}
-                variants={metaFadeVariants}
-                initial="enter"
-                animate="center"
-                exit="exit"
-                className="flex min-w-0 items-center gap-1.5 font-mono text-[12px] tabular-nums text-[#625C54] sm:gap-2 dark:text-[#A59D90]"
-              >
-                <span className="shrink-0 font-medium">{item.accessionNo}</span>
-                <span aria-hidden="true" className="hidden min-[420px]:inline">/</span>
-                <span className="hidden truncate min-[420px]:inline">{CATEGORY_LABELS[item.category]}档案</span>
-                {positionLabel && (
-                  <>
-                    <span aria-hidden="true" className="hidden sm:inline">·</span>
-                    <span className="hidden text-[#8C857B] sm:inline dark:text-[#9A9184]">{positionLabel}</span>
-                  </>
-                )}
-              </motion.div>
-            </AnimatePresence>
+            <div
+              key={item.id}
+              className={`flex min-w-0 items-center gap-1.5 font-mono text-[12px] tabular-nums text-[#625C54] sm:gap-2 dark:text-[#A59D90] ${
+                hasSwitchedItem && !prefersReducedMotion
+                  ? 'detail-content-switch-neutral'
+                  : ''
+              }`}
+            >
+              <span className="shrink-0 font-medium">{item.accessionNo}</span>
+              <span aria-hidden="true" className="hidden min-[420px]:inline">/</span>
+              <span className="hidden truncate min-[420px]:inline">{CATEGORY_LABELS[item.category]}档案</span>
+              {positionLabel && (
+                <>
+                  <span aria-hidden="true" className="hidden sm:inline">·</span>
+                  <span className="hidden text-[#8C857B] sm:inline dark:text-[#9A9184]">{positionLabel}</span>
+                </>
+              )}
+            </div>
           </div>
           <div className="flex shrink-0 items-center gap-1">
             {(onPrevItem || onNextItem) && (
@@ -1051,46 +1209,31 @@ function DetailDrawerShell({
           onScroll={handleBodyScroll}
           className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-5 pb-12 min-[420px]:px-5 sm:px-6"
         >
-          <AnimatePresence
-            mode="wait"
-            initial={false}
-            custom={switchDirection}
-            onExitComplete={() => {
-              bodyScrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
-              if (progressBarRef.current) {
-                progressBarRef.current.style.width = '0%';
-              }
-              activeSectionRef.current = 'overview';
-              setActiveSection('overview');
-            }}
+          <div
+            key={item.id}
+            data-testid="detail-drawer-content"
+            data-item-id={item.id}
+            data-transition-dir={switchDirection}
+            className={contentSwitchClass}
           >
-            <motion.div
-              key={item.id}
-              data-testid="detail-drawer-content"
-              data-item-id={item.id}
-              data-transition-dir={switchDirection}
-              custom={switchDirection}
-              variants={contentVariants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-            >
               {/* Atmospheric Cinematic Hero */}
               <div className="relative -mx-4 -mt-5 overflow-hidden px-4 pt-5 pb-5 min-[420px]:-mx-5 min-[420px]:px-5 sm:-mx-6 sm:px-6">
-                {item.coverUrl && (
-                  <div
-                    aria-hidden="true"
-                    className="pointer-events-none absolute inset-0 overflow-hidden"
-                  >
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 overflow-hidden [contain:strict]"
+                >
+                  <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(201,164,92,0.12),transparent_62%)] dark:bg-[radial-gradient(ellipse_at_top_left,rgba(212,175,106,0.14),transparent_60%)]" />
+                  {bodyHydrated && phase === 'open' && item.coverUrl && (
                     <img
                       src={item.coverUrl}
                       alt=""
+                      decoding="async"
                       referrerPolicy="no-referrer"
-                      className="h-full w-full scale-110 transform-gpu object-cover opacity-[0.13] blur-xl saturate-125 dark:opacity-[0.20]"
+                      className="h-full w-full scale-105 object-cover opacity-[0.12] blur-lg saturate-110 transition-opacity duration-300 dark:opacity-[0.18]"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-b from-[#F7F5F0]/35 via-[#F7F5F0]/78 to-[#F7F5F0] dark:from-[#141210]/40 dark:via-[#141210]/78 dark:to-[#141210]" />
-                  </div>
-                )}
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-b from-[#F7F5F0]/35 via-[#F7F5F0]/78 to-[#F7F5F0] dark:from-[#141210]/40 dark:via-[#141210]/78 dark:to-[#141210]" />
+                </div>
 
                 <div className="relative flex gap-4 sm:gap-5">
                   {/* Framed Poster Plate (Click to Lightbox + Quiet Inline Cover Action) */}
@@ -1457,7 +1600,7 @@ function DetailDrawerShell({
                 <WatchLogSection item={item} onUpdateItem={onUpdateItem} />
               )}
 
-              {/* Cinema Medal Showcase (Positioned Below Core Story & Watch Log) */}
+              {/* Cinema Medal Showcase (Positioned Below Core Story & Watch Log — rendered on Frame 0 to avoid visible pop-in on 900px viewports) */}
               <DetailMedalShowcase
                 item={item}
                 allItems={allItems}
@@ -1465,6 +1608,9 @@ function DetailDrawerShell({
                 onJumpToMedalHall={onJumpToMedalHall}
               />
 
+              {/* Below-the-fold heavy modules mount seamlessly once the entry glide settles */}
+              {bodyHydrated ? (
+                <>
               {/* Dedicated Tag Management: Autocomplete + Instant Same-Tag Filtering */}
               <div ref={relationsSectionRef} className="scroll-mt-3">
                 <DetailTagManager
@@ -2399,147 +2545,127 @@ function DetailDrawerShell({
               </div>
             )}
             </div>
-            </motion.div>
-          </AnimatePresence>
+                </>
+              ) : (
+                <div className="mt-6 h-48" aria-hidden="true" />
+              )}
+          </div>
         </div>
 
         {/* Transient Floating Toast Feedback (for Instant Hero Controls & Save) */}
-        <AnimatePresence>
-          {savedFeedback && !isDirty && (
-            <motion.div
-              key="drawer-saved-toast"
-              data-testid="drawer-saved-toast"
-              role="status"
-              aria-live="polite"
-              initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
-              animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
-              exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 6 }}
-              transition={{ duration: 0.18 }}
-              className="pointer-events-none absolute right-5 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-20 inline-flex items-center gap-1.5 rounded-xl border border-[#C8DFD0] bg-[#191613]/92 px-3.5 py-2 text-xs font-medium text-[#F5F1E8] shadow-lg backdrop-blur-xs dark:border-[#2B523B] dark:bg-[#172B20] dark:text-[#9FE2BC]"
-            >
-              <Check className="h-3.5 w-3.5 text-[#6CC492]" aria-hidden="true" />
-              <span>{savedFeedback}</span>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {savedFeedback && !isDirty && (
+          <div
+            data-testid="drawer-saved-toast"
+            role="status"
+            aria-live="polite"
+            className="toast-pop-in pointer-events-none absolute right-5 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-20 inline-flex items-center gap-1.5 rounded-xl border border-[#C8DFD0] bg-[#191613]/95 px-3.5 py-2 text-xs font-medium text-[#F5F1E8] shadow-lg dark:border-[#2B523B] dark:bg-[#172B20] dark:text-[#9FE2BC]"
+          >
+            <Check className="h-3.5 w-3.5 text-[#6CC492]" aria-hidden="true" />
+            <span>{savedFeedback}</span>
+          </div>
+        )}
 
         {/* Contextual Dirty-Only Sticky Save Bar (Frees 68px Reading Canvas When Clean) */}
-        <AnimatePresence>
-          {(isDirty || saving) && (
-            <motion.div
-              key="drawer-dirty-save-bar"
-              data-testid="drawer-dirty-save-bar"
-              initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 20 }}
-              animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
-              exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 20 }}
-              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-              className="border-t border-[#E4DFD5] bg-[#FAF8F3]/96 px-4 py-3 pb-[calc(0.85rem+env(safe-area-inset-bottom))] backdrop-blur-xs min-[420px]:px-5 dark:border-[#2E2924] dark:bg-[#191613]/96"
-            >
-              <div className="flex items-center gap-2.5">
-                <button
-                  type="button"
-                  onClick={handleResetDraft}
-                  disabled={saving}
-                  className="inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-[#DCD6CB] bg-white px-3.5 text-[14px] font-medium text-[#4B453E] whitespace-nowrap cursor-pointer transition-colors hover:border-[#1A1816] hover:text-[#1A1816] disabled:opacity-50 md:text-xs dark:border-[#3A342D] dark:bg-[#24201C] dark:text-[#C4BCB0] dark:hover:border-[#D4AF6A] dark:hover:text-[#F3EFE6]"
-                >
-                  <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-                  <span>还原</span>
-                </button>
-                <button
-                  type="submit"
-                  form="detail-edit-form"
-                  disabled={saving}
-                  className="h-11 flex-1 rounded-xl bg-[#B43B2B] text-[15px] font-medium text-white shadow-xs transition-colors hover:bg-[#932D20] active:scale-[0.98] cursor-pointer disabled:opacity-60 md:text-sm"
-                >
-                  {saving ? '保存中…' : '保存档案修订'}
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
+        {(isDirty || saving) && (
+          <div
+            data-testid="drawer-dirty-save-bar"
+            className="detail-drawer-bar-in border-t border-[#E4DFD5] bg-[#FAF8F3] px-4 py-3 pb-[calc(0.85rem+env(safe-area-inset-bottom))] min-[420px]:px-5 dark:border-[#2E2924] dark:bg-[#191613]"
+          >
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={handleResetDraft}
+                disabled={saving}
+                className="inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-[#DCD6CB] bg-white px-3.5 text-[14px] font-medium text-[#4B453E] whitespace-nowrap cursor-pointer transition-colors hover:border-[#1A1816] hover:text-[#1A1816] disabled:opacity-50 md:text-xs dark:border-[#3A342D] dark:bg-[#24201C] dark:text-[#C4BCB0] dark:hover:border-[#D4AF6A] dark:hover:text-[#F3EFE6]"
+              >
+                <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                <span>还原</span>
+              </button>
+              <button
+                type="submit"
+                form="detail-edit-form"
+                disabled={saving}
+                className="h-11 flex-1 rounded-xl bg-[#B43B2B] text-[15px] font-medium text-white shadow-xs transition-colors hover:bg-[#932D20] active:scale-[0.98] cursor-pointer disabled:opacity-60 md:text-sm"
+              >
+                {saving ? '保存中…' : '保存档案修订'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* High-Resolution Poster Lightbox */}
-      <AnimatePresence>
-        {posterLightboxOpen && item.coverUrl && (
-          <motion.div
-            key="poster-lightbox"
-            data-testid="poster-lightbox"
-            role="dialog"
-            aria-modal="true"
-            aria-label={`${item.title}高清海报赏析`}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: prefersReducedMotion ? 0.08 : 0.2 }}
-            onClick={() => setPosterLightboxOpen(false)}
-            className="fixed inset-0 z-[70] flex flex-col items-center justify-center bg-[#0C0A09]/92 p-5 backdrop-blur-md"
+      {posterLightboxOpen && item.coverUrl && (
+        <div
+          data-testid="poster-lightbox"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`${item.title}高清海报赏析`}
+          onClick={() => setPosterLightboxOpen(false)}
+          className="encounter-backdrop-in fixed inset-0 z-[70] flex flex-col items-center justify-center bg-[#0C0A09]/92 p-5"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="detail-lightbox-in flex max-h-full max-w-full flex-col items-center"
           >
-            <motion.div
-              initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.94 }}
-              animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, scale: 1 }}
-              exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96 }}
-              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-              onClick={(e) => e.stopPropagation()}
-              className="flex max-h-full max-w-full flex-col items-center"
-            >
-              <img
-                src={item.coverUrl}
-                alt={`${item.title}高清海报`}
-                referrerPolicy="no-referrer"
-                className="max-h-[76dvh] w-auto max-w-[90vw] rounded-xl border border-white/15 object-contain shadow-2xl"
-              />
-              <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-center">
-                <p className="font-editorial text-[15px] text-[#F5F1E8]">
-                  <span className="mr-2 font-mono text-xs text-[#A59D90]">
-                    {item.accessionNo}
+            <img
+              src={item.coverUrl}
+              alt={`${item.title}高清海报`}
+              referrerPolicy="no-referrer"
+              className="max-h-[76dvh] w-auto max-w-[90vw] rounded-xl border border-white/15 object-contain shadow-2xl"
+            />
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-center">
+              <p className="font-editorial text-[15px] text-[#F5F1E8]">
+                <span className="mr-2 font-mono text-xs text-[#A59D90]">
+                  {item.accessionNo}
+                </span>
+                <span>{item.title}</span>
+                {item.year && (
+                  <span className="ml-2 font-mono text-xs text-[#A59D90]">
+                    {item.year}
                   </span>
-                  <span>{item.title}</span>
-                  {item.year && (
-                    <span className="ml-2 font-mono text-xs text-[#A59D90]">
-                      {item.year}
-                    </span>
-                  )}
-                </p>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPosterLightboxOpen(false);
-                      setCoverPickerOpen(true);
-                    }}
-                    className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-3 text-xs font-medium text-[#F5F1E8] transition-colors hover:bg-white/20 cursor-pointer"
-                  >
-                    <ImagePlus className="h-3.5 w-3.5" aria-hidden="true" />
-                    <span>更换封面</span>
-                  </button>
-                  <button
-                    type="button"
-                    data-testid="poster-lightbox-close"
-                    onClick={() => setPosterLightboxOpen(false)}
-                    aria-label="关闭海报大图"
-                    className="inline-flex h-9 items-center gap-1 rounded-lg border border-white/20 bg-white/10 px-3 text-xs font-medium text-[#F5F1E8] transition-colors hover:bg-white/20 cursor-pointer"
-                  >
-                    <X className="h-3.5 w-3.5" aria-hidden="true" />
-                    <span>关闭</span>
-                  </button>
-                </div>
+                )}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPosterLightboxOpen(false);
+                    setCoverPickerOpen(true);
+                  }}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-3 text-xs font-medium text-[#F5F1E8] transition-colors hover:bg-white/20 cursor-pointer"
+                >
+                  <ImagePlus className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>更换封面</span>
+                </button>
+                <button
+                  type="button"
+                  data-testid="poster-lightbox-close"
+                  onClick={() => setPosterLightboxOpen(false)}
+                  aria-label="关闭海报大图"
+                  className="inline-flex h-9 items-center gap-1 rounded-lg border border-white/20 bg-white/10 px-3 text-xs font-medium text-[#F5F1E8] transition-colors hover:bg-white/20 cursor-pointer"
+                >
+                  <X className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>关闭</span>
+                </button>
               </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            </div>
+          </div>
+        </div>
+      )}
 
-      <CoverPickerModal
-        open={coverPickerOpen}
-        item={item}
-        onClose={() => setCoverPickerOpen(false)}
-        onApplyCover={async (nextCoverUrl) => {
-          await onUpdateItem(item.id, { coverUrl: nextCoverUrl });
-          setCoverUrlInput(nextCoverUrl || '');
-          setSavedFeedback('封面已更新');
-        }}
-      />
-    </motion.div>
+      {coverPickerOpen && (
+        <CoverPickerModal
+          open={coverPickerOpen}
+          item={item}
+          onClose={() => setCoverPickerOpen(false)}
+          onApplyCover={async (nextCoverUrl) => {
+            await onUpdateItem(item.id, { coverUrl: nextCoverUrl });
+            setCoverUrlInput(nextCoverUrl || '');
+            setSavedFeedback('封面已更新');
+          }}
+        />
+      )}
+    </div>
   );
 }

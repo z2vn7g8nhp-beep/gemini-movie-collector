@@ -1,134 +1,134 @@
 export type DrawerSwitchDirection = 'prev' | 'next' | 'neutral';
 
-export const DRAWER_ENTER_EASE: [number, number, number, number] = [
-  0.22, 1, 0.36, 1,
-];
+export type DrawerPhase = 'closed' | 'open' | 'closing';
 
-export const DRAWER_EXIT_EASE: [number, number, number, number] = [
-  0.32, 0.72, 0, 1,
-];
-
-export const DRAWER_TIMINGS = {
-  backdropEnterSec: 0.24,
-  backdropExitSec: 0.2,
-  panelEnterSec: 0.32,
-  panelExitSec: 0.24,
-  contentFadeOutSec: 0.1,
-  contentFadeInSec: 0.18,
-  contentDriftPx: 6,
-} as const;
-
-export function getDrawerBackdropVariants(reducedMotion: boolean) {
-  return {
-    closed: {
-      opacity: 0,
-      transition: {
-        duration: reducedMotion ? 0.01 : DRAWER_TIMINGS.backdropExitSec,
-        ease: DRAWER_EXIT_EASE,
-      },
-    },
-    open: {
-      opacity: 1,
-      transition: {
-        duration: reducedMotion ? 0.01 : DRAWER_TIMINGS.backdropEnterSec,
-        ease: DRAWER_ENTER_EASE,
-      },
-    },
-  };
+export interface DrawerPresenceState {
+  phase: DrawerPhase;
+  renderedItemId: string | null;
 }
 
-export function getDrawerPanelVariants(reducedMotion: boolean) {
-  if (reducedMotion) {
+export const DRAWER_TIMINGS = {
+  backdropEnterMs: 180,
+  backdropExitMs: 145,
+  panelEnterMs: 220,
+  panelExitMs: 155,
+  contentSwitchMs: 150,
+  secondaryHydrateDelayMs: 185,
+  desktopOffsetPx: 24,
+  mobileOffsetPx: 24,
+  exitOffsetPx: 16,
+  contentDriftPx: 10,
+} as const;
+
+export function getDrawerExitDurationMs(reducedMotion: boolean): number {
+  return reducedMotion ? 0 : DRAWER_TIMINGS.panelExitMs;
+}
+
+export function getSecondaryHydrateDelayMs(
+  reducedMotion: boolean,
+  alreadyEntered: boolean
+): number {
+  if (reducedMotion || alreadyEntered) return 0;
+  return DRAWER_TIMINGS.secondaryHydrateDelayMs;
+}
+
+/**
+ * Pure state machine governing mount/unmount presence of the archive drawer.
+ * Handles rapid close -> re-open interruptions cleanly without stuck overlays.
+ */
+export function resolveNextDrawerPresence(
+  current: DrawerPresenceState,
+  incomingItemId: string | null,
+  reducedMotion: boolean
+): DrawerPresenceState {
+  if (incomingItemId) {
+    if (
+      current.phase === 'open' &&
+      current.renderedItemId === incomingItemId
+    ) {
+      return current;
+    }
     return {
-      closed: {
-        x: 0,
-        opacity: 0,
-        transition: { duration: 0.01 },
-      },
-      open: {
-        x: 0,
-        opacity: 1,
-        transition: { duration: 0.01 },
-      },
+      phase: 'open',
+      renderedItemId: incomingItemId,
     };
   }
 
+  if (current.phase === 'closed' || !current.renderedItemId) {
+    return {
+      phase: 'closed',
+      renderedItemId: null,
+    };
+  }
+
+  if (reducedMotion) {
+    return {
+      phase: 'closed',
+      renderedItemId: null,
+    };
+  }
+
+  if (current.phase === 'closing') {
+    return current;
+  }
+
   return {
-    closed: {
-      x: '100%',
-      opacity: 0.92,
-      transition: {
-        duration: DRAWER_TIMINGS.panelExitSec,
-        ease: DRAWER_EXIT_EASE,
-      },
-    },
-    open: {
-      x: 0,
-      opacity: 1,
-      transition: {
-        duration: DRAWER_TIMINGS.panelEnterSec,
-        ease: DRAWER_ENTER_EASE,
-      },
-    },
+    phase: 'closing',
+    renderedItemId: current.renderedItemId,
+  };
+}
+
+export function completeDrawerExit(
+  current: DrawerPresenceState
+): DrawerPresenceState {
+  if (current.phase !== 'closing') return current;
+  return {
+    phase: 'closed',
+    renderedItemId: null,
+  };
+}
+
+export interface DrawerMotionClasses {
+  backdrop: string;
+  panel: string;
+}
+
+export function getDrawerMotionClasses(
+  phase: DrawerPhase,
+  reducedMotion: boolean
+): DrawerMotionClasses {
+  if (reducedMotion || phase === 'closed') {
+    return { backdrop: '', panel: '' };
+  }
+  if (phase === 'closing') {
+    return {
+      backdrop: 'detail-drawer-backdrop-out',
+      panel: 'detail-drawer-panel-out',
+    };
+  }
+  return {
+    backdrop: 'detail-drawer-backdrop-in',
+    panel: 'detail-drawer-panel-in',
   };
 }
 
 export function getSwitchOffsetX(
   direction: DrawerSwitchDirection,
-  phase: 'enter' | 'exit',
   reducedMotion: boolean
 ): number {
   if (reducedMotion || direction === 'neutral') return 0;
-  const distance = DRAWER_TIMINGS.contentDriftPx;
-  if (direction === 'next') {
-    return phase === 'enter' ? distance : -distance;
-  }
-  return phase === 'enter' ? -distance : distance;
+  return direction === 'next'
+    ? DRAWER_TIMINGS.contentDriftPx
+    : -DRAWER_TIMINGS.contentDriftPx;
 }
 
-export function getDrawerContentVariants(reducedMotion: boolean) {
-  return {
-    enter: (direction: DrawerSwitchDirection = 'neutral') => ({
-      opacity: reducedMotion ? 1 : 0,
-      x: getSwitchOffsetX(direction, 'enter', reducedMotion),
-    }),
-    center: {
-      opacity: 1,
-      x: 0,
-      transition: {
-        duration: reducedMotion ? 0.01 : DRAWER_TIMINGS.contentFadeInSec,
-        ease: DRAWER_ENTER_EASE,
-      },
-    },
-    exit: (direction: DrawerSwitchDirection = 'neutral') => ({
-      opacity: reducedMotion ? 1 : 0,
-      x: getSwitchOffsetX(direction, 'exit', reducedMotion),
-      transition: {
-        duration: reducedMotion ? 0.01 : DRAWER_TIMINGS.contentFadeOutSec,
-        ease: DRAWER_EXIT_EASE,
-      },
-    }),
-  };
-}
-
-export function getDrawerMetaFadeVariants(reducedMotion: boolean) {
-  return {
-    enter: {
-      opacity: reducedMotion ? 1 : 0,
-    },
-    center: {
-      opacity: 1,
-      transition: {
-        duration: reducedMotion ? 0.01 : DRAWER_TIMINGS.contentFadeInSec,
-        ease: DRAWER_ENTER_EASE,
-      },
-    },
-    exit: {
-      opacity: reducedMotion ? 1 : 0,
-      transition: {
-        duration: reducedMotion ? 0.01 : DRAWER_TIMINGS.contentFadeOutSec,
-        ease: DRAWER_EXIT_EASE,
-      },
-    },
-  };
+export function getContentSwitchClass(
+  direction: DrawerSwitchDirection,
+  reducedMotion: boolean,
+  isInitialMount: boolean
+): string {
+  if (reducedMotion || isInitialMount) return '';
+  if (direction === 'next') return 'detail-content-switch-next';
+  if (direction === 'prev') return 'detail-content-switch-prev';
+  return 'detail-content-switch-neutral';
 }
