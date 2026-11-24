@@ -239,16 +239,16 @@ export function DetailTagManager({
       ref={containerRef}
       aria-label="档案标签管理"
       data-testid="detail-tag-manager"
-      className="mt-6 rounded-2xl border border-[#E4DFD5] bg-white p-3.5 sm:p-4 dark:border-[#322D27] dark:bg-[#1D1A17]"
+      className="mt-7 border-t border-[#E6E0D5] pt-5 dark:border-[#2C2721]"
     >
       {/* Header */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <Tag className="h-4 w-4 text-[#7A7268] md:h-3.5 md:w-3.5 dark:text-[#A59D90]" aria-hidden="true" />
-          <h3 className="text-[14px] font-medium tracking-[0.04em] text-[#1A1816] md:text-xs md:tracking-[0.06em] dark:text-[#F3EFE6]">
+          <Tag className="h-3.5 w-3.5 text-[#8C857B] dark:text-[#9A9184]" aria-hidden="true" />
+          <h3 className="text-[12px] font-medium tracking-[0.08em] text-[#6E675E] dark:text-[#A59D90]">
             标签管理
           </h3>
-          <span className="font-mono text-[12px] tabular-nums text-[#8C857B] md:text-[11px] dark:text-[#9A9184]">
+          <span className="font-mono text-[11px] tabular-nums text-[#8C857B] dark:text-[#8E8578]">
             {item.tags.length} / {MAX_TAGS_PER_ITEM}
           </span>
         </div>

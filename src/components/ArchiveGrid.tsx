@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowUpRight, Check, Layers, Star } from 'lucide-react';
+import { ArrowUpRight, Check, Heart, Layers, Star } from 'lucide-react';
 import type { ArchiveCategory, ArchiveItem, CollectionStatus } from '../types/archive';
 import {
   CATEGORY_LABELS,
@@ -598,17 +598,45 @@ export function ArchiveGrid({
                   </div>
                 </button>
 
-                {onOpenCardModal && (
-                  <button
-                    type="button"
-                    onClick={() => onOpenCardModal(item)}
-                    aria-label={`以实体藏卡赏析「${item.title}」`}
-                    title="实体藏卡赏析"
-                    className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#E4DFD5] bg-white text-[#625C54] transition-colors hover:border-[#1A1816] hover:text-[#1A1816] cursor-pointer md:inline-flex dark:border-[#3A342D] dark:bg-[#25211D] dark:text-[#C4BCB0] dark:hover:border-[#D4AF6A] dark:hover:text-[#F3EFE6]"
-                  >
-                    <Layers className="h-4 w-4" aria-hidden="true" />
-                  </button>
-                )}
+                <div className="hidden shrink-0 items-center gap-1.5 md:flex">
+                  {!batchMode && onQuickUpdateStatus && (
+                    <button
+                      type="button"
+                      data-testid={`card-quick-fav-${item.id}`}
+                      onClick={() =>
+                        onQuickUpdateStatus(item, isFavorite ? 'watched' : 'favorite')
+                      }
+                      aria-pressed={isFavorite}
+                      aria-label={
+                        isFavorite
+                          ? `取消「${item.title}」的挚爱标记`
+                          : `将「${item.title}」标记为挚爱`
+                      }
+                      title={isFavorite ? '取消挚爱' : '标记挚爱'}
+                      className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border transition-colors cursor-pointer ${
+                        isFavorite
+                          ? 'border-[#DFC692] bg-[#FBF5E8] text-[#B43B2B] hover:border-[#B43B2B] dark:border-[#6B5634] dark:bg-[#2A2218] dark:text-[#F28C7B]'
+                          : 'border-[#E4DFD5] bg-white text-[#7A7268] hover:border-[#1A1816] hover:text-[#B43B2B] dark:border-[#3A342D] dark:bg-[#25211D] dark:text-[#A59D90] dark:hover:border-[#D4AF6A] dark:hover:text-[#F28C7B]'
+                      }`}
+                    >
+                      <Heart
+                        className={`h-4 w-4 ${isFavorite ? 'fill-current' : ''}`}
+                        aria-hidden="true"
+                      />
+                    </button>
+                  )}
+                  {onOpenCardModal && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenCardModal(item)}
+                      aria-label={`以实体藏卡赏析「${item.title}」`}
+                      title="实体藏卡赏析"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[#E4DFD5] bg-white text-[#625C54] transition-colors hover:border-[#1A1816] hover:text-[#1A1816] cursor-pointer dark:border-[#3A342D] dark:bg-[#25211D] dark:text-[#C4BCB0] dark:hover:border-[#D4AF6A] dark:hover:text-[#F3EFE6]"
+                    >
+                      <Layers className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                  )}
+                </div>
               </article>
             );
           })}
@@ -813,17 +841,47 @@ export function ArchiveGrid({
                   </div>
                 </button>
 
-                {/* Desktop Hover Quick Card Preview Trigger (Sibling Button, Valid DOM) */}
-                {onOpenCardModal && (
-                  <button
-                    type="button"
-                    onClick={() => onOpenCardModal(item)}
-                    aria-label={`以实体藏卡赏析「${item.title}」`}
-                    title="实体藏卡赏析"
-                    className="absolute left-3 top-3 hidden h-7 w-7 items-center justify-center rounded-lg border border-white/20 bg-[#191613]/78 text-[#F2D68A] opacity-0 backdrop-blur-xs transition-all duration-150 group-hover:opacity-100 focus-visible:opacity-100 hover:bg-[#191613] cursor-pointer md:flex"
-                  >
-                    <Layers className="h-3.5 w-3.5" aria-hidden="true" />
-                  </button>
+                {/* Desktop Hover Quick Actions (Sibling Buttons, Valid DOM) */}
+                {!batchMode && (onQuickUpdateStatus || onOpenCardModal) && (
+                  <div className="absolute left-3 top-3 hidden items-center gap-1.5 md:flex">
+                    {onQuickUpdateStatus && (
+                      <button
+                        type="button"
+                        data-testid={`card-quick-fav-${item.id}`}
+                        onClick={() =>
+                          onQuickUpdateStatus(item, isFavorite ? 'watched' : 'favorite')
+                        }
+                        aria-pressed={isFavorite}
+                        aria-label={
+                          isFavorite
+                            ? `取消「${item.title}」的挚爱标记`
+                            : `将「${item.title}」标记为挚爱`
+                        }
+                        title={isFavorite ? '取消挚爱' : '标记挚爱'}
+                        className={`flex h-7 w-7 items-center justify-center rounded-lg border backdrop-blur-xs transition-all duration-150 cursor-pointer ${
+                          isFavorite
+                            ? 'border-[#F28C7B]/55 bg-[#191613]/82 text-[#F28C7B] opacity-95 hover:bg-[#191613]'
+                            : 'border-white/20 bg-[#191613]/76 text-[#F3EFE6]/90 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:bg-[#191613] hover:text-[#F28C7B]'
+                        }`}
+                      >
+                        <Heart
+                          className={`h-3.5 w-3.5 ${isFavorite ? 'fill-current' : ''}`}
+                          aria-hidden="true"
+                        />
+                      </button>
+                    )}
+                    {onOpenCardModal && (
+                      <button
+                        type="button"
+                        onClick={() => onOpenCardModal(item)}
+                        aria-label={`以实体藏卡赏析「${item.title}」`}
+                        title="实体藏卡赏析"
+                        className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/20 bg-[#191613]/76 text-[#F2D68A] opacity-0 backdrop-blur-xs transition-all duration-150 group-hover:opacity-100 focus-visible:opacity-100 hover:bg-[#191613] cursor-pointer"
+                      >
+                        <Layers className="h-3.5 w-3.5" aria-hidden="true" />
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             </article>

@@ -12,6 +12,8 @@ import {
   Layers,
   Link2,
   Loader2,
+  Maximize2,
+  PencilLine,
   Pin,
   Plus,
   RefreshCw,
@@ -73,6 +75,13 @@ import {
   getDrawerMetaFadeVariants,
   getDrawerPanelVariants,
 } from '../utils/drawerMotion';
+import {
+  type DossierSectionId,
+  buildAccessionMetadataRows,
+  buildDossierSectionTabs,
+  computeActiveDossierSection,
+  computeReadingProgress,
+} from '../utils/dossierLayout';
 
 function retainKnownLists(next: OnlineRelationsResponse, previous: OnlineRelationsResponse | null) {
   if (!previous) return next;
@@ -250,6 +259,12 @@ function DetailDrawerShell({
   const [savedFeedback, setSavedFeedback] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [coverPickerOpen, setCoverPickerOpen] = useState(false);
+  const [posterLightboxOpen, setPosterLightboxOpen] = useState(false);
+  const [hoverRating, setHoverRating] = useState<number | null>(null);
+  const [quickBusy, setQuickBusy] = useState(false);
+  const [summaryExpanded, setSummaryExpanded] = useState(false);
+  const [activeSection, setActiveSection] = useState<DossierSectionId>('overview');
+  const [readingProgress, setReadingProgress] = useState(0);
 
   // Structured Character Dossier fields (only used when item.category === 'character')
   const [charAlias, setCharAlias] = useState('');
@@ -268,6 +283,7 @@ function DetailDrawerShell({
   const bodyScrollRef = useRef<HTMLDivElement | null>(null);
   const relationsSectionRef = useRef<HTMLDivElement | null>(null);
   const editFormRef = useRef<HTMLFormElement | null>(null);
+  const graphSectionRef = useRef<HTMLDivElement | null>(null);
 
   // Live online relation discovery state (for films & people only)
   const [onlineRelations, setOnlineRelations] =
@@ -318,8 +334,26 @@ function DetailDrawerShell({
     setDossierError('');
     setDossierReloadTick(0);
     setEditTab('notes');
+    setPosterLightboxOpen(false);
+    setHoverRating(null);
+    setSummaryExpanded(false);
+    setActiveSection('overview');
+    setReadingProgress(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item?.id]);
+
+  // Keep hero quick controls synced if item rating/status updates externally
+  useEffect(() => {
+    setRating(item.rating);
+    setStatus(item.status);
+  }, [item.rating, item.status]);
+
+  // Auto-clear brief save/quick-action feedback toast
+  useEffect(() => {
+    if (!savedFeedback) return;
+    const timer = window.setTimeout(() => setSavedFeedback(''), 2400);
+    return () => window.clearTimeout(timer);
+  }, [savedFeedback]);
 
   // Auto-enrich Character Dossier from Wikipedia / Wikidata / exact Bangumi ID
   useEffect(() => {
@@ -487,6 +521,20 @@ function DetailDrawerShell({
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (coverPickerOpen) return;
+      if (posterLightboxOpen) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          setPosterLightboxOpen(false);
+        }
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+        if (editFormRef.current) {
+          e.preventDefault();
+          editFormRef.current.requestSubmit();
+        }
+        return;
+      }
       if (e.key === 'Escape') {
         onClose();
         return;
@@ -511,7 +559,15 @@ function DetailDrawerShell({
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [coverPickerOpen, onClose, onPrevItem, onNextItem, handlePrevItem, handleNextItem]);
+  }, [
+    coverPickerOpen,
+    posterLightboxOpen,
+    onClose,
+    onPrevItem,
+    onNextItem,
+    handlePrevItem,
+    handleNextItem,
+  ]);
 
   const relatedItems = allItems.filter(
     (other) => other.id !== item.id && isExplicitlyLinked(item, other)
@@ -577,14 +633,17 @@ function DetailDrawerShell({
     item.category === 'film' ? ['person', 'character'] : ['film', 'character'];
 
   const handleJumpToTop = () => {
+    setActiveSection('overview');
     bodyScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleJumpToRelations = () => {
+    setActiveSection('relations');
     relationsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   const handleJumpToEditNotes = () => {
+    setActiveSection('notes');
     setEditTab('notes');
     requestAnimationFrame(() => {
       editFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -592,11 +651,81 @@ function DetailDrawerShell({
   };
 
   const handleJumpToEditSpecs = () => {
+    setActiveSection('notes');
     setEditTab('dossier');
     requestAnimationFrame(() => {
       editFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   };
+
+  const handleJumpToGraph = () => {
+    setActiveSection('graph');
+    graphSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const handleJumpToSection = (id: DossierSectionId) => {
+    if (id === 'overview') handleJumpToTop();
+    else if (id === 'relations') handleJumpToRelations();
+    else if (id === 'notes') handleJumpToEditNotes();
+    else handleJumpToGraph();
+  };
+
+  const handleBodyScroll = useCallback(() => {
+    const el = bodyScrollRef.current;
+    if (!el) return;
+    const progress = computeReadingProgress(
+      el.scrollTop,
+      el.scrollHeight,
+      el.clientHeight
+    );
+    setReadingProgress(progress);
+
+    const containerTop = el.getBoundingClientRect().top;
+    const getOffset = (node: HTMLElement | null) =>
+      node ? node.getBoundingClientRect().top - containerTop + el.scrollTop : undefined;
+
+    const nextActive = computeActiveDossierSection(
+      el.scrollTop,
+      {
+        overview: 0,
+        relations: getOffset(relationsSectionRef.current),
+        notes: getOffset(editFormRef.current),
+        graph: getOffset(graphSectionRef.current),
+      },
+      Math.max(0, el.scrollHeight - el.clientHeight)
+    );
+    setActiveSection(nextActive);
+  }, []);
+
+  const handleQuickRating = async (starVal: number) => {
+    if (quickBusy) return;
+    const nextRating = item.rating === starVal ? 0 : starVal;
+    setRating(nextRating);
+    setQuickBusy(true);
+    try {
+      await onUpdateItem(item.id, { rating: nextRating });
+      setSavedFeedback(nextRating > 0 ? `已评 ${nextRating}.0 星` : '已清除评分');
+    } finally {
+      setQuickBusy(false);
+    }
+  };
+
+  const handleQuickStatus = async (nextStatus: CollectionStatus) => {
+    if (quickBusy || nextStatus === item.status) return;
+    setStatus(nextStatus);
+    setQuickBusy(true);
+    try {
+      await onUpdateItem(item.id, { status: nextStatus });
+      setSavedFeedback(`状态已更新为「${getStatusLabel(nextStatus, item.category)}」`);
+    } finally {
+      setQuickBusy(false);
+    }
+  };
+
+  const accessionMetadataRows = useMemo(
+    () => buildAccessionMetadataRows(item, item.watchLogs?.length ?? 0),
+    [item]
+  );
 
   const isDirty = (() => {
     if (rating !== item.rating) return true;
@@ -730,14 +859,14 @@ function DetailDrawerShell({
       >
         {/* Mobile Drag Handle */}
         <div
-          className="flex justify-center pt-2.5 pb-1 md:hidden"
+          className="flex shrink-0 justify-center pt-2.5 pb-1 md:hidden"
           aria-hidden="true"
         >
           <div className="h-1.5 w-10 rounded-full bg-[#D3CCC0] dark:bg-[#423B33]" />
         </div>
 
         {/* Sticky Sheet Header */}
-        <div className="flex items-center justify-between gap-2 border-b border-[#E4DFD5] bg-[#F7F5F0]/95 px-4 py-2.5 min-[420px]:px-5 dark:border-[#2E2924] dark:bg-[#141210]/95">
+        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[#E4DFD5] bg-[#F7F5F0]/95 px-4 py-2.5 min-[420px]:px-5 dark:border-[#2E2924] dark:bg-[#141210]/95">
           <div className="min-w-0 flex-1 overflow-hidden">
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
@@ -746,11 +875,11 @@ function DetailDrawerShell({
                 initial="enter"
                 animate="center"
                 exit="exit"
-                className="flex min-w-0 items-center gap-2 font-mono text-[13px] tabular-nums text-[#625C54] md:text-xs dark:text-[#A59D90]"
+                className="flex min-w-0 items-center gap-1.5 font-mono text-[12px] tabular-nums text-[#625C54] sm:gap-2 dark:text-[#A59D90]"
               >
-                <span className="truncate">{item.accessionNo}</span>
-                <span aria-hidden="true">/</span>
-                <span className="shrink-0">{CATEGORY_LABELS[item.category]}档案</span>
+                <span className="shrink-0 font-medium">{item.accessionNo}</span>
+                <span aria-hidden="true" className="hidden min-[420px]:inline">/</span>
+                <span className="hidden truncate min-[420px]:inline">{CATEGORY_LABELS[item.category]}档案</span>
                 {positionLabel && (
                   <>
                     <span aria-hidden="true" className="hidden sm:inline">·</span>
@@ -805,7 +934,8 @@ function DetailDrawerShell({
                 }`}
               >
                 <Pin className="h-3.5 w-3.5" aria-hidden="true" />
-                <span>{isPinnedToShowcase ? '已置顶' : '置顶展位'}</span>
+                <span className="hidden sm:inline">{isPinnedToShowcase ? '已置顶' : '置顶展位'}</span>
+                <span className="sm:hidden">{isPinnedToShowcase ? '已置顶' : '置顶'}</span>
               </button>
             )}
             {onOpenCardModal && (
@@ -813,7 +943,7 @@ function DetailDrawerShell({
                 type="button"
                 onClick={() => onOpenCardModal(item)}
                 aria-label="以实体藏卡模式赏析"
-                className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-[#DCD6CB] bg-white px-3 text-[13px] font-medium text-[#1A1816] whitespace-nowrap cursor-pointer transition-colors hover:border-[#1A1816] md:text-xs dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:hover:border-[#D4AF6A]"
+                className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-[#DCD6CB] bg-white px-2.5 text-[13px] font-medium text-[#1A1816] whitespace-nowrap cursor-pointer transition-colors hover:border-[#1A1816] sm:px-3 md:text-xs dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:hover:border-[#D4AF6A]"
               >
                 <Layers className="h-3.5 w-3.5 text-[#A67C37] dark:text-[#E4C37A]" aria-hidden="true" />
                 <span>藏卡</span>
@@ -824,55 +954,69 @@ function DetailDrawerShell({
               onClick={onClose}
               aria-label="关闭档案详情"
               title="关闭 (Esc)"
-              className="flex h-10 w-10 items-center justify-center rounded-xl text-[#625C54] transition-colors hover:bg-[#EAE4D9] hover:text-[#1A1816] cursor-pointer dark:text-[#A59D90] dark:hover:bg-[#2A2520] dark:hover:text-[#F3EFE6]"
+              className="flex h-9 w-9 items-center justify-center rounded-xl text-[#625C54] transition-colors hover:bg-[#EAE4D9] hover:text-[#1A1816] cursor-pointer sm:h-10 sm:w-10 dark:text-[#A59D90] dark:hover:bg-[#2A2520] dark:hover:text-[#F3EFE6]"
             >
               <X className="h-5 w-5" />
             </button>
           </div>
         </div>
 
-        {/* Compact Section Quick-Jump Anchor Strip */}
+        {/* Scroll-Spy Section Anchor Strip + Hairline Reading Progress */}
         <nav
           aria-label="档案快捷定位"
-          className="flex items-center gap-1 border-b border-[#EAE4D9] bg-[#FAF8F3] px-4 py-1.5 min-[420px]:px-5 dark:border-[#2E2924] dark:bg-[#191613]"
+          data-testid="dossier-section-nav"
+          className="no-scrollbar relative flex shrink-0 items-center gap-1 overflow-x-auto border-b border-[#EAE4D9] bg-[#FAF8F3] px-4 min-[420px]:px-5 dark:border-[#2E2924] dark:bg-[#191613]"
         >
-          <button
-            type="button"
-            onClick={handleJumpToTop}
-            className="min-h-[32px] rounded-lg px-2.5 text-[12px] font-medium text-[#4B453E] transition-colors hover:bg-[#EFECE4] hover:text-[#1A1816] cursor-pointer dark:text-[#C4BCB0] dark:hover:bg-[#29241F] dark:hover:text-[#F3EFE6]"
-          >
-            档案概览
-          </button>
-          <button
-            type="button"
-            onClick={handleJumpToRelations}
-            className="min-h-[32px] rounded-lg px-2.5 text-[12px] font-medium text-[#4B453E] transition-colors hover:bg-[#EFECE4] hover:text-[#1A1816] cursor-pointer dark:text-[#C4BCB0] dark:hover:bg-[#29241F] dark:hover:text-[#F3EFE6]"
-          >
-            标签与关联
-            {relatedItems.length > 0 && (
-              <span className="ml-1 font-mono text-[11px] tabular-nums text-[#8C857B] dark:text-[#9A9184]">
-                {relatedItems.length}
-              </span>
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={handleJumpToEditNotes}
-            className="min-h-[32px] rounded-lg px-2.5 text-[12px] font-medium text-[#4B453E] transition-colors hover:bg-[#EFECE4] hover:text-[#1A1816] cursor-pointer dark:text-[#C4BCB0] dark:hover:bg-[#29241F] dark:hover:text-[#F3EFE6]"
-          >
-            手记与编辑
-            {isDirty && (
-              <span className="ml-1 text-[#B43B2B] dark:text-[#F28C7B]" aria-label="有未保存修改">
-                · 未保存
-              </span>
-            )}
-          </button>
+          {buildDossierSectionTabs({
+            relatedCount: relatedItems.length,
+            tagCount: item.tags.length,
+            hasUnsavedChanges: isDirty,
+          }).map((tab) => {
+            const isActive = activeSection === tab.id;
+            const isUnsavedNotes = tab.id === 'notes' && isDirty;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                data-testid={`dossier-nav-${tab.id}`}
+                aria-current={isActive ? 'location' : undefined}
+                onClick={() => handleJumpToSection(tab.id)}
+                className={`relative min-h-[38px] shrink-0 px-2.5 text-[12px] font-medium whitespace-nowrap transition-colors cursor-pointer ${
+                  isActive
+                    ? 'text-[#1A1816] dark:text-[#F5F1E8]'
+                    : isUnsavedNotes
+                      ? 'text-[#B43B2B] dark:text-[#F28C7B]'
+                      : 'text-[#6E675E] hover:text-[#1A1816] dark:text-[#A59D90] dark:hover:text-[#F3EFE6]'
+                }`}
+              >
+                <span>{tab.label}</span>
+                {typeof tab.count === 'number' && tab.count > 0 && (
+                  <span className="ml-1 font-mono text-[11px] tabular-nums text-[#8C857B] dark:text-[#8E8578]">
+                    {tab.count}
+                  </span>
+                )}
+                {isActive && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute inset-x-2 bottom-0 h-[2px] rounded-full bg-[#B43B2B] dark:bg-[#E4C37A]"
+                  />
+                )}
+              </button>
+            );
+          })}
+          {/* Razor-Thin Reading Progress Hairline */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute bottom-0 left-0 h-[1.5px] bg-[#B43B2B]/55 transition-[width] duration-150 ease-out dark:bg-[#E4C37A]/60"
+            style={{ width: `${readingProgress}%` }}
+          />
         </nav>
 
         {/* Scrollable Sheet Body */}
         <div
           ref={bodyScrollRef}
-          className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-5 pb-10 min-[420px]:px-5 sm:px-6"
+          onScroll={handleBodyScroll}
+          className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-5 pb-12 min-[420px]:px-5 sm:px-6"
         >
           <AnimatePresence
             mode="wait"
@@ -880,6 +1024,8 @@ function DetailDrawerShell({
             custom={switchDirection}
             onExitComplete={() => {
               bodyScrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+              setReadingProgress(0);
+              setActiveSection('overview');
             }}
           >
             <motion.div
@@ -893,445 +1039,603 @@ function DetailDrawerShell({
               animate="center"
               exit="exit"
             >
-              {/* Header Block: Cover + Key Metadata */}
-              <div className="flex gap-4">
-            <div className="gallery-paper-mat w-[124px] shrink-0 self-start overflow-hidden border border-[#E4DFD5] p-2 min-[420px]:w-[134px] sm:w-[144px] dark:border-[#322D27]">
-              <button
-                type="button"
-                onClick={() => setCoverPickerOpen(true)}
-                aria-label={`更换「${item.title}」的封面`}
-                className="gallery-cover-frame group relative block w-full text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B43B2B]"
-              >
-                <ArchivalImage
-                  src={item.coverUrl}
-                  alt={`${item.title}封面`}
-                  title={item.title}
-                  category={item.category}
-                  className="aspect-[3/4] w-full rounded-[14px]"
-                />
-              </button>
-              <button
-                type="button"
-                data-testid="change-cover-btn"
-                onClick={() => setCoverPickerOpen(true)}
-                className="mt-2 inline-flex min-h-[38px] w-full items-center justify-center gap-1 rounded-xl bg-[#F2ECE2] px-2 text-[12px] font-medium text-[#3D3832] transition-colors hover:bg-[#E7E0D3] hover:text-[#1A1816] whitespace-nowrap cursor-pointer md:min-h-[34px] md:text-[11px] dark:bg-[#2A2520] dark:text-[#E5DED2] dark:hover:bg-[#352F28] dark:hover:text-[#FAF7F0]"
-              >
-                <ImagePlus className="h-3.5 w-3.5 shrink-0 text-[#B43B2B] dark:text-[#EB7865]" aria-hidden="true" />
-                <span>换封面</span>
-              </button>
-            </div>
-
-            <div className="min-w-0 flex-1">
-              <h2
-                id="detail-drawer-title"
-                className="font-editorial text-[24px] font-medium leading-tight text-[#1A1816] min-[420px]:text-[26px] md:text-2xl dark:text-[#F5F1E8]"
-              >
-                {charTitleParts.primaryName}
-              </h2>
-              {isCharacter && charTitleParts.secondaryAlias && (
-                <p className="mt-0.5 text-[15px] font-medium text-[#524C44] md:text-sm dark:text-[#C4BCB0]">
-                  {charTitleParts.secondaryAlias}
-                </p>
-              )}
-              {item.originalTitle && (
-                <p className="mt-1 break-words text-[13px] text-[#7A7268] md:text-xs dark:text-[#A59D90]">
-                  {item.originalTitle}
-                </p>
-              )}
-
-              {isCharacter ? (
-                <div className="mt-2.5 space-y-1 text-[13px] text-[#4B453E] md:text-xs dark:text-[#C4BCB0]">
-                  {(item.relatedWorkTitle || linkedWorkItem) && (
-                    <p className="truncate">
-                      <span className="text-[#8C857B] dark:text-[#9A9184]">出处：</span>
-                      {linkedWorkItem ? (
-                        <button
-                          type="button"
-                          onClick={() => onSelectRelated(linkedWorkItem)}
-                          className="font-medium text-[#1A1816] underline decoration-[#CFC7B9] underline-offset-4 hover:text-[#B43B2B] cursor-pointer dark:text-[#F3EFE6] dark:decoration-[#5A5247] dark:hover:text-[#F28C7B]"
-                        >
-                          《{linkedWorkItem.title}》
-                        </button>
-                      ) : (
-                        <span className="font-medium text-[#1A1816] dark:text-[#F3EFE6]">
-                          《{item.relatedWorkTitle}》
-                        </span>
-                      )}
-                    </p>
-                  )}
-                  {(item.portrayedBy || linkedActorItem) && (
-                    <p className="truncate">
-                      <span className="text-[#8C857B] dark:text-[#9A9184]">饰演：</span>
-                      {linkedActorItem ? (
-                        <button
-                          type="button"
-                          onClick={() => onSelectRelated(linkedActorItem)}
-                          className="font-medium text-[#1A1816] underline decoration-[#CFC7B9] underline-offset-4 hover:text-[#B43B2B] cursor-pointer dark:text-[#F3EFE6] dark:decoration-[#5A5247] dark:hover:text-[#F28C7B]"
-                        >
-                          {linkedActorItem.title}
-                        </button>
-                      ) : (
-                        <span className="font-medium text-[#1A1816] dark:text-[#F3EFE6]">
-                          {item.portrayedBy}
-                        </span>
-                      )}
-                    </p>
-                  )}
-                </div>
-              ) : (
-                item.subtitle && (
-                  <p className="mt-1.5 text-[13px] font-medium text-[#3D3832] md:text-xs dark:text-[#D1C9BC]">
-                    {item.subtitle}
-                  </p>
-                )
-              )}
-
-              <p className="mt-2.5 flex items-center flex-wrap gap-x-1.5 text-[13px] text-[#625C54] tabular-nums md:text-xs dark:text-[#B8AFA2]">
-                <span>
-                  {[
-                    getStatusLabel(item.status, item.category),
-                    item.year,
-                    item.region,
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </span>
-                {item.rating > 0 && (
-                  <>
-                    <span aria-hidden="true">·</span>
-                    <span className="inline-flex items-center gap-0.5 font-mono text-[#B43B2B] dark:text-[#F28C7B]">
-                      <Star
-                        className="h-3.5 w-3.5 fill-[#B43B2B] text-[#B43B2B] md:h-3 md:w-3 dark:fill-[#EB7865] dark:text-[#EB7865]"
-                        aria-hidden="true"
-                      />
-                      {item.rating}.0
-                    </span>
-                  </>
+              {/* Atmospheric Cinematic Hero */}
+              <div className="relative -mx-4 -mt-5 overflow-hidden px-4 pt-5 pb-5 min-[420px]:-mx-5 min-[420px]:px-5 sm:-mx-6 sm:px-6">
+                {item.coverUrl && (
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 overflow-hidden"
+                  >
+                    <img
+                      src={item.coverUrl}
+                      alt=""
+                      referrerPolicy="no-referrer"
+                      className="h-full w-full scale-110 transform-gpu object-cover opacity-[0.13] blur-xl saturate-125 dark:opacity-[0.20]"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-b from-[#F7F5F0]/35 via-[#F7F5F0]/78 to-[#F7F5F0] dark:from-[#141210]/40 dark:via-[#141210]/78 dark:to-[#141210]" />
+                  </div>
                 )}
-              </p>
 
-              {item.sourceName && (
-                <p className="mt-2 text-[13px] text-[#7A7268] md:text-xs dark:text-[#9E9588]">
-                  来源：
-                  {item.sourceUrl ? (
-                    <a
-                      href={item.sourceUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1 text-[#1A1816] underline decoration-[#BFB6A7] underline-offset-4 dark:text-[#E5DED2] dark:decoration-[#5A5247]"
+                <div className="relative flex gap-4 sm:gap-5">
+                  {/* Framed Poster Plate (Click to Lightbox + Quiet Inline Cover Action) */}
+                  <div className="w-[114px] shrink-0 self-start min-[420px]:w-[126px] sm:w-[140px]">
+                    <button
+                      type="button"
+                      data-testid="poster-lightbox-trigger"
+                      onClick={() => {
+                        if (item.coverUrl) {
+                          setPosterLightboxOpen(true);
+                        } else {
+                          setCoverPickerOpen(true);
+                        }
+                      }}
+                      aria-label={
+                        item.coverUrl
+                          ? `放大赏析「${item.title}」海报`
+                          : `为「${item.title}」选择封面`
+                      }
+                      className="gallery-cover-frame group relative block w-full overflow-hidden rounded-[12px] border border-[#DFD8CA] shadow-[0_12px_28px_-14px_rgba(24,18,12,0.38)] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B43B2B] dark:border-[#3A342C] dark:shadow-[0_14px_30px_-14px_rgba(0,0,0,0.75)]"
                     >
-                      {item.sourceName}
-                      <ExternalLink className="h-3 w-3" aria-hidden="true" />
-                    </a>
-                  ) : (
-                    item.sourceName
-                  )}
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Quick Cross-Jump Strip: Click Album Name or Tag to Jump & Auto-Select */}
-          <DetailCrossJumpBar
-            item={item}
-            allItems={allItems}
-            albums={albums}
-            onJumpToAlbum={(albumId, focusItemId) =>
-              onJumpToAlbum?.(albumId, focusItemId)
-            }
-            onJumpToTag={(tag, focusItemId) => onFilterByTag(tag, focusItemId)}
-            onAddToAlbum={onAddToAlbum}
-          />
-
-          {/* Prominent Dynamic Cinema Medal Showcase */}
-          <DetailMedalShowcase
-            item={item}
-            allItems={allItems}
-            onFilterByTag={(tag) => onFilterByTag(tag, item.id)}
-            onJumpToMedalHall={onJumpToMedalHall}
-          />
-
-          {/* Archival Completeness Strip */}
-          <div className="mt-3.5 flex items-center justify-between gap-3 rounded-xl border border-[#E4DFD5] bg-white px-3.5 py-3 dark:border-[#322D27] dark:bg-[#1D1A17]">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 text-[13px] md:text-xs">
-                <span
-                  className={`font-medium ${
-                    completeness.tier === 'masterpiece'
-                      ? 'text-[#8E6523] dark:text-[#E4C37A]'
-                      : 'text-[#1A1816] dark:text-[#F3EFE6]'
-                  }`}
-                >
-                  成色：{completeness.tierLabel}级
-                </span>
-                <span className="font-mono text-[12px] tabular-nums text-[#7A7268] md:text-[11px] dark:text-[#A59D90]">
-                  {completeness.score} / {completeness.maxScore}
-                </span>
-              </div>
-              <div className="mt-1.5 grid max-w-[180px] grid-cols-5 gap-1">
-                {[0, 1, 2, 3, 4].map((idx) => (
-                  <span
-                    key={idx}
-                    className={`h-1 rounded-full ${
-                      idx < completeness.score
-                        ? completeness.tier === 'masterpiece'
-                          ? 'bg-[#A67C37] dark:bg-[#D4AF6A]'
-                          : 'bg-[#B43B2B] dark:bg-[#E06856]'
-                        : 'bg-[#ECE7DD] dark:bg-[#322D27]'
-                    }`}
-                  />
-                ))}
-              </div>
-            </div>
-            {completeness.tier !== 'masterpiece' ? (
-              <button
-                type="button"
-                onClick={handleJumpToEditNotes}
-                className="min-h-[40px] shrink-0 rounded-lg border border-[#DCD6CB] bg-[#FAF9F6] px-3 text-[13px] font-medium text-[#1A1816] whitespace-nowrap cursor-pointer md:min-h-[36px] md:text-xs dark:border-[#3A342D] dark:bg-[#24201C] dark:text-[#F3EFE6] dark:hover:border-[#D4AF6A]"
-              >
-                去补齐{completeness.missingLabels[0] ? `「${completeness.missingLabels[0]}」` : ''}
-              </button>
-            ) : (
-              <span className="shrink-0 font-editorial text-[13px] text-[#8E6523] md:text-xs dark:text-[#E4C37A]">
-                已达典藏满格
-              </span>
-            )}
-          </div>
-
-          {/* Editorial Pull Quote */}
-          {item.quote && (
-            <blockquote className="mt-5 border-y border-[#DFD9CD] py-4 text-center dark:border-[#322D27]">
-              <p className="font-editorial text-[17px] italic leading-relaxed text-[#292521] md:text-base dark:text-[#EFE9DE]">
-                “{item.quote}”
-              </p>
-            </blockquote>
-          )}
-
-          {/* Character: Dedicated Structured Dossier Card | Film/Person: Prose Summary */}
-          {isCharacter ? (
-            <CharacterDossierSection
-              item={item}
-              loading={dossierLoading}
-              error={dossierError}
-              onRefresh={() => setDossierReloadTick((t) => t + 1)}
-              onJumpToEditSpecs={handleJumpToEditSpecs}
-            />
-          ) : (
-            item.summary && (
-              <p className="mt-5 text-[15px] leading-[1.75] text-[#2E2A26] md:text-sm md:leading-relaxed dark:text-[#DED7CB]">
-                {item.summary}
-                <SummarySource revision={item.summaryRevision} />
-              </p>
-            )
-          )}
-
-          {/* Watch & Rewatch Log Module for Films */}
-          {item.category === 'film' && (
-            <WatchLogSection item={item} onUpdateItem={onUpdateItem} />
-          )}
-
-          {/* Dedicated Tag Management: Autocomplete + Instant Same-Tag Filtering */}
-          <div ref={relationsSectionRef} className="scroll-mt-3">
-            <DetailTagManager
-              item={item}
-              allItems={allItems}
-              onUpdateTags={(nextTags) => onUpdateItem(item.id, { tags: nextTags })}
-              onFilterByTag={onFilterByTag}
-              onSelectRelated={onSelectRelated}
-            />
-          </div>
-
-          {/* Cross-Entity Links: Existing Collected Relations */}
-          <section
-            className="mt-6"
-            aria-label="已关联馆藏"
-            data-testid="linked-relations-section"
-          >
-            <div className="flex items-center justify-between">
-              <h3 className="text-[13px] font-medium tracking-[0.06em] text-[#7A7268] md:text-xs md:tracking-[0.08em] dark:text-[#A59D90]">
-                已关联馆藏（{relatedItems.length}）
-              </h3>
-            </div>
-
-            {relatedItems.length > 0 ? (
-              <div className="mt-2.5 space-y-2.5">
-                {relatedItems.map((rel) => {
-                  const canUnlink =
-                    item.relatedIds.includes(rel.id) ||
-                    rel.relatedIds.includes(item.id);
-                  return (
-                    <div
-                      key={rel.id}
-                      data-testid={`linked-item-${rel.id}`}
-                      className="flex items-center justify-between gap-2 rounded-2xl border border-[#E4DFD5] bg-white p-3 dark:border-[#322D27] dark:bg-[#1D1A17]"
+                      <ArchivalImage
+                        src={item.coverUrl}
+                        alt={`${item.title}封面`}
+                        title={item.title}
+                        category={item.category}
+                        className="aspect-[3/4] w-full rounded-[11px]"
+                        imgClassName="transition-transform duration-300 ease-out group-hover:scale-[1.03]"
+                      />
+                      {item.coverUrl && (
+                        <span
+                          aria-hidden="true"
+                          className="pointer-events-none absolute right-2 bottom-2 flex h-7 w-7 items-center justify-center rounded-lg border border-white/20 bg-[#191613]/72 text-[#F5F1E8] opacity-0 backdrop-blur-xs transition-opacity duration-150 group-hover:opacity-100"
+                        >
+                          <Maximize2 className="h-3.5 w-3.5" />
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="change-cover-btn"
+                      onClick={() => setCoverPickerOpen(true)}
+                      className="mt-2 inline-flex min-h-[34px] w-full items-center justify-center gap-1 rounded-lg px-2 text-[12px] font-medium text-[#625C54] transition-colors hover:bg-[#ECE6DB]/80 hover:text-[#1A1816] whitespace-nowrap cursor-pointer md:text-[11px] dark:text-[#A89F92] dark:hover:bg-[#27221D] dark:hover:text-[#F3EFE6]"
                     >
-                      <button
-                        type="button"
-                        onClick={() => onSelectRelated(rel)}
-                        aria-label={`跳转查看关联${CATEGORY_LABELS[rel.category]}「${rel.title}」`}
-                        className="flex min-w-0 flex-1 items-center gap-3 text-left cursor-pointer"
+                      <ImagePlus className="h-3.5 w-3.5 shrink-0 text-[#B43B2B] dark:text-[#EB7865]" aria-hidden="true" />
+                      <span>更换封面</span>
+                    </button>
+                  </div>
+
+                  {/* Editorial Identity + Instant Inline Controls */}
+                  <div className="min-w-0 flex-1 pt-0.5">
+                    {/* Unboxed Completeness Kicker */}
+                    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px]">
+                      <span
+                        className={`font-medium tracking-[0.04em] ${
+                          completeness.tier === 'masterpiece'
+                            ? 'text-[#8E6523] dark:text-[#E4C37A]'
+                            : 'text-[#6E675E] dark:text-[#B8AFA2]'
+                        }`}
                       >
-                        <ArchivalImage
-                          src={rel.coverUrl}
-                          alt={rel.title}
-                          title={rel.title}
-                          category={rel.category}
-                          compact
-                          className="h-14 w-11 shrink-0 rounded-xl"
-                        />
-                        <div className="min-w-0">
-                          <p className="text-[12px] text-[#7A7268] md:text-[11px] dark:text-[#A59D90]">
-                            {CATEGORY_LABELS[rel.category]}
-                            {rel.year ? ` · ${rel.year}` : ''}
-                          </p>
-                          <p className="truncate font-editorial text-[15px] font-medium text-[#1A1816] md:text-sm dark:text-[#F3EFE6]">
-                            {rel.title}
-                          </p>
-                          {rel.subtitle && (
-                            <p className="truncate text-[12px] text-[#625C54] md:text-[11px] dark:text-[#B8AFA2]">
-                              {rel.subtitle}
-                            </p>
-                          )}
-                        </div>
-                      </button>
-                      {canUnlink && (
+                        {completeness.tierLabel}级
+                      </span>
+                      <span className="font-mono tabular-nums text-[#8C857B] dark:text-[#8E8578]">
+                        {completeness.score}/{completeness.maxScore}
+                      </span>
+                      <span
+                        aria-hidden="true"
+                        className="inline-grid w-14 grid-cols-5 gap-0.5"
+                      >
+                        {[0, 1, 2, 3, 4].map((idx) => (
+                          <span
+                            key={idx}
+                            className={`h-[2px] rounded-full ${
+                              idx < completeness.score
+                                ? completeness.tier === 'masterpiece'
+                                  ? 'bg-[#A67C37] dark:bg-[#D4AF6A]'
+                                  : 'bg-[#B43B2B] dark:bg-[#E06856]'
+                                : 'bg-[#DDD6C9] dark:bg-[#353029]'
+                            }`}
+                          />
+                        ))}
+                      </span>
+                      {completeness.tier !== 'masterpiece' && completeness.missingLabels[0] && (
                         <button
                           type="button"
-                          onClick={() => void handleRemoveLink(rel.id)}
-                          aria-label={`取消与「${rel.title}」的关联`}
-                          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[#8C857B] hover:bg-[#F3EFE8] hover:text-[#B43B2B] cursor-pointer dark:text-[#9A9184] dark:hover:bg-[#2C2721] dark:hover:text-[#F28C7B]"
+                          onClick={handleJumpToEditNotes}
+                          className="text-[#8E6523] underline decoration-[#CBB896] underline-offset-4 transition-colors hover:text-[#B43B2B] cursor-pointer dark:text-[#E4C37A] dark:decoration-[#6B593B] dark:hover:text-[#F5DC9B]"
                         >
-                          <X className="h-4 w-4" />
+                          补齐「{completeness.missingLabels[0]}」
                         </button>
                       )}
                     </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="mt-2 rounded-2xl border border-dashed border-[#DCD6CB] bg-white/60 px-3.5 py-3 text-[13px] leading-relaxed text-[#7A7268] md:text-xs dark:border-[#3A342D] dark:bg-[#1D1A17]/60 dark:text-[#A59D90]">
-                {item.category === 'film'
-                  ? '尚未关联影人或角色。可直接从下方联网名单一键收录关联，或手动建档。'
-                  : item.category === 'person'
-                    ? '尚未关联影视或其他藏品，可在下方联网名单一键收录关联。'
-                    : '尚未关联馆内影视或影人。收录出处作品或演员后，可在此直接跳转。'}
-              </p>
-            )}
 
-            {/* Smart Unlinked Library Recommendations Based on Work / Actor Names */}
-            {smartRecommendations.length > 0 && (
-              <div
-                data-testid="detail-smart-link-suggestions"
-                className="mt-3 rounded-2xl border border-[#E5D5BE] bg-[#FFFDF8] p-3.5 dark:border-[#5A4930] dark:bg-[#241E16]"
+                    {/* Title & Subtitle */}
+                    <h2
+                      id="detail-drawer-title"
+                      className="mt-2 font-editorial text-[24px] font-medium leading-[1.22] tracking-[0.01em] text-[#1A1816] min-[420px]:text-[26px] sm:text-[28px] dark:text-[#F5F1E8]"
+                    >
+                      {charTitleParts.primaryName}
+                    </h2>
+                    {isCharacter && charTitleParts.secondaryAlias && (
+                      <p className="mt-0.5 text-[14px] font-medium text-[#524C44] dark:text-[#C4BCB0]">
+                        {charTitleParts.secondaryAlias}
+                      </p>
+                    )}
+                    {item.originalTitle && (
+                      <p className="mt-1 break-words text-[13px] tracking-[0.01em] text-[#7A7268] md:text-xs dark:text-[#A59D90]">
+                        {item.originalTitle}
+                      </p>
+                    )}
+
+                    {isCharacter ? (
+                      <div className="mt-2 space-y-1 text-[13px] text-[#4B453E] md:text-xs dark:text-[#C4BCB0]">
+                        {(item.relatedWorkTitle || linkedWorkItem) && (
+                          <p className="truncate">
+                            <span className="text-[#8C857B] dark:text-[#9A9184]">出处：</span>
+                            {linkedWorkItem ? (
+                              <button
+                                type="button"
+                                onClick={() => onSelectRelated(linkedWorkItem)}
+                                className="font-medium text-[#1A1816] underline decoration-[#CFC7B9] underline-offset-4 hover:text-[#B43B2B] cursor-pointer dark:text-[#F3EFE6] dark:decoration-[#5A5247] dark:hover:text-[#F28C7B]"
+                              >
+                                《{linkedWorkItem.title}》
+                              </button>
+                            ) : (
+                              <span className="font-medium text-[#1A1816] dark:text-[#F3EFE6]">
+                                《{item.relatedWorkTitle}》
+                              </span>
+                            )}
+                          </p>
+                        )}
+                        {(item.portrayedBy || linkedActorItem) && (
+                          <p className="truncate">
+                            <span className="text-[#8C857B] dark:text-[#9A9184]">饰演：</span>
+                            {linkedActorItem ? (
+                              <button
+                                type="button"
+                                onClick={() => onSelectRelated(linkedActorItem)}
+                                className="font-medium text-[#1A1816] underline decoration-[#CFC7B9] underline-offset-4 hover:text-[#B43B2B] cursor-pointer dark:text-[#F3EFE6] dark:decoration-[#5A5247] dark:hover:text-[#F28C7B]"
+                              >
+                                {linkedActorItem.title}
+                              </button>
+                            ) : (
+                              <span className="font-medium text-[#1A1816] dark:text-[#F3EFE6]">
+                                {item.portrayedBy}
+                              </span>
+                            )}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      item.subtitle && (
+                        <p className="mt-1.5 text-[13px] font-medium text-[#4B453E] md:text-xs dark:text-[#C8C0B4]">
+                          {item.subtitle}
+                        </p>
+                      )
+                    )}
+
+                    {/* Instant 1-Click 5-Star Rating */}
+                    <div
+                      data-testid="hero-quick-rating"
+                      className="mt-3.5 flex items-center gap-0.5 sm:gap-1"
+                      onMouseLeave={() => setHoverRating(null)}
+                    >
+                      {[1, 2, 3, 4, 5].map((starVal) => {
+                        const displayVal = hoverRating ?? item.rating;
+                        const filled = starVal <= displayVal;
+                        return (
+                          <button
+                            key={starVal}
+                            type="button"
+                            disabled={quickBusy}
+                            data-testid={`hero-star-${starVal}`}
+                            onMouseEnter={() => setHoverRating(starVal)}
+                            onClick={() => void handleQuickRating(starVal)}
+                            aria-label={
+                              item.rating === starVal
+                                ? `取消 ${starVal} 星评分`
+                                : `评为 ${starVal} 星`
+                            }
+                            aria-pressed={item.rating >= starVal}
+                            className="flex h-7 w-7 items-center justify-center rounded-lg transition-transform duration-150 hover:scale-110 active:scale-95 cursor-pointer disabled:opacity-50 sm:h-8 sm:w-8"
+                          >
+                            <Star
+                              className={`h-[17px] w-[17px] transition-colors sm:h-[18px] sm:w-[18px] ${
+                                filled
+                                  ? 'fill-[#B43B2B] text-[#B43B2B] dark:fill-[#EB7865] dark:text-[#EB7865]'
+                                  : 'text-[#CFC7B9] hover:text-[#B43B2B]/60 dark:text-[#4D453C] dark:hover:text-[#EB7865]/70'
+                              }`}
+                            />
+                          </button>
+                        );
+                      })}
+                      <span className="ml-1.5 shrink-0 whitespace-nowrap font-mono text-[12px] tabular-nums text-[#625C54] dark:text-[#B8AFA2]">
+                        {item.rating > 0 ? (
+                          <>
+                            <span>{item.rating}.0</span>
+                            <span className="hidden sm:inline"> / 5</span>
+                          </>
+                        ) : (
+                          '点击评分'
+                        )}
+                      </span>
+                    </div>
+
+                    {/* Instant 1-Click 4-State Status Switcher */}
+                    <div
+                      data-testid="hero-quick-status"
+                      role="group"
+                      aria-label="快捷切换收藏状态"
+                      className="mt-2.5 grid grid-cols-4 gap-1 rounded-xl border border-[#E2DBD0] bg-[#FAF8F3]/90 p-1 dark:border-[#322D27] dark:bg-[#1B1815]/90"
+                    >
+                      {STATUS_CHOICES.map((st) => {
+                        const active = item.status === st;
+                        const isFav = st === 'favorite';
+                        return (
+                          <button
+                            key={st}
+                            type="button"
+                            disabled={quickBusy}
+                            data-testid={`hero-status-${st}`}
+                            aria-pressed={active}
+                            onClick={() => void handleQuickStatus(st)}
+                            className={`min-h-[34px] rounded-lg px-1.5 text-[12px] font-medium whitespace-nowrap transition-colors cursor-pointer disabled:opacity-60 ${
+                              active
+                                ? isFav
+                                  ? 'bg-[#221D17] text-[#F2D68A] shadow-xs dark:bg-[#E4C37A] dark:text-[#141210]'
+                                  : 'bg-[#1A1816] text-[#F7F5F0] shadow-xs dark:bg-[#F3EFE6] dark:text-[#141210]'
+                                : 'text-[#625C54] hover:bg-[#EFEAE0] hover:text-[#1A1816] dark:text-[#A59D90] dark:hover:bg-[#2A2520] dark:hover:text-[#F3EFE6]'
+                            }`}
+                          >
+                            {getStatusLabel(st, item.category)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Museum Accession Metadata Ledger */}
+              <dl
+                data-testid="dossier-accession-ledger"
+                className="grid grid-cols-2 gap-x-4 gap-y-3 border-t border-[#E6E0D5] pt-4 sm:grid-cols-3 dark:border-[#2C2721]"
+              >
+                {accessionMetadataRows.map((row) => (
+                  <div key={row.key} className="min-w-0">
+                    <dt className="text-[11px] tracking-[0.06em] text-[#8C857B] dark:text-[#8E8578]">
+                      {row.label}
+                    </dt>
+                    <dd
+                      className={`mt-0.5 truncate text-[13px] font-medium text-[#1A1816] md:text-xs dark:text-[#EFEAE0] ${
+                        row.mono ? 'font-mono tabular-nums' : ''
+                      }`}
+                    >
+                      {row.href ? (
+                        <a
+                          href={row.href}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex max-w-full items-center gap-1 text-[#1A1816] underline decoration-[#C9C0B1] underline-offset-4 transition-colors hover:text-[#B43B2B] dark:text-[#EFEAE0] dark:decoration-[#5A5247] dark:hover:text-[#E4C37A]"
+                        >
+                          <span className="truncate">{row.value}</span>
+                          <ExternalLink className="h-3 w-3 shrink-0" aria-hidden="true" />
+                        </a>
+                      ) : (
+                        row.value
+                      )}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+
+              {/* Quick Cross-Jump Strip: Album & Tag Index */}
+              <DetailCrossJumpBar
+                item={item}
+                allItems={allItems}
+                albums={albums}
+                onJumpToAlbum={(albumId, focusItemId) =>
+                  onJumpToAlbum?.(albumId, focusItemId)
+                }
+                onJumpToTag={(tag, focusItemId) => onFilterByTag(tag, focusItemId)}
+                onAddToAlbum={onAddToAlbum}
+              />
+
+              {/* Editorial Pull Quote */}
+              {item.quote && (
+                <blockquote className="mt-6 border-y border-[#E2DCD0] py-4.5 text-center dark:border-[#2C2721]">
+                  <p className="font-editorial text-[17px] italic leading-[1.7] text-[#292521] md:text-[16.5px] dark:text-[#EFE9DE]">
+                    “{item.quote}”
+                  </p>
+                </blockquote>
+              )}
+
+              {/* Curator's Personal Notes Reading Block (Previously Hidden Inside Bottom Textarea!) */}
+              {!isCharacter && item.notes?.trim() && (
+                <section
+                  aria-label="策展手记"
+                  data-testid="dossier-curator-notes"
+                  className="mt-6 rounded-xl border border-[#E6E0D5] bg-[#FAF8F3] px-4 py-3.5 dark:border-[#2E2924] dark:bg-[#1B1815]"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-[11px] font-medium tracking-[0.12em] text-[#8E6523] dark:text-[#E4C37A]">
+                      策展手记
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={handleJumpToEditNotes}
+                      className="inline-flex items-center gap-1 text-[11px] text-[#7A7268] transition-colors hover:text-[#1A1816] cursor-pointer dark:text-[#9A9184] dark:hover:text-[#F3EFE6]"
+                    >
+                      <PencilLine className="h-3 w-3" aria-hidden="true" />
+                      <span>编辑</span>
+                    </button>
+                  </div>
+                  <p className="mt-2 whitespace-pre-line text-[14.5px] leading-[1.8] text-[#2B2723] md:text-[14px] dark:text-[#E2DBD0]">
+                    {item.notes}
+                  </p>
+                </section>
+              )}
+
+              {/* Character: Dedicated Structured Dossier Card | Film/Person: Prose Summary */}
+              {isCharacter ? (
+                <CharacterDossierSection
+                  item={item}
+                  loading={dossierLoading}
+                  error={dossierError}
+                  onRefresh={() => setDossierReloadTick((t) => t + 1)}
+                  onJumpToEditSpecs={handleJumpToEditSpecs}
+                />
+              ) : (
+                item.summary && (
+                  <section aria-label="档案梗概" className="mt-6">
+                    <h3 className="text-[11px] font-medium tracking-[0.12em] text-[#8C857B] dark:text-[#8E8578]">
+                      {item.category === 'person' ? '人物简介' : '作品梗概'}
+                    </h3>
+                    <p
+                      className={`mt-2 text-[15px] leading-[1.82] text-[#2E2A26] md:text-[14.5px] dark:text-[#DED7CB] ${
+                        !summaryExpanded && item.summary.length > 220
+                          ? 'line-clamp-4'
+                          : ''
+                      }`}
+                    >
+                      {item.summary}
+                      <SummarySource revision={item.summaryRevision} />
+                    </p>
+                    {item.summary.length > 220 && (
+                      <button
+                        type="button"
+                        onClick={() => setSummaryExpanded((v) => !v)}
+                        className="mt-1.5 inline-flex items-center gap-1 text-[12px] font-medium text-[#7A7268] transition-colors hover:text-[#1A1816] cursor-pointer dark:text-[#A59D90] dark:hover:text-[#F3EFE6]"
+                      >
+                        <span>{summaryExpanded ? '收起简介' : '展开全文'}</span>
+                        {summaryExpanded ? (
+                          <ChevronUp className="h-3.5 w-3.5" aria-hidden="true" />
+                        ) : (
+                          <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+                        )}
+                      </button>
+                    )}
+                  </section>
+                )
+              )}
+
+              {/* Watch & Rewatch Log Module for Films */}
+              {item.category === 'film' && (
+                <WatchLogSection item={item} onUpdateItem={onUpdateItem} />
+              )}
+
+              {/* Cinema Medal Showcase (Positioned Below Core Story & Watch Log) */}
+              <DetailMedalShowcase
+                item={item}
+                allItems={allItems}
+                onFilterByTag={(tag) => onFilterByTag(tag, item.id)}
+                onJumpToMedalHall={onJumpToMedalHall}
+              />
+
+              {/* Dedicated Tag Management: Autocomplete + Instant Same-Tag Filtering */}
+              <div ref={relationsSectionRef} className="scroll-mt-3">
+                <DetailTagManager
+                  item={item}
+                  allItems={allItems}
+                  onUpdateTags={(nextTags) => onUpdateItem(item.id, { tags: nextTags })}
+                  onFilterByTag={onFilterByTag}
+                  onSelectRelated={onSelectRelated}
+                />
+              </div>
+
+              {/* Cross-Entity Links: Existing Collected Relations (Compact 2-Col Archival Grid) */}
+              <section
+                className="mt-7 border-t border-[#E6E0D5] pt-5 dark:border-[#2C2721]"
+                aria-label="已关联馆藏"
+                data-testid="linked-relations-section"
+              >
+                <div className="flex items-center justify-between">
+                  <h3 className="text-[12px] font-medium tracking-[0.08em] text-[#6E675E] dark:text-[#A59D90]">
+                    已关联馆藏
+                    <span className="ml-1.5 font-mono text-[11px] tabular-nums text-[#8C857B] dark:text-[#8E8578]">
+                      {relatedItems.length}
+                    </span>
+                  </h3>
+                </div>
+
+                {relatedItems.length > 0 ? (
+                  <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                    {relatedItems.map((rel) => {
+                      const canUnlink =
+                        item.relatedIds.includes(rel.id) ||
+                        rel.relatedIds.includes(item.id);
+                      return (
+                        <div
+                          key={rel.id}
+                          data-testid={`linked-item-${rel.id}`}
+                          className="group/rel flex items-center justify-between gap-2 rounded-xl border border-[#E4DFD5] bg-[#FFFDF9] p-2.5 transition-colors hover:border-[#C8BFB0] dark:border-[#302B25] dark:bg-[#1B1815] dark:hover:border-[#4D453B]"
+                        >
+                          <button
+                            type="button"
+                            onClick={() => onSelectRelated(rel)}
+                            aria-label={`跳转查看关联${CATEGORY_LABELS[rel.category]}「${rel.title}」`}
+                            className="flex min-w-0 flex-1 items-center gap-2.5 text-left cursor-pointer"
+                          >
+                            <ArchivalImage
+                              src={rel.coverUrl}
+                              alt={rel.title}
+                              title={rel.title}
+                              category={rel.category}
+                              compact
+                              className="h-12 w-9 shrink-0 rounded-lg"
+                            />
+                            <div className="min-w-0">
+                              <p className="text-[11px] text-[#8C857B] dark:text-[#9A9184]">
+                                {CATEGORY_LABELS[rel.category]}
+                                {rel.year ? ` · ${rel.year}` : ''}
+                              </p>
+                              <p className="truncate font-editorial text-[14px] font-medium text-[#1A1816] transition-colors group-hover/rel:text-[#B43B2B] dark:text-[#F3EFE6] dark:group-hover/rel:text-[#F28C7B]">
+                                {rel.title}
+                              </p>
+                              {rel.subtitle && (
+                                <p className="truncate text-[11px] text-[#6E675E] dark:text-[#A59D90]">
+                                  {rel.subtitle}
+                                </p>
+                              )}
+                            </div>
+                          </button>
+                          {canUnlink && (
+                            <button
+                              type="button"
+                              onClick={() => void handleRemoveLink(rel.id)}
+                              aria-label={`取消与「${rel.title}」的关联`}
+                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#9A9287] transition-colors hover:bg-[#F3EFE8] hover:text-[#B43B2B] cursor-pointer dark:text-[#8E8578] dark:hover:bg-[#2C2721] dark:hover:text-[#F28C7B]"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="mt-2.5 text-[13px] leading-relaxed text-[#7A7268] md:text-xs dark:text-[#A59D90]">
+                    {item.category === 'film'
+                      ? '尚未关联影人或角色。可直接从下方联网名单一键收录关联，或手动建档。'
+                      : item.category === 'person'
+                        ? '尚未关联影视或其他藏品，可在下方联网名单一键收录关联。'
+                        : '尚未关联馆内影视或影人。收录出处作品或演员后，可在此直接跳转。'}
+                  </p>
+                )}
+
+                {/* Smart Unlinked Library Recommendations Based on Work / Actor Names */}
+                {smartRecommendations.length > 0 && (
+                  <div
+                    data-testid="detail-smart-link-suggestions"
+                    className="mt-3.5 rounded-xl border border-[#E5D5BE] bg-[#FFFDF8] p-3.5 dark:border-[#5A4930] dark:bg-[#241E16]"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="flex items-center gap-1.5 text-[13px] font-medium text-[#8E6523] md:text-xs dark:text-[#E4C37A]">
+                        <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        <span>
+                          发现 {smartRecommendations.length} 项相关未关联藏品
+                        </span>
+                      </p>
+                      <span className="shrink-0 text-[12px] text-[#8C857B] md:text-[11px] dark:text-[#A59D90]">
+                        一键建立链接
+                      </span>
+                    </div>
+
+                    <ul className="mt-2.5 space-y-2">
+                      {smartRecommendations.map(({ item: recItem, reason }) => (
+                        <li
+                          key={`rec-${recItem.id}`}
+                          className="flex items-center justify-between gap-2 rounded-xl border border-[#ECE4D6] bg-white p-2.5 dark:border-[#3B3328] dark:bg-[#1A1714]"
+                        >
+                          <button
+                            type="button"
+                            onClick={() => onSelectRelated(recItem)}
+                            className="flex min-w-0 flex-1 items-center gap-2.5 text-left cursor-pointer"
+                          >
+                            <ArchivalImage
+                              src={recItem.coverUrl}
+                              alt={recItem.title}
+                              title={recItem.title}
+                              category={recItem.category}
+                              compact
+                              className="h-12 w-9 shrink-0 rounded-lg"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate font-editorial text-[14px] font-medium text-[#1A1816] md:text-xs dark:text-[#F3EFE6]">
+                                {recItem.title}
+                              </p>
+                              <p className="mt-0.5 truncate text-[12px] text-[#6E665C] md:text-[11px] dark:text-[#A59D90]">
+                                <span className="text-[#A67C37] dark:text-[#E4C37A]">
+                                  {CATEGORY_LABELS[recItem.category]}
+                                </span>
+                                <span aria-hidden="true"> · </span>
+                                <span>{reason}</span>
+                              </p>
+                            </div>
+                          </button>
+
+                          <button
+                            type="button"
+                            data-testid={`detail-smart-link-btn-${recItem.id}`}
+                            onClick={() => void onLinkExisting(item.id, recItem.id)}
+                            className="inline-flex min-h-[40px] shrink-0 items-center gap-1 rounded-xl bg-[#B43B2B] px-3 text-[13px] font-medium text-white whitespace-nowrap cursor-pointer transition-colors hover:bg-[#932D20] active:scale-[0.97] md:min-h-[36px] md:text-xs"
+                          >
+                            <Link2 className="h-3.5 w-3.5" aria-hidden="true" />
+                            <span>一键关联</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Manual Link From Existing Collection */}
+                {linkableCandidates.length > 0 && (
+                  <div className="mt-3 flex items-center gap-2">
+                    <label htmlFor="add-related-select" className="sr-only">
+                      选择要关联的藏品
+                    </label>
+                    <div className="relative min-w-0 flex-1">
+                      <Link2
+                        className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8C857B] md:h-3.5 md:w-3.5 dark:text-[#9A9184]"
+                        aria-hidden="true"
+                      />
+                      <select
+                        id="add-related-select"
+                        value={selectedLinkId}
+                        onChange={(e) => setSelectedLinkId(e.target.value)}
+                        className="h-11 w-full rounded-xl border border-[#DCD6CB] bg-white pl-9 pr-3 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:pl-8 md:text-xs dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:focus:border-[#D4AF6A]"
+                      >
+                        <option value="">关联馆内其他条目…</option>
+                        {linkableCandidates.map((cand) => (
+                          <option key={cand.id} value={cand.id}>
+                            [{CATEGORY_LABELS[cand.category]}] {cand.title}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!selectedLinkId}
+                      onClick={() => void handleAddLink()}
+                      className="inline-flex h-11 shrink-0 items-center gap-1 rounded-xl border border-[#DCD6CB] bg-white px-4 text-[14px] font-medium text-[#1A1816] whitespace-nowrap cursor-pointer disabled:opacity-40 md:px-3.5 md:text-xs dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:hover:border-[#D4AF6A]"
+                    >
+                      <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                      关联
+                    </button>
+                  </div>
+                )}
+              </section>
+
+              {/* Live Online Discovery: Films & People ONLY (Hairline-Separated Section) */}
+              {!isCharacter && (
+              <section
+                className="mt-7 border-t border-[#E6E0D5] pt-5 dark:border-[#2C2721]"
+                aria-label="联网演职员与角色发现"
+                data-testid="online-relations-section"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <p className="flex items-center gap-1.5 text-[13px] font-medium text-[#8E6523] md:text-xs dark:text-[#E4C37A]">
-                    <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                    <span>
-                      发现 {smartRecommendations.length} 项相关未关联藏品
-                    </span>
-                  </p>
-                  <span className="shrink-0 text-[12px] text-[#8C857B] md:text-[11px] dark:text-[#A59D90]">
-                    一键建立链接
-                  </span>
-                </div>
-
-                <ul className="mt-2.5 space-y-2">
-                  {smartRecommendations.map(({ item: recItem, reason }) => (
-                    <li
-                      key={`rec-${recItem.id}`}
-                      className="flex items-center justify-between gap-2 rounded-xl border border-[#ECE4D6] bg-white p-2.5 dark:border-[#3B3328] dark:bg-[#1A1714]"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => onSelectRelated(recItem)}
-                        className="flex min-w-0 flex-1 items-center gap-2.5 text-left cursor-pointer"
-                      >
-                        <ArchivalImage
-                          src={recItem.coverUrl}
-                          alt={recItem.title}
-                          title={recItem.title}
-                          category={recItem.category}
-                          compact
-                          className="h-12 w-9 shrink-0 rounded-lg"
-                        />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate font-editorial text-[14px] font-medium text-[#1A1816] md:text-xs dark:text-[#F3EFE6]">
-                            {recItem.title}
-                          </p>
-                          <p className="mt-0.5 truncate text-[12px] text-[#6E665C] md:text-[11px] dark:text-[#A59D90]">
-                            <span className="text-[#A67C37] dark:text-[#E4C37A]">
-                              {CATEGORY_LABELS[recItem.category]}
-                            </span>
-                            <span aria-hidden="true"> · </span>
-                            <span>{reason}</span>
-                          </p>
-                        </div>
-                      </button>
-
-                      <button
-                        type="button"
-                        data-testid={`detail-smart-link-btn-${recItem.id}`}
-                        onClick={() => void onLinkExisting(item.id, recItem.id)}
-                        className="inline-flex min-h-[40px] shrink-0 items-center gap-1 rounded-xl bg-[#B43B2B] px-3 text-[13px] font-medium text-white whitespace-nowrap cursor-pointer transition-colors hover:bg-[#932D20] active:scale-[0.97] md:min-h-[36px] md:text-xs"
-                      >
-                        <Link2 className="h-3.5 w-3.5" aria-hidden="true" />
-                        <span>一键关联</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Manual Link From Existing Collection */}
-            {linkableCandidates.length > 0 && (
-              <div className="mt-3 flex items-center gap-2">
-                <label htmlFor="add-related-select" className="sr-only">
-                  选择要关联的藏品
-                </label>
-                <div className="relative min-w-0 flex-1">
-                  <Link2
-                    className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8C857B] md:h-3.5 md:w-3.5 dark:text-[#9A9184]"
-                    aria-hidden="true"
-                  />
-                  <select
-                    id="add-related-select"
-                    value={selectedLinkId}
-                    onChange={(e) => setSelectedLinkId(e.target.value)}
-                    className="h-11 w-full rounded-xl border border-[#DCD6CB] bg-white pl-9 pr-3 text-[16px] text-[#1A1816] focus:border-[#1A1816] focus:outline-none md:pl-8 md:text-xs dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:focus:border-[#D4AF6A]"
-                  >
-                    <option value="">关联馆内其他条目…</option>
-                    {linkableCandidates.map((cand) => (
-                      <option key={cand.id} value={cand.id}>
-                        [{CATEGORY_LABELS[cand.category]}] {cand.title}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <button
-                  type="button"
-                  disabled={!selectedLinkId}
-                  onClick={() => void handleAddLink()}
-                  className="inline-flex h-11 shrink-0 items-center gap-1 rounded-xl border border-[#DCD6CB] bg-white px-4 text-[14px] font-medium text-[#1A1816] whitespace-nowrap cursor-pointer disabled:opacity-40 md:px-3.5 md:text-xs dark:border-[#3A342D] dark:bg-[#1D1A17] dark:text-[#F3EFE6] dark:hover:border-[#D4AF6A]"
-                >
-                  <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-                  关联
-                </button>
-              </div>
-            )}
-          </section>
-
-          {/* Live Online Discovery: Films & People ONLY (Characters focus on the Dossier above) */}
-          {!isCharacter && (
-          <section
-            className="mt-6 rounded-2xl border border-[#E4DFD5] bg-white p-3.5 sm:p-4 dark:border-[#322D27] dark:bg-[#1D1A17]"
-            aria-label="联网演职员与角色发现"
-            data-testid="online-relations-section"
-          >
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <h3 className="text-[14px] font-medium tracking-[0.04em] text-[#1A1816] md:text-xs md:tracking-[0.06em] dark:text-[#F3EFE6]">
+                  <div className="min-w-0">
+                    <h3 className="text-[12px] font-medium tracking-[0.08em] text-[#6E675E] dark:text-[#A59D90]">
                   {item.category === 'film'
                     ? '联网演职员与登场角色'
                     : '联网参演作品与角色'}
@@ -2022,12 +2326,14 @@ function DetailDrawerShell({
           </form>
 
           {/* Bottom Deep Relation SVG Network Graph Preview */}
-          <DetailRelationGraph
-            item={item}
-            allItems={allItems}
-            onSelectItem={onSelectRelated}
-            onOpenGlobalMap={onOpenGlobalMap}
-          />
+          <div ref={graphSectionRef} className="scroll-mt-3">
+            <DetailRelationGraph
+              item={item}
+              allItems={allItems}
+              onSelectItem={onSelectRelated}
+              onOpenGlobalMap={onOpenGlobalMap}
+            />
+          </div>
 
           {/* Quiet Destructive Action Row */}
           <div className="mt-5 flex items-center justify-between border-t border-[#E4DFD5] pt-3 dark:border-[#2E2924]">
@@ -2063,38 +2369,132 @@ function DetailDrawerShell({
           </AnimatePresence>
         </div>
 
-        {/* Sticky Bottom Save Bar */}
-        <div className="border-t border-[#E4DFD5] bg-white px-4 py-3 pb-[calc(0.85rem+env(safe-area-inset-bottom))] min-[420px]:px-5 dark:border-[#2E2924] dark:bg-[#191613]">
-          <div className="flex items-center gap-2.5">
-            {isDirty && (
-              <button
-                type="button"
-                onClick={handleResetDraft}
-                className="inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-[#DCD6CB] bg-[#FAF9F6] px-3.5 text-[14px] font-medium text-[#4B453E] whitespace-nowrap cursor-pointer transition-colors hover:border-[#1A1816] hover:text-[#1A1816] md:text-xs dark:border-[#3A342D] dark:bg-[#24201C] dark:text-[#C4BCB0] dark:hover:border-[#D4AF6A] dark:hover:text-[#F3EFE6]"
-              >
-                <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-                <span>还原</span>
-              </button>
-            )}
-            <button
-              type="submit"
-              form="detail-edit-form"
-              disabled={saving}
-              className={`h-11 flex-1 rounded-xl text-[15px] font-medium cursor-pointer active:scale-[0.98] transition-all disabled:opacity-60 md:text-sm ${
-                isDirty
-                  ? 'bg-[#B43B2B] text-white hover:bg-[#932D20] shadow-xs'
-                  : 'bg-[#1A1816] text-white hover:bg-[#332E29] dark:bg-[#F3EFE6] dark:text-[#141210] dark:hover:bg-[#E4C37A]'
-              }`}
+        {/* Transient Floating Toast Feedback (for Instant Hero Controls & Save) */}
+        <AnimatePresence>
+          {savedFeedback && !isDirty && (
+            <motion.div
+              key="drawer-saved-toast"
+              data-testid="drawer-saved-toast"
+              role="status"
+              aria-live="polite"
+              initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
+              animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
+              exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 6 }}
+              transition={{ duration: 0.18 }}
+              className="pointer-events-none absolute right-5 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-20 inline-flex items-center gap-1.5 rounded-xl border border-[#C8DFD0] bg-[#191613]/92 px-3.5 py-2 text-xs font-medium text-[#F5F1E8] shadow-lg backdrop-blur-xs dark:border-[#2B523B] dark:bg-[#172B20] dark:text-[#9FE2BC]"
             >
-              {saving
-                ? '保存中…'
-                : isDirty
-                  ? '保存未同步修改'
-                  : '保存修改'}
-            </button>
-          </div>
-        </div>
+              <Check className="h-3.5 w-3.5 text-[#6CC492]" aria-hidden="true" />
+              <span>{savedFeedback}</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Contextual Dirty-Only Sticky Save Bar (Frees 68px Reading Canvas When Clean) */}
+        <AnimatePresence>
+          {(isDirty || saving) && (
+            <motion.div
+              key="drawer-dirty-save-bar"
+              data-testid="drawer-dirty-save-bar"
+              initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 20 }}
+              animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
+              exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 20 }}
+              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              className="border-t border-[#E4DFD5] bg-[#FAF8F3]/96 px-4 py-3 pb-[calc(0.85rem+env(safe-area-inset-bottom))] backdrop-blur-xs min-[420px]:px-5 dark:border-[#2E2924] dark:bg-[#191613]/96"
+            >
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={handleResetDraft}
+                  disabled={saving}
+                  className="inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-[#DCD6CB] bg-white px-3.5 text-[14px] font-medium text-[#4B453E] whitespace-nowrap cursor-pointer transition-colors hover:border-[#1A1816] hover:text-[#1A1816] disabled:opacity-50 md:text-xs dark:border-[#3A342D] dark:bg-[#24201C] dark:text-[#C4BCB0] dark:hover:border-[#D4AF6A] dark:hover:text-[#F3EFE6]"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>还原</span>
+                </button>
+                <button
+                  type="submit"
+                  form="detail-edit-form"
+                  disabled={saving}
+                  className="h-11 flex-1 rounded-xl bg-[#B43B2B] text-[15px] font-medium text-white shadow-xs transition-colors hover:bg-[#932D20] active:scale-[0.98] cursor-pointer disabled:opacity-60 md:text-sm"
+                >
+                  {saving ? '保存中…' : '保存档案修订'}
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
+
+      {/* High-Resolution Poster Lightbox */}
+      <AnimatePresence>
+        {posterLightboxOpen && item.coverUrl && (
+          <motion.div
+            key="poster-lightbox"
+            data-testid="poster-lightbox"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`${item.title}高清海报赏析`}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: prefersReducedMotion ? 0.08 : 0.2 }}
+            onClick={() => setPosterLightboxOpen(false)}
+            className="fixed inset-0 z-[70] flex flex-col items-center justify-center bg-[#0C0A09]/92 p-5 backdrop-blur-md"
+          >
+            <motion.div
+              initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.94 }}
+              animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, scale: 1 }}
+              exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96 }}
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+              onClick={(e) => e.stopPropagation()}
+              className="flex max-h-full max-w-full flex-col items-center"
+            >
+              <img
+                src={item.coverUrl}
+                alt={`${item.title}高清海报`}
+                referrerPolicy="no-referrer"
+                className="max-h-[76dvh] w-auto max-w-[90vw] rounded-xl border border-white/15 object-contain shadow-2xl"
+              />
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-center">
+                <p className="font-editorial text-[15px] text-[#F5F1E8]">
+                  <span className="mr-2 font-mono text-xs text-[#A59D90]">
+                    {item.accessionNo}
+                  </span>
+                  <span>{item.title}</span>
+                  {item.year && (
+                    <span className="ml-2 font-mono text-xs text-[#A59D90]">
+                      {item.year}
+                    </span>
+                  )}
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPosterLightboxOpen(false);
+                      setCoverPickerOpen(true);
+                    }}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-3 text-xs font-medium text-[#F5F1E8] transition-colors hover:bg-white/20 cursor-pointer"
+                  >
+                    <ImagePlus className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span>更换封面</span>
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="poster-lightbox-close"
+                    onClick={() => setPosterLightboxOpen(false)}
+                    aria-label="关闭海报大图"
+                    className="inline-flex h-9 items-center gap-1 rounded-lg border border-white/20 bg-white/10 px-3 text-xs font-medium text-[#F5F1E8] transition-colors hover:bg-white/20 cursor-pointer"
+                  >
+                    <X className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span>关闭</span>
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <CoverPickerModal
         open={coverPickerOpen}

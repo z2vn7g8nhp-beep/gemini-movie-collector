@@ -109,14 +109,14 @@ export function ArchivalImage({
 
   return (
     <div
-      className={`relative overflow-hidden bg-[#1B1815] ${className}`}
+      className={`relative overflow-hidden bg-[#EAE4D8] dark:bg-[#231F1B] ${className}`}
     >
       {!showFallback ? (
         <>
           {!loaded && (
             <div
               aria-hidden="true"
-              className="absolute inset-0 bg-[#E8E2D7] dark:bg-[#2A2520]"
+              className="absolute inset-0 bg-[#EAE4D8] dark:bg-[#231F1B]"
             />
           )}
           <img
