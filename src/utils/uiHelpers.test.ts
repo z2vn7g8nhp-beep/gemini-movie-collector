@@ -138,8 +138,32 @@ test('getArchiveCardVisualClasses applies golden outline glow for favorite cards
   });
   assert.equal(watchedGrid.hasFavoriteGlow, false);
   assert.doesNotMatch(watchedGrid.frameClassName, /archive-card-favorite/);
+  assert.match(watchedGrid.frameClassName, /archive-card-surface/);
+  assert.match(watchedGrid.frameClassName, /archive-card-grid/);
 
-  // Batch selection takes visual precedence over favorite glow
+  const watchedList = getArchiveCardVisualClasses({
+    status: 'watched',
+    isMasterpiece: false,
+    isSelected: false,
+    isPressing: false,
+    viewMode: 'list',
+  });
+  assert.equal(watchedList.hasFavoriteGlow, false);
+  assert.match(watchedList.frameClassName, /archive-card-surface/);
+  assert.match(watchedList.frameClassName, /archive-card-list/);
+
+  const masterpieceGrid = getArchiveCardVisualClasses({
+    status: 'watched',
+    isMasterpiece: true,
+    isSelected: false,
+    isPressing: false,
+    viewMode: 'grid',
+  });
+  assert.equal(masterpieceGrid.hasFavoriteGlow, false);
+  assert.match(masterpieceGrid.frameClassName, /archive-card-masterpiece/);
+  assert.match(masterpieceGrid.frameClassName, /archive-card-grid/);
+
+  // Batch selection takes visual precedence over favorite glow and default rim
   const selectedFav = getArchiveCardVisualClasses({
     status: 'favorite',
     isMasterpiece: true,
@@ -149,6 +173,7 @@ test('getArchiveCardVisualClasses applies golden outline glow for favorite cards
   });
   assert.equal(selectedFav.hasFavoriteGlow, false);
   assert.match(selectedFav.frameClassName, /ring-\[#B43B2B\]/);
+  assert.doesNotMatch(selectedFav.frameClassName, /archive-card-surface/);
 
   // Cross-jump located state highlights the card in both grid and list views
   const locatedGrid = getArchiveCardVisualClasses({

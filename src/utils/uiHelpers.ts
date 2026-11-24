@@ -180,20 +180,20 @@ export function getArchiveCardVisualClasses({
     if (isFavorite) {
       return {
         frameClassName:
-          'archive-card-favorite archive-card-favorite-list border-[#C9A45C]/90 bg-[#FFFDF9] dark:border-[#C9A45C]/70 dark:bg-[#211D18]',
+          'archive-card-favorite archive-card-favorite-list border-[#C9A45C]/90 bg-[#FFFDF9] dark:border-[#C9A45C]/75 dark:bg-[#211D18]',
         hasFavoriteGlow: true,
       };
     }
     if (isMasterpiece) {
       return {
         frameClassName:
-          'border-[#DDD2BE] bg-[#FFFDF9] hover:border-[#CFC1A6] hover:bg-[#FAF7F0] dark:border-[#4B4132] dark:bg-[#1D1A17] dark:hover:border-[#6A5A42] dark:hover:bg-[#24201B]',
+          'archive-card-surface archive-card-list archive-card-masterpiece border-[#DDD2BE] bg-[#FFFDF9] hover:border-[#CFC1A6] hover:bg-[#FAF7F0] dark:border-[#C9A45C]/38 dark:bg-[#1D1A17] dark:hover:border-[#D4AF6A]/58 dark:hover:bg-[#24201B]',
         hasFavoriteGlow: false,
       };
     }
     return {
       frameClassName:
-        'border-[#E4DFD5] bg-[#FFFDF9] hover:border-[#CFC5B4] hover:bg-[#FAF7F0] dark:border-[#322D27] dark:bg-[#1D1A17] dark:hover:border-[#4A433A] dark:hover:bg-[#24201C]',
+        'archive-card-surface archive-card-list border-[#E4DFD5] bg-[#FFFDF9] hover:border-[#CFC5B4] hover:bg-[#FAF7F0] dark:border-[#C9A45C]/25 dark:bg-[#1D1A17] dark:hover:border-[#D4AF6A]/45 dark:hover:bg-[#24201C]',
       hasFavoriteGlow: false,
     };
   }
@@ -222,20 +222,20 @@ export function getArchiveCardVisualClasses({
   if (isFavorite) {
     return {
       frameClassName:
-        'archive-card-favorite archive-card-favorite-grid border-[#C9A45C]/90 dark:border-[#C9A45C]/70',
+        'archive-card-favorite archive-card-favorite-grid border-[#C9A45C]/90 dark:border-[#C9A45C]/75',
       hasFavoriteGlow: true,
     };
   }
   if (isMasterpiece) {
     return {
       frameClassName:
-        'gallery-card-masterpiece border-[#DFD2B8] hover:border-[#CBB892] dark:border-[#534634] dark:hover:border-[#786548]',
+        'archive-card-surface archive-card-grid gallery-card-masterpiece archive-card-masterpiece border-[#DFD2B8] hover:border-[#CBB892] dark:border-[#C9A45C]/40 dark:hover:border-[#D4AF6A]/60',
       hasFavoriteGlow: false,
     };
   }
   return {
     frameClassName:
-      'border-[#E6E0D4] hover:border-[#CFC5B4] dark:border-[#322D27] dark:hover:border-[#4B443B]',
+      'archive-card-surface archive-card-grid border-[#E6E0D4] hover:border-[#CFC5B4] dark:border-[#C9A45C]/25 dark:hover:border-[#D4AF6A]/46',
     hasFavoriteGlow: false,
   };
 }

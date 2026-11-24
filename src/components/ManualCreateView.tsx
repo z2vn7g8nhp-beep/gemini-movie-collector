@@ -648,10 +648,10 @@ export function ManualCreateView({
         className="hidden lg:sticky lg:top-20 lg:col-span-5 lg:block"
       >
         <div
-          className={`gallery-card border p-5 ${
+          className={`gallery-card archive-sidebar-card border p-5 ${
             isMasterpiecePreview
               ? 'gallery-card-masterpiece border-[#C9A45C]'
-              : 'border-[#E4DFD5] dark:border-[#322D27]'
+              : 'border-[#E4DFD5] dark:border-[#C9A45C]/32'
           }`}
         >
           <div className="flex items-center justify-between gap-2 border-b border-[#EFECE4] pb-3 dark:border-[#2E2924]">

@@ -49,7 +49,7 @@ export function PostCollectLinkSheet({
       role="region"
       aria-label="智能关联推荐"
       data-testid="post-collect-link-sheet"
-      className="fixed inset-x-3 bottom-[calc(74px+env(safe-area-inset-bottom))] z-40 mx-auto max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-2xl border border-[#3B352D] bg-[#1C1A17] text-[#F5F1E8] shadow-[0_18px_48px_rgba(20,18,15,0.34)] sm:max-w-[440px] md:inset-x-auto md:right-6 md:bottom-6 md:w-[420px]"
+      className="archive-sidebar-card fixed inset-x-3 bottom-[calc(74px+env(safe-area-inset-bottom))] z-40 mx-auto max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-2xl border border-[#3B352D] bg-[#1C1A17] text-[#F5F1E8] shadow-[0_18px_48px_rgba(20,18,15,0.34)] sm:max-w-[440px] md:inset-x-auto md:right-6 md:bottom-6 md:w-[420px]"
     >
       {/* Header */}
       <div className="flex items-start justify-between gap-2 border-b border-white/10 px-4 py-3">

@@ -388,33 +388,136 @@ html.dark {
     0 10px 22px -14px rgba(28, 22, 15, 0.14);
 }
 
-/* Dark Mode Archival Surface & Foil Elevation Overrides */
+/* Dark Mode Archival Surface & Gilded Fluorescent Rim System */
+.dark .gallery-card:not(.archive-card-located):not(.archive-card-favorite):not([class*="ring-"]) {
+  background-color: #1B1815;
+  border-color: rgba(212, 175, 106, 0.22);
+  box-shadow:
+    0 0 0 1px rgba(212, 175, 106, 0.08),
+    0 1px 0 rgba(245, 219, 156, 0.07) inset,
+    0 0 14px -6px rgba(212, 175, 106, 0.14),
+    0 10px 24px -16px rgba(0, 0, 0, 0.56);
+}
+
 .dark .gallery-card {
   background-color: #1B1815;
-  box-shadow:
-    0 1px 0 rgba(255, 246, 224, 0.045) inset,
-    0 2px 6px rgba(0, 0, 0, 0.26),
-    0 10px 24px -16px rgba(0, 0, 0, 0.5);
 }
 
 @media (hover: hover) {
-  .dark .gallery-card-interactive:hover {
+  .dark .gallery-card-interactive:not(.archive-card-located):not(.archive-card-favorite):not([class*="ring-"]):hover {
+    border-color: rgba(228, 195, 122, 0.42);
     box-shadow:
-      0 1px 0 rgba(255, 246, 224, 0.08) inset,
-      0 6px 14px rgba(0, 0, 0, 0.34),
-      0 16px 32px -16px rgba(0, 0, 0, 0.62);
+      0 0 0 1px rgba(228, 195, 122, 0.18),
+      0 1px 0 rgba(245, 219, 156, 0.12) inset,
+      0 0 20px -5px rgba(212, 175, 106, 0.22),
+      0 16px 32px -16px rgba(0, 0, 0, 0.66);
   }
 }
 
-.dark .gallery-card-masterpiece {
+.dark .gallery-card-dark {
+  border-color: rgba(212, 175, 106, 0.26);
   box-shadow:
-    0 1px 0 rgba(228, 195, 122, 0.12) inset,
-    0 3px 8px rgba(166, 124, 55, 0.14),
-    0 12px 24px -14px rgba(0, 0, 0, 0.6);
+    0 0 0 1px rgba(212, 175, 106, 0.09),
+    0 1px 0 rgba(245, 219, 156, 0.1) inset,
+    0 0 16px -6px rgba(212, 175, 106, 0.16),
+    0 12px 28px -16px rgba(0, 0, 0, 0.62);
 }
 
+/* Standard Dark Collection Cards (Grid & List): faint gilded fluorescent rim modeled on archive-card-favorite-grid */
+.dark .archive-card-surface {
+  position: relative;
+  border-color: rgba(212, 175, 106, 0.25);
+  transition:
+    transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 220ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 200ms ease,
+    background-color 180ms ease;
+}
+
+.dark .archive-card-surface::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 2;
+  box-shadow:
+    inset 0 0 0 1px rgba(228, 195, 122, 0.09),
+    inset 0 0 12px -10px rgba(212, 175, 106, 0.14);
+  transition: box-shadow 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dark .archive-card-grid {
+  box-shadow:
+    0 0 0 1px rgba(212, 175, 106, 0.1),
+    0 1px 0 rgba(245, 219, 156, 0.08) inset,
+    0 0 15px -6px rgba(212, 175, 106, 0.17),
+    0 10px 24px -15px rgba(0, 0, 0, 0.58);
+}
+
+.dark .archive-card-list {
+  box-shadow:
+    0 0 0 1px rgba(212, 175, 106, 0.09),
+    0 1px 0 rgba(245, 219, 156, 0.07) inset,
+    0 0 13px -6px rgba(212, 175, 106, 0.14),
+    0 6px 16px -12px rgba(0, 0, 0, 0.48);
+}
+
+.dark .gallery-card-masterpiece,
+.dark .archive-card-masterpiece {
+  border-color: rgba(212, 175, 106, 0.38);
+  box-shadow:
+    0 0 0 1px rgba(212, 175, 106, 0.15),
+    0 1px 0 rgba(245, 219, 156, 0.12) inset,
+    0 0 17px -6px rgba(212, 175, 106, 0.21),
+    0 12px 24px -14px rgba(0, 0, 0, 0.62);
+}
+
+.dark .archive-card-masterpiece::after {
+  box-shadow:
+    inset 0 0 0 1px rgba(228, 195, 122, 0.15),
+    inset 0 0 14px -10px rgba(212, 175, 106, 0.18);
+}
+
+@media (hover: hover) {
+  .dark .archive-card-grid:hover {
+    border-color: rgba(228, 195, 122, 0.46);
+    box-shadow:
+      0 0 0 1px rgba(228, 195, 122, 0.2),
+      0 1px 0 rgba(245, 219, 156, 0.13) inset,
+      0 0 20px -5px rgba(212, 175, 106, 0.24),
+      0 16px 32px -15px rgba(0, 0, 0, 0.68);
+  }
+
+  .dark .archive-card-list:hover {
+    border-color: rgba(228, 195, 122, 0.44);
+    box-shadow:
+      0 0 0 1px rgba(228, 195, 122, 0.18),
+      0 1px 0 rgba(245, 219, 156, 0.11) inset,
+      0 0 18px -5px rgba(212, 175, 106, 0.2),
+      0 10px 22px -12px rgba(0, 0, 0, 0.56);
+  }
+
+  .dark .archive-card-surface:hover::after {
+    box-shadow:
+      inset 0 0 0 1px rgba(240, 212, 146, 0.18),
+      inset 0 0 16px -10px rgba(212, 175, 106, 0.2);
+  }
+
+  .dark .gallery-card-masterpiece:hover,
+  .dark .archive-card-masterpiece:hover {
+    border-color: rgba(228, 195, 122, 0.58);
+    box-shadow:
+      0 0 0 1px rgba(232, 198, 126, 0.25),
+      0 1px 0 rgba(245, 219, 156, 0.15) inset,
+      0 0 22px -5px rgba(212, 175, 106, 0.27),
+      0 16px 32px -14px rgba(0, 0, 0, 0.7);
+  }
+}
+
+/* Favorite ("挚爱") Dark Collection Cards: elevated gilded aura preserving clear visual hierarchy above standard cards */
 .dark .archive-card-favorite {
-  border-color: rgba(212, 175, 106, 0.68);
+  border-color: rgba(212, 175, 106, 0.74);
   background-color: #201C17;
   background-image: linear-gradient(
     180deg,
@@ -426,58 +529,125 @@ html.dark {
 
 .dark .archive-card-favorite::after {
   box-shadow:
-    inset 0 0 0 1px rgba(228, 195, 122, 0.24),
-    inset 0 0 16px -10px rgba(212, 175, 106, 0.2);
+    inset 0 0 0 1px rgba(228, 195, 122, 0.28),
+    inset 0 0 16px -10px rgba(212, 175, 106, 0.24);
 }
 
 .dark .archive-card-favorite-grid {
   box-shadow:
-    0 0 0 1px rgba(212, 175, 106, 0.22),
-    0 1px 0 rgba(245, 219, 156, 0.1) inset,
-    0 0 18px -5px rgba(212, 175, 106, 0.22),
-    0 12px 26px -14px rgba(0, 0, 0, 0.62);
+    0 0 0 1px rgba(212, 175, 106, 0.26),
+    0 1px 0 rgba(245, 219, 156, 0.14) inset,
+    0 0 22px -4px rgba(212, 175, 106, 0.28),
+    0 12px 26px -14px rgba(0, 0, 0, 0.64);
 }
 
 .dark .archive-card-favorite-list {
   box-shadow:
-    0 0 0 1px rgba(212, 175, 106, 0.2),
-    0 1px 0 rgba(245, 219, 156, 0.08) inset,
-    0 0 16px -5px rgba(212, 175, 106, 0.18),
-    0 8px 18px -12px rgba(0, 0, 0, 0.52);
+    0 0 0 1px rgba(212, 175, 106, 0.24),
+    0 1px 0 rgba(245, 219, 156, 0.12) inset,
+    0 0 20px -4px rgba(212, 175, 106, 0.24),
+    0 8px 18px -12px rgba(0, 0, 0, 0.54);
 }
 
 @media (hover: hover) {
   .dark .archive-card-favorite-grid:hover {
-    border-color: rgba(228, 195, 122, 0.88);
+    border-color: rgba(228, 195, 122, 0.92);
     box-shadow:
-      0 0 0 1px rgba(232, 198, 126, 0.38),
-      0 1px 0 rgba(245, 219, 156, 0.16) inset,
-      0 0 22px -4px rgba(212, 175, 106, 0.3),
-      0 16px 32px -14px rgba(0, 0, 0, 0.7);
+      0 0 0 1px rgba(232, 198, 126, 0.42),
+      0 1px 0 rgba(245, 219, 156, 0.18) inset,
+      0 0 26px -3px rgba(212, 175, 106, 0.36),
+      0 16px 32px -14px rgba(0, 0, 0, 0.72);
   }
 
   .dark .archive-card-favorite-list:hover {
-    border-color: rgba(228, 195, 122, 0.88);
+    border-color: rgba(228, 195, 122, 0.92);
     box-shadow:
-      0 0 0 1px rgba(232, 198, 126, 0.34),
-      0 1px 0 rgba(245, 219, 156, 0.14) inset,
-      0 0 20px -4px rgba(212, 175, 106, 0.26),
-      0 10px 22px -12px rgba(0, 0, 0, 0.6);
+      0 0 0 1px rgba(232, 198, 126, 0.38),
+      0 1px 0 rgba(245, 219, 156, 0.16) inset,
+      0 0 24px -3px rgba(212, 175, 106, 0.32),
+      0 10px 22px -12px rgba(0, 0, 0, 0.62);
   }
 
   .dark .archive-card-favorite:hover::after {
     box-shadow:
-      inset 0 0 0 1px rgba(245, 219, 156, 0.38),
-      inset 0 0 20px -10px rgba(212, 175, 106, 0.28);
+      inset 0 0 0 1px rgba(245, 219, 156, 0.42),
+      inset 0 0 20px -10px rgba(212, 175, 106, 0.32);
   }
+}
+
+/* Dark Mode Sidebar / Detail Drawer Panel: subtle gilded fluorescent edge seam */
+.dark .archive-sidebar-panel {
+  border-top: 1px solid rgba(212, 175, 106, 0.34);
+  box-shadow:
+    0 -1px 0 rgba(212, 175, 106, 0.16),
+    0 -10px 28px -8px rgba(212, 175, 106, 0.22),
+    inset 0 1px 0 rgba(245, 219, 156, 0.15),
+    0 -18px 44px -10px rgba(0, 0, 0, 0.72);
+}
+
+.dark .archive-sidebar-panel::before {
+  content: "";
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  top: 0;
+  height: 1px;
+  pointer-events: none;
+  z-index: 30;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(245, 219, 156, 0.42) 50%,
+    transparent 100%
+  );
+}
+
+@media (min-width: 768px) {
+  .dark .archive-sidebar-panel {
+    border-top: 0;
+    border-left: 1px solid rgba(212, 175, 106, 0.36);
+    box-shadow:
+      -1px 0 0 rgba(212, 175, 106, 0.18),
+      -12px 0 32px -10px rgba(212, 175, 106, 0.24),
+      inset 1px 0 0 rgba(245, 219, 156, 0.14),
+      inset 14px 0 26px -20px rgba(212, 175, 106, 0.18),
+      -24px 0 56px -14px rgba(0, 0, 0, 0.78);
+  }
+
+  .dark .archive-sidebar-panel::before {
+    left: 0;
+    right: auto;
+    top: 4%;
+    bottom: 8%;
+    width: 1px;
+    height: auto;
+    background: linear-gradient(
+      180deg,
+      rgba(245, 219, 156, 0.08) 0%,
+      rgba(245, 219, 156, 0.44) 24%,
+      rgba(212, 175, 106, 0.24) 68%,
+      rgba(212, 175, 106, 0.06) 100%
+    );
+  }
+}
+
+.dark .archive-sidebar-card {
+  border-color: rgba(212, 175, 106, 0.32);
+  box-shadow:
+    0 0 0 1px rgba(212, 175, 106, 0.13),
+    0 1px 0 rgba(245, 219, 156, 0.11) inset,
+    0 0 20px -6px rgba(212, 175, 106, 0.2),
+    0 16px 36px -16px rgba(0, 0, 0, 0.68);
 }
 
 .dark .showcase-card-warm-light {
   background-color: #1B1815;
+  border-color: rgba(212, 175, 106, 0.24);
   box-shadow:
-    0 1px 0 rgba(255, 246, 224, 0.05) inset,
-    0 4px 10px rgba(0, 0, 0, 0.3),
-    0 12px 24px -16px rgba(0, 0, 0, 0.54);
+    0 0 0 1px rgba(212, 175, 106, 0.08),
+    0 1px 0 rgba(245, 219, 156, 0.07) inset,
+    0 0 16px -6px rgba(212, 175, 106, 0.15),
+    0 12px 24px -16px rgba(0, 0, 0, 0.56);
 }
 
 .dark .showcase-card-warm-light::before {
@@ -501,11 +671,12 @@ html.dark {
 
 @media (hover: hover) {
   .dark .showcase-card-warm-light:hover {
-    border-color: rgba(212, 175, 106, 0.5);
+    border-color: rgba(228, 195, 122, 0.48);
     box-shadow:
-      0 1px 0 rgba(255, 246, 224, 0.1) inset,
-      0 8px 20px -10px rgba(0, 0, 0, 0.48),
-      0 18px 36px -18px rgba(188, 142, 66, 0.18);
+      0 0 0 1px rgba(228, 195, 122, 0.18),
+      0 1px 0 rgba(245, 219, 156, 0.12) inset,
+      0 0 22px -5px rgba(212, 175, 106, 0.22),
+      0 18px 36px -18px rgba(0, 0, 0, 0.66);
   }
 }
 
@@ -513,13 +684,14 @@ html.dark {
   box-shadow:
     0 1px 2px rgba(0, 0, 0, 0.34),
     0 6px 16px -8px rgba(0, 0, 0, 0.62),
-    0 0 0 1px rgba(228, 195, 122, 0.12);
+    0 0 0 1px rgba(228, 195, 122, 0.14);
 }
 
 .dark .gallery-paper-mat {
   background: linear-gradient(180deg, #211E1A 0%, #191613 100%);
   box-shadow:
-    0 1px 0 rgba(255, 246, 224, 0.06) inset,
+    0 0 0 1px rgba(212, 175, 106, 0.12),
+    0 1px 0 rgba(245, 219, 156, 0.08) inset,
     0 4px 12px rgba(0, 0, 0, 0.35),
     0 14px 28px -14px rgba(0, 0, 0, 0.6);
 }

@@ -855,7 +855,7 @@ function DetailDrawerShell({
       <motion.div
         data-testid="detail-drawer-panel"
         variants={panelVariants}
-        className="relative flex max-h-[92dvh] w-full max-w-full flex-col overflow-hidden rounded-t-3xl bg-[#F7F5F0] shadow-2xl will-change-transform md:h-full md:max-h-full md:max-w-[600px] md:rounded-none md:border-l md:border-[#DFD9CD] dark:bg-[#141210] dark:md:border-[#322D27]"
+        className="archive-sidebar-panel relative flex max-h-[92dvh] w-full max-w-full flex-col overflow-hidden rounded-t-3xl bg-[#F7F5F0] shadow-2xl will-change-transform md:h-full md:max-h-full md:max-w-[600px] md:rounded-none md:border-l md:border-[#DFD9CD] dark:bg-[#141210]"
       >
         {/* Mobile Drag Handle */}
         <div
