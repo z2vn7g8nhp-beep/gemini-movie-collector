@@ -9,6 +9,7 @@ import {
   UserRound,
 } from 'lucide-react';
 import type { ThemeMode } from '../utils/theme';
+import { BrandLogo } from './BrandLogo';
 import { PWAInstallButton } from './PWAInstallButton';
 
 export type AppTab = 'library' | 'timeline' | 'search' | 'create' | 'profile';
@@ -116,15 +117,14 @@ export function AppTopBar({
         <button
           type="button"
           onClick={() => onSelectTab('library')}
-          className="flex min-w-0 items-center gap-2 font-editorial text-[19px] font-semibold tracking-[0.08em] text-[#1A1816] whitespace-nowrap cursor-pointer dark:text-[#F3EFE6]"
+          aria-label="光影志 · 返回藏馆首页"
+          className="group flex min-w-0 items-center gap-2 font-editorial text-[19px] font-semibold tracking-[0.1em] text-[#1A1816] whitespace-nowrap cursor-pointer dark:text-[#F3EFE6]"
         >
           {activeTab === 'library' && (
-            <span
-              aria-hidden="true"
-              className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-[4px] border border-[#B43B2B]/80 font-editorial text-[10px] font-semibold leading-none text-[#B43B2B] dark:border-[#EB7865]/80 dark:text-[#EB7865]"
-            >
-              影
-            </span>
+            <BrandLogo
+              size={26}
+              className="transition-transform duration-200 group-active:scale-95"
+            />
           )}
           <span className="truncate">{TAB_TITLES[activeTab]}</span>
         </button>
@@ -184,14 +184,13 @@ export function AppTopBar({
         <button
           type="button"
           onClick={() => onSelectTab('library')}
-          className="flex items-center gap-2.5 font-editorial text-[21px] font-semibold tracking-[0.1em] text-[#1A1816] whitespace-nowrap shrink-0 cursor-pointer transition-opacity hover:opacity-80 dark:text-[#F3EFE6]"
+          aria-label="光影志 · 返回藏馆首页"
+          className="group flex items-center gap-2.5 font-editorial text-[20px] font-semibold tracking-[0.12em] text-[#1A1816] whitespace-nowrap shrink-0 cursor-pointer transition-opacity hover:opacity-90 dark:text-[#F3EFE6]"
         >
-          <span
-            aria-hidden="true"
-            className="inline-flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[4px] border border-[#B43B2B]/80 font-editorial text-[11px] font-semibold leading-none text-[#B43B2B] dark:border-[#EB7865]/80 dark:text-[#EB7865]"
-          >
-            影
-          </span>
+          <BrandLogo
+            size={28}
+            className="transition-transform duration-200 ease-out group-hover:scale-[1.04]"
+          />
           <span>光影志</span>
         </button>
 

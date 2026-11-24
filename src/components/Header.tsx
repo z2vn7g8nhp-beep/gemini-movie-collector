@@ -1,4 +1,5 @@
 import type { ArchiveCategory } from '../types/archive';
+import { BrandLogo } from './BrandLogo';
 
 interface HeaderProps {
   activeCategory: 'all' | ArchiveCategory;
@@ -25,9 +26,13 @@ export function Header({
         <button
           type="button"
           onClick={() => onSelectCategory('all')}
-          className="font-editorial text-lg sm:text-xl font-medium tracking-[0.06em] text-[#1A1816] whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#B43B2B] dark:text-[#F3EFE6]"
+          className="group flex items-center gap-2.5 font-editorial text-lg sm:text-xl font-semibold tracking-[0.12em] text-[#1A1816] whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#B43B2B] dark:text-[#F3EFE6]"
         >
-          光影志
+          <BrandLogo
+            size={28}
+            className="transition-transform duration-200 ease-out group-hover:scale-[1.04]"
+          />
+          <span>光影志</span>
         </button>
 
         {/* Zone 2: 4 Clean Single-Line Navigation Links */}
