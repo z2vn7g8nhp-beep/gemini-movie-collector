@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Award,
   BookOpen,
@@ -45,6 +45,7 @@ import { ArchivalImage } from './ArchivalImage';
 interface CollectorSpotlightRailProps {
   items: ArchiveItem[];
   collector: CollectorState;
+  todayKey?: string;
   activeAlbumId: string;
   onCheckInToday: () => Promise<void>;
   onOpenDetail: (item: ArchiveItem) => void;
@@ -71,6 +72,7 @@ const TARGET_PRESETS = [3, 5, 8, 10, 12];
 export function CollectorSpotlightRail({
   items,
   collector,
+  todayKey: propTodayKey,
   activeAlbumId,
   onCheckInToday,
   onOpenDetail,
@@ -94,8 +96,24 @@ export function CollectorSpotlightRail({
   const [albumError, setAlbumError] = useState('');
   const [shuffleOffset, setShuffleOffset] = useState(0);
   const [quoteIdx, setQuoteIdx] = useState(0);
+  const glowRafRef = useRef<number | null>(null);
+  const pendingGlowRef = useRef<{
+    el: HTMLDivElement;
+    x: number;
+    y: number;
+  } | null>(null);
 
-  const todayKey = useMemo(() => formatLocalDateKey(), []);
+  useEffect(() => {
+    return () => {
+      if (glowRafRef.current !== null) {
+        window.cancelAnimationFrame(glowRafRef.current);
+        glowRafRef.current = null;
+      }
+      pendingGlowRef.current = null;
+    };
+  }, []);
+
+  const todayKey = propTodayKey || formatLocalDateKey();
   const showcaseConfig = useMemo(
     () => normalizeShowcaseConfig(collector.showcase),
     [collector.showcase]
@@ -182,14 +200,25 @@ export function CollectorSpotlightRail({
 
   const handleCardPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.pointerType === 'touch') return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const { xPercent, yPercent } = computeWarmGlowAnchor(
-      e.clientX,
-      e.clientY,
-      rect
-    );
-    e.currentTarget.style.setProperty('--glow-x', xPercent);
-    e.currentTarget.style.setProperty('--glow-y', yPercent);
+    pendingGlowRef.current = {
+      el: e.currentTarget,
+      x: e.clientX,
+      y: e.clientY,
+    };
+    if (glowRafRef.current !== null) return;
+    glowRafRef.current = window.requestAnimationFrame(() => {
+      glowRafRef.current = null;
+      const pending = pendingGlowRef.current;
+      if (!pending || !pending.el.isConnected) return;
+      const rect = pending.el.getBoundingClientRect();
+      const { xPercent, yPercent } = computeWarmGlowAnchor(
+        pending.x,
+        pending.y,
+        rect
+      );
+      pending.el.style.setProperty('--glow-x', xPercent);
+      pending.el.style.setProperty('--glow-y', yPercent);
+    });
   };
 
   return (

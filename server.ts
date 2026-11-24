@@ -274,7 +274,7 @@ async function createServer() {
 
   app.put('/api/collection/:id', (req: Request, res: Response) => {
     const { id } = req.params;
-    const patch = req.body as Partial<ServerArchiveItem>;
+    const patch = (req.body ?? {}) as Record<string, unknown>;
     const items = readStoredCollection() ?? [];
     const index = items.findIndex((i) => i.id === id);
     if (index === -1) {
@@ -283,12 +283,30 @@ async function createServer() {
     }
     const updated: ServerArchiveItem = {
       ...items[index],
-      ...patch,
+      ...(patch as Partial<ServerArchiveItem>),
       id,
       updatedAt: new Date().toISOString(),
     };
-    if (patch.coverUrl === '' || patch.coverUrl === null) {
-      delete updated.coverUrl;
+    const clearableFields = [
+      'quote',
+      'coverUrl',
+      'relatedWorkTitle',
+      'portrayedBy',
+      'originalTitle',
+      'subtitle',
+      'year',
+      'region',
+      'sourceUrl',
+    ] as const;
+    for (const field of clearableFields) {
+      if (Object.prototype.hasOwnProperty.call(patch, field)) {
+        const val = patch[field];
+        if (val === null || val === undefined || (typeof val === 'string' && !val.trim())) {
+          delete updated[field];
+        } else if (typeof val === 'string') {
+          updated[field] = val.trim();
+        }
+      }
     }
     const next = [...items];
     next[index] = updated;

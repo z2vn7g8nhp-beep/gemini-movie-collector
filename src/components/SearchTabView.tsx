@@ -24,6 +24,7 @@ interface SearchTabViewProps {
   existingItems: ArchiveItem[];
   initialQuery?: string;
   initialCategory?: ArchiveCategory;
+  initialCategoryTick?: number;
   onConsumeInitialQuery?: () => void;
   onCollectResult: (result: OnlineSearchResult) => Promise<void>;
   onJumpToManual: (prefillTitle: string, category: ArchiveCategory) => void;
@@ -77,6 +78,7 @@ export function SearchTabView({
   existingItems,
   initialQuery = '',
   initialCategory = 'film',
+  initialCategoryTick = 0,
   onConsumeInitialQuery,
   onCollectResult,
   onJumpToManual,
@@ -108,14 +110,31 @@ export function SearchTabView({
   );
 
   const searchVersion = useRef(0);
-  const clearSearch = () => {
+  const activeAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      activeAbortRef.current?.abort();
+      activeAbortRef.current = null;
+    };
+  }, []);
+
+  const clearSearch = (nextCategory: ArchiveCategory = category) => {
     searchVersion.current++;
+    activeAbortRef.current?.abort();
+    activeAbortRef.current = null;
     setLoading(false);
     setResults([]);
     setActiveSources([]);
     setHasSearched(false);
     setError('');
-    saveSearchSession({ category, query: '', results: [], activeSources: [], hasSearched: false });
+    saveSearchSession({
+      category: nextCategory,
+      query: '',
+      results: [],
+      activeSources: [],
+      hasSearched: false,
+    });
   };
 
   const runSearch = async (
@@ -130,6 +149,10 @@ export function SearchTabView({
     }
 
     const version = ++searchVersion.current;
+    activeAbortRef.current?.abort();
+    const controller = new AbortController();
+    activeAbortRef.current = controller;
+
     setLoading(true);
     setError('');
     setHasSearched(true);
@@ -139,8 +162,8 @@ export function SearchTabView({
       return next;
     });
     try {
-      const data = await searchOnline(trimmed, cat, 'imdb');
-      if (version !== searchVersion.current) return;
+      const data = await searchOnline(trimmed, cat, 'imdb', controller.signal);
+      if (version !== searchVersion.current || controller.signal.aborted) return;
       if (data.error) {
         setError(data.error);
         setResults([]);
@@ -156,10 +179,13 @@ export function SearchTabView({
         hasSearched: true,
       });
     } catch {
-      if (version !== searchVersion.current) return;
+      if (version !== searchVersion.current || controller.signal.aborted) return;
       setError('网络连接中断，请检查网络后重试。');
       setResults([]);
     } finally {
+      if (activeAbortRef.current === controller) {
+        activeAbortRef.current = null;
+      }
       if (version === searchVersion.current) setLoading(false);
     }
   };
@@ -170,9 +196,13 @@ export function SearchTabView({
       setQuery(initialQuery.trim());
       void runSearch(initialQuery.trim(), initialCategory);
       onConsumeInitialQuery?.();
+    } else if (initialCategoryTick > 0) {
+      clearSearch(initialCategory);
+      setCategory(initialCategory);
+      setQuery('');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialQuery, initialCategory]);
+  }, [initialQuery, initialCategory, initialCategoryTick]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -227,7 +257,7 @@ export function SearchTabView({
                 type="button"
                 aria-pressed={active}
                 onClick={() => {
-                  if (!active) { clearSearch(); setCategory(cat); }
+                  if (!active) { clearSearch(cat); setCategory(cat); }
                 }}
                 className={`min-h-[44px] rounded-lg text-[15px] font-medium whitespace-nowrap cursor-pointer transition-colors md:min-h-[40px] md:text-sm ${
                   active

@@ -1252,7 +1252,8 @@ async function enrichCharacterNamesBrowser(
 export async function searchOnline(
   query: string,
   category: ArchiveCategory,
-  _source: SearchSourceOption = 'imdb'
+  _source: SearchSourceOption = 'imdb',
+  signal?: AbortSignal
 ): Promise<OnlineSearchResponse> {
   const trimmed = query.trim();
   if (!trimmed) {
@@ -1264,11 +1265,23 @@ export async function searchOnline(
     };
   }
 
+  if (signal?.aborted) {
+    return {
+      results: [],
+      activeSources: [],
+      mode: getRuntimeModeSync(),
+    };
+  }
+
   const isExplicitStatic = detectInitialStaticHint(getInitialSignals());
   const useBackendSearch = !isExplicitStatic && cachedMode !== 'static';
 
   if (useBackendSearch) {
     const controller = new AbortController();
+    const onExternalAbort = () => controller.abort();
+    if (signal) {
+      signal.addEventListener('abort', onExternalAbort, { once: true });
+    }
     const timer = window.setTimeout(() => controller.abort(), 12500);
     try {
       const res = await fetch(
@@ -1307,10 +1320,28 @@ export async function searchOnline(
         cachedMode = 'static';
       }
     } catch {
+      if (signal?.aborted) {
+        return {
+          results: [],
+          activeSources: [],
+          mode: getRuntimeModeSync(),
+        };
+      }
       // Transient backend timeout or pure static fallback -> continue to browser-direct
     } finally {
       window.clearTimeout(timer);
+      if (signal) {
+        signal.removeEventListener('abort', onExternalAbort);
+      }
     }
+  }
+
+  if (signal?.aborted) {
+    return {
+      results: [],
+      activeSources: [],
+      mode: getRuntimeModeSync(),
+    };
   }
 
   const mode = await detectRuntimeMode();
@@ -1353,12 +1384,20 @@ export async function searchOnline(
         doubanOptions: doubanOpts,
         enableDoubanAssist: true,
       }),
-      searchBaikeCharacterBrowser(trimmed),
-      searchBangumiCharactersStrictBrowser(trimmed),
-      searchBangumiSubjectCharactersBrowser([trimmed]),
-      searchTvmazeCharactersBrowser([trimmed]),
-      searchMoegirlBrowser(trimmed, 'character'),
+      searchBaikeCharacterBrowser(trimmed, signal),
+      searchBangumiCharactersStrictBrowser(trimmed, signal),
+      searchBangumiSubjectCharactersBrowser([trimmed], undefined, signal),
+      searchTvmazeCharactersBrowser([trimmed], { signal }),
+      searchMoegirlBrowser(trimmed, 'character', signal),
     ]);
+
+  if (signal?.aborted) {
+    return {
+      results: [],
+      activeSources: [],
+      mode,
+    };
+  }
 
   const rawChars: OnlineSearchResult[] = [];
   const activeSources: string[] = [];
@@ -1390,7 +1429,7 @@ export async function searchOnline(
     rawChars.push(...moegirlOut.value);
   }
 
-  const enriched = await enrichCharacterNamesBrowser(rawChars);
+  const enriched = await enrichCharacterNamesBrowser(rawChars, signal);
   const merged = mergeBilingualResults(deduplicateSearchResults(enriched));
   const ranked = rankCharacterResults(merged, trimmed);
 

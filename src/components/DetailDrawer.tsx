@@ -230,6 +230,7 @@ function DetailDrawerShell({
     ? extractImdbIdFromUrl(savedItem.sourceUrl) : null;
   const needsProfile = Boolean(imdbId && !hasCjkCharacters(savedItem.summary || ''));
   useEffect(() => {
+    setResolvedFilm(null);
     if (!imdbId || !needsProfile) return;
     let active = true;
     searchOnline(imdbId, 'film').then(({ results }) => {
@@ -237,7 +238,7 @@ function DetailDrawerShell({
       if (active && match) setResolvedFilm(match);
     }).catch(() => {});
     return () => { active = false; };
-  }, [imdbId, needsProfile]);
+  }, [savedItem.id, imdbId, needsProfile]);
 
   const item = useMemo(() => {
     if (!imdbId || !needsProfile || resolvedFilm?.externalId !== 'imdb-' + imdbId) return savedItem;
@@ -247,13 +248,14 @@ function DetailDrawerShell({
       originalTitle: savedItem.originalTitle || (rename ? savedItem.title : undefined),
       summary: resolvedFilm.summary, summaryRevision: resolvedFilm.summaryRevision };
   }, [savedItem, imdbId, needsProfile, resolvedFilm]);
-  const [rating, setRating] = useState(0);
-  const [status, setStatus] = useState<CollectionStatus>('watched');
-  const [quote, setQuote] = useState('');
-  const [notes, setNotes] = useState('');
-  const [relatedWorkTitle, setRelatedWorkTitle] = useState('');
-  const [portrayedBy, setPortrayedBy] = useState('');
-  const [coverUrlInput, setCoverUrlInput] = useState('');
+  const [syncedItemId, setSyncedItemId] = useState(item.id);
+  const [rating, setRating] = useState(item.rating);
+  const [status, setStatus] = useState<CollectionStatus>(item.status);
+  const [quote, setQuote] = useState(item.quote || '');
+  const [notes, setNotes] = useState(item.notes || '');
+  const [relatedWorkTitle, setRelatedWorkTitle] = useState(item.relatedWorkTitle || '');
+  const [portrayedBy, setPortrayedBy] = useState(item.portrayedBy || '');
+  const [coverUrlInput, setCoverUrlInput] = useState(item.coverUrl || '');
   const [selectedLinkId, setSelectedLinkId] = useState('');
   const [saving, setSaving] = useState(false);
   const [savedFeedback, setSavedFeedback] = useState('');
@@ -261,26 +263,28 @@ function DetailDrawerShell({
   const [coverPickerOpen, setCoverPickerOpen] = useState(false);
   const [posterLightboxOpen, setPosterLightboxOpen] = useState(false);
   const [hoverRating, setHoverRating] = useState<number | null>(null);
-  const [quickBusy, setQuickBusy] = useState(false);
   const [summaryExpanded, setSummaryExpanded] = useState(false);
   const [activeSection, setActiveSection] = useState<DossierSectionId>('overview');
-  const [readingProgress, setReadingProgress] = useState(0);
+  const activeSectionRef = useRef<DossierSectionId>('overview');
+  activeSectionRef.current = activeSection;
 
   // Structured Character Dossier fields (only used when item.category === 'character')
-  const [charAlias, setCharAlias] = useState('');
-  const [charIdentity, setCharIdentity] = useState('');
-  const [charAffiliation, setCharAffiliation] = useState('');
-  const [charOrigin, setCharOrigin] = useState('');
-  const [charAbilities, setCharAbilities] = useState('');
-  const [charFirstAppearance, setCharFirstAppearance] = useState('');
-  const [charCreator, setCharCreator] = useState('');
-  const [charHighlights, setCharHighlights] = useState('');
-  const [charBio, setCharBio] = useState('');
+  const [charAlias, setCharAlias] = useState(item.characterProfile?.alias || '');
+  const [charIdentity, setCharIdentity] = useState(item.characterProfile?.identity || '');
+  const [charAffiliation, setCharAffiliation] = useState(item.characterProfile?.affiliation || '');
+  const [charOrigin, setCharOrigin] = useState(item.characterProfile?.origin || '');
+  const [charAbilities, setCharAbilities] = useState(item.characterProfile?.abilities || '');
+  const [charFirstAppearance, setCharFirstAppearance] = useState(item.characterProfile?.firstAppearance || '');
+  const [charCreator, setCharCreator] = useState(item.characterProfile?.creator || '');
+  const [charHighlights, setCharHighlights] = useState(item.characterProfile?.highlights || '');
+  const [charBio, setCharBio] = useState(item.characterProfile?.bio || item.summary || '');
   const [dossierLoading, setDossierLoading] = useState(false);
   const [dossierError, setDossierError] = useState('');
   const [dossierReloadTick, setDossierReloadTick] = useState(0);
   const [editTab, setEditTab] = useState<'notes' | 'dossier'>('notes');
   const bodyScrollRef = useRef<HTMLDivElement | null>(null);
+  const progressBarRef = useRef<HTMLDivElement | null>(null);
+  const scrollRafRef = useRef<number | null>(null);
   const relationsSectionRef = useRef<HTMLDivElement | null>(null);
   const editFormRef = useRef<HTMLFormElement | null>(null);
   const graphSectionRef = useRef<HTMLDivElement | null>(null);
@@ -315,6 +319,7 @@ function DetailDrawerShell({
 
   useEffect(() => {
     if (!item) return;
+    setSyncedItemId(item.id);
     setRating(item.rating);
     setStatus(item.status);
     setQuote(item.quote || '');
@@ -338,9 +343,19 @@ function DetailDrawerShell({
     setHoverRating(null);
     setSummaryExpanded(false);
     setActiveSection('overview');
-    setReadingProgress(0);
+    if (progressBarRef.current) {
+      progressBarRef.current.style.width = '0%';
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item?.id]);
+
+  useEffect(() => {
+    return () => {
+      if (scrollRafRef.current !== null) {
+        window.cancelAnimationFrame(scrollRafRef.current);
+      }
+    };
+  }, []);
 
   // Keep hero quick controls synced if item rating/status updates externally
   useEffect(() => {
@@ -569,13 +584,27 @@ function DetailDrawerShell({
     handleNextItem,
   ]);
 
-  const relatedItems = allItems.filter(
-    (other) => other.id !== item.id && isExplicitlyLinked(item, other)
+  const relatedItems = useMemo(
+    () =>
+      allItems.filter(
+        (other) => other.id !== item.id && isExplicitlyLinked(item, other)
+      ),
+    [allItems, item]
   );
-  const relatedIdSet = new Set(relatedItems.map((r) => r.id));
-  const smartRecommendations = findRecommendedUnlinkedItems(item, allItems, 5);
-  const linkableCandidates = allItems.filter(
-    (other) => other.id !== item.id && !relatedIdSet.has(other.id)
+  const relatedIdSet = useMemo(
+    () => new Set(relatedItems.map((r) => r.id)),
+    [relatedItems]
+  );
+  const smartRecommendations = useMemo(
+    () => findRecommendedUnlinkedItems(item, allItems, 5),
+    [item, allItems]
+  );
+  const linkableCandidates = useMemo(
+    () =>
+      allItems.filter(
+        (other) => other.id !== item.id && !relatedIdSet.has(other.id)
+      ),
+    [allItems, item.id, relatedIdSet]
   );
 
   // Configure two contextual online relation tabs depending on item category
@@ -601,15 +630,19 @@ function DetailDrawerShell({
   const totalOnlineCount = primaryList.length + secondaryList.length;
 
   const filterNorm = relationsFilter.trim().toLowerCase();
-  const filteredOnlineList = filterNorm
-    ? visibleOnlineList.filter((cand) =>
-        [cand.title, cand.originalTitle, cand.subtitle, cand.portrayedBy]
-          .filter(Boolean)
-          .join(' ')
-          .toLowerCase()
-          .includes(filterNorm)
-      )
-    : visibleOnlineList;
+  const filteredOnlineList = useMemo(
+    () =>
+      filterNorm
+        ? visibleOnlineList.filter((cand) =>
+            [cand.title, cand.originalTitle, cand.subtitle, cand.portrayedBy]
+              .filter(Boolean)
+              .join(' ')
+              .toLowerCase()
+              .includes(filterNorm)
+          )
+        : visibleOnlineList,
+    [visibleOnlineList, filterNorm]
+  );
   const displayedOnlineList =
     relationsExpanded || filterNorm
       ? filteredOnlineList
@@ -617,7 +650,7 @@ function DetailDrawerShell({
 
   const imdbTitleId = item.category === 'film' ? extractImdbIdFromUrl(item.sourceUrl) : null;
   const isCharacter = item.category === 'character';
-  const completeness = computeItemCompleteness(item);
+  const completeness = useMemo(() => computeItemCompleteness(item), [item]);
   const charTitleParts = isCharacter
     ? splitCharacterTitle(item.title)
     : { primaryName: item.title, secondaryAlias: undefined };
@@ -671,55 +704,53 @@ function DetailDrawerShell({
   };
 
   const handleBodyScroll = useCallback(() => {
-    const el = bodyScrollRef.current;
-    if (!el) return;
-    const progress = computeReadingProgress(
-      el.scrollTop,
-      el.scrollHeight,
-      el.clientHeight
-    );
-    setReadingProgress(progress);
+    if (scrollRafRef.current !== null) return;
+    scrollRafRef.current = window.requestAnimationFrame(() => {
+      scrollRafRef.current = null;
+      const el = bodyScrollRef.current;
+      if (!el) return;
+      const progress = computeReadingProgress(
+        el.scrollTop,
+        el.scrollHeight,
+        el.clientHeight
+      );
+      if (progressBarRef.current) {
+        progressBarRef.current.style.width = `${progress}%`;
+      }
 
-    const containerTop = el.getBoundingClientRect().top;
-    const getOffset = (node: HTMLElement | null) =>
-      node ? node.getBoundingClientRect().top - containerTop + el.scrollTop : undefined;
+      const containerTop = el.getBoundingClientRect().top;
+      const getOffset = (node: HTMLElement | null) =>
+        node ? node.getBoundingClientRect().top - containerTop + el.scrollTop : undefined;
 
-    const nextActive = computeActiveDossierSection(
-      el.scrollTop,
-      {
-        overview: 0,
-        relations: getOffset(relationsSectionRef.current),
-        notes: getOffset(editFormRef.current),
-        graph: getOffset(graphSectionRef.current),
-      },
-      Math.max(0, el.scrollHeight - el.clientHeight)
-    );
-    setActiveSection(nextActive);
+      const nextActive = computeActiveDossierSection(
+        el.scrollTop,
+        {
+          overview: 0,
+          relations: getOffset(relationsSectionRef.current),
+          notes: getOffset(editFormRef.current),
+          graph: getOffset(graphSectionRef.current),
+        },
+        Math.max(0, el.scrollHeight - el.clientHeight)
+      );
+      if (nextActive !== activeSectionRef.current) {
+        activeSectionRef.current = nextActive;
+        setActiveSection(nextActive);
+      }
+    });
   }, []);
 
-  const handleQuickRating = async (starVal: number) => {
-    if (quickBusy) return;
-    const nextRating = item.rating === starVal ? 0 : starVal;
+  const handleQuickRating = (starVal: number) => {
+    const nextRating = rating === starVal ? 0 : starVal;
     setRating(nextRating);
-    setQuickBusy(true);
-    try {
-      await onUpdateItem(item.id, { rating: nextRating });
-      setSavedFeedback(nextRating > 0 ? `已评 ${nextRating}.0 星` : '已清除评分');
-    } finally {
-      setQuickBusy(false);
-    }
+    setSavedFeedback(nextRating > 0 ? `已评 ${nextRating}.0 星` : '已清除评分');
+    void onUpdateItem(item.id, { rating: nextRating });
   };
 
-  const handleQuickStatus = async (nextStatus: CollectionStatus) => {
-    if (quickBusy || nextStatus === item.status) return;
+  const handleQuickStatus = (nextStatus: CollectionStatus) => {
+    if (nextStatus === status) return;
     setStatus(nextStatus);
-    setQuickBusy(true);
-    try {
-      await onUpdateItem(item.id, { status: nextStatus });
-      setSavedFeedback(`状态已更新为「${getStatusLabel(nextStatus, item.category)}」`);
-    } finally {
-      setQuickBusy(false);
-    }
+    setSavedFeedback(`状态已更新为「${getStatusLabel(nextStatus, item.category)}」`);
+    void onUpdateItem(item.id, { status: nextStatus });
   };
 
   const accessionMetadataRows = useMemo(
@@ -728,6 +759,7 @@ function DetailDrawerShell({
   );
 
   const isDirty = (() => {
+    if (syncedItemId !== item.id) return false;
     if (rating !== item.rating) return true;
     if (status !== item.status) return true;
     if (quote.trim() !== (item.quote || '').trim()) return true;
@@ -1006,9 +1038,10 @@ function DetailDrawerShell({
           })}
           {/* Razor-Thin Reading Progress Hairline */}
           <div
+            ref={progressBarRef}
             aria-hidden="true"
-            className="pointer-events-none absolute bottom-0 left-0 h-[1.5px] bg-[#B43B2B]/55 transition-[width] duration-150 ease-out dark:bg-[#E4C37A]/60"
-            style={{ width: `${readingProgress}%` }}
+            className="pointer-events-none absolute bottom-0 left-0 h-[1.5px] bg-[#B43B2B]/55 transition-[width] duration-100 ease-out dark:bg-[#E4C37A]/60"
+            style={{ width: '0%' }}
           />
         </nav>
 
@@ -1024,7 +1057,10 @@ function DetailDrawerShell({
             custom={switchDirection}
             onExitComplete={() => {
               bodyScrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
-              setReadingProgress(0);
+              if (progressBarRef.current) {
+                progressBarRef.current.style.width = '0%';
+              }
+              activeSectionRef.current = 'overview';
               setActiveSection('overview');
             }}
           >
@@ -1226,7 +1262,6 @@ function DetailDrawerShell({
                           <button
                             key={starVal}
                             type="button"
-                            disabled={quickBusy}
                             data-testid={`hero-star-${starVal}`}
                             onMouseEnter={() => setHoverRating(starVal)}
                             onClick={() => void handleQuickRating(starVal)}
@@ -1274,7 +1309,6 @@ function DetailDrawerShell({
                           <button
                             key={st}
                             type="button"
-                            disabled={quickBusy}
                             data-testid={`hero-status-${st}`}
                             aria-pressed={active}
                             onClick={() => void handleQuickStatus(st)}

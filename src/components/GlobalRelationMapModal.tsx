@@ -48,6 +48,11 @@ import {
   type GraphNodeFocusState,
   type NodeIntensityTier,
 } from '../utils/globalGraph';
+import {
+  computeZoomPanAroundPoint,
+  pushGraphHistory,
+  type GraphHistoryState,
+} from '../utils/interactionHelpers';
 import { readCachedRelations } from '../utils/relationsCache';
 import { GlobalGraphInspector } from './GlobalGraphInspector';
 
@@ -93,8 +98,12 @@ export function GlobalRelationMapModal({
   const [isolatedOnly, setIsolatedOnly] = useState(false);
 
   const [focusedId, setFocusedId] = useState<string | null>(null);
-  const [history, setHistory] = useState<string[]>([]);
-  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [historyState, setHistoryState] = useState<GraphHistoryState>({
+    entries: [],
+    index: -1,
+  });
+  const history = historyState.entries;
+  const historyIndex = historyState.index;
 
   const [pathPicking, setPathPicking] = useState(false);
   const [pathTargetId, setPathTargetId] = useState<string | null>(null);
@@ -112,6 +121,15 @@ export function GlobalRelationMapModal({
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
 
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const cameraGroupRef = useRef<SVGGElement | null>(null);
+  const scaleRef = useRef(scale);
+  scaleRef.current = scale;
+  const panRef = useRef(pan);
+  panRef.current = pan;
+  const dragRafRef = useRef<number | null>(null);
+  const searchBlurTimerRef = useRef<number | null>(null);
+
   const dragRef = useRef<{
     active: boolean;
     moved: boolean;
@@ -119,7 +137,18 @@ export function GlobalRelationMapModal({
     startY: number;
     origX: number;
     origY: number;
-  }>({ active: false, moved: false, startX: 0, startY: 0, origX: 0, origY: 0 });
+    currentX: number;
+    currentY: number;
+  }>({
+    active: false,
+    moved: false,
+    startX: 0,
+    startY: 0,
+    origX: 0,
+    origY: 0,
+    currentX: 0,
+    currentY: 0,
+  });
 
   // Automatically enrich filmography connections from local bundled credit shards + cached relations
   useEffect(() => {
@@ -271,25 +300,76 @@ export function GlobalRelationMapModal({
         setPathTargetId(null);
       }
       if (recordHistory) {
-        setHistory((prev) => {
-          const base = prev.slice(0, historyIndex + 1);
-          if (base[base.length - 1] === nodeId) {
-            return base;
+        setHistoryState((prev) => {
+          const next = pushGraphHistory(prev, nodeId);
+          if (next.entries.length > 12) {
+            const overflow = next.entries.length - 12;
+            return {
+              entries: next.entries.slice(overflow),
+              index: Math.max(0, next.index - overflow),
+            };
           }
-          const next = [...base, nodeId].slice(-12);
-          setHistoryIndex(next.length - 1);
           return next;
         });
       }
       if (recenter) {
         const target = nodeById.get(nodeId);
         if (target) {
-          setPan(computeFocusCamera(target, graph, scale));
+          setPan(computeFocusCamera(target, graph, scaleRef.current));
         }
       }
     },
-    [historyIndex, nodeById, graph, scale]
+    [nodeById, graph]
   );
+
+  // Clean up timers and RAF on unmount
+  useEffect(() => {
+    return () => {
+      if (dragRafRef.current !== null) {
+        window.cancelAnimationFrame(dragRafRef.current);
+      }
+      if (searchBlurTimerRef.current !== null) {
+        window.clearTimeout(searchBlurTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Non-passive wheel listener for smooth pointer-anchored zoom without scrolling behind
+  useEffect(() => {
+    if (!open) return;
+    const svg = svgRef.current;
+    if (!svg) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = svg.getBoundingClientRect();
+      const anchorX =
+        rect.width > 0
+          ? ((e.clientX - rect.left) / rect.width) * graph.width
+          : graph.width / 2;
+      const anchorY =
+        rect.height > 0
+          ? ((e.clientY - rect.top) / rect.height) * graph.height
+          : graph.height / 2;
+      const zoomFactor = e.deltaY > 0 ? 0.9 : 1.11;
+      const res = computeZoomPanAroundPoint({
+        currentZoom: scaleRef.current,
+        currentPan: panRef.current,
+        targetZoom: scaleRef.current * zoomFactor,
+        anchorX,
+        anchorY,
+        centerX: graph.width / 2,
+        centerY: graph.height / 2,
+        minZoom: 0.6,
+        maxZoom: 2.4,
+      });
+      scaleRef.current = res.zoom;
+      panRef.current = res.pan;
+      setScale(res.zoom);
+      setPan(res.pan);
+    };
+    svg.addEventListener('wheel', onWheel, { passive: false });
+    return () => svg.removeEventListener('wheel', onWheel);
+  }, [open, graph.width, graph.height, graph.nodes.length]);
 
   // Reset canvas category visibility when modal opens fresh
   useEffect(() => {
@@ -308,8 +388,9 @@ export function GlobalRelationMapModal({
         : graph.hubs[0]?.id ?? graph.nodes[0]?.id ?? null;
 
     setFocusedId(preferredId);
-    setHistory(preferredId ? [preferredId] : []);
-    setHistoryIndex(preferredId ? 0 : -1);
+    setHistoryState(
+      preferredId ? { entries: [preferredId], index: 0 } : { entries: [], index: -1 }
+    );
     setPathPicking(false);
     setPathTargetId(null);
     setSearchQuery('');
@@ -485,16 +566,38 @@ export function GlobalRelationMapModal({
 
   if (!open) return null;
 
+  const scheduleSearchBlurClose = () => {
+    if (searchBlurTimerRef.current !== null) {
+      window.clearTimeout(searchBlurTimerRef.current);
+    }
+    searchBlurTimerRef.current = window.setTimeout(() => {
+      searchBlurTimerRef.current = null;
+      setSearchOpen(false);
+    }, 160);
+  };
+
+  const handleSearchFocus = () => {
+    if (searchBlurTimerRef.current !== null) {
+      window.clearTimeout(searchBlurTimerRef.current);
+      searchBlurTimerRef.current = null;
+    }
+    setSearchOpen(true);
+  };
+
   const handlePointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
     if ((e.target as HTMLElement).closest('g[data-node-id]')) return;
+    e.preventDefault();
     setIsDragging(true);
     dragRef.current = {
       active: true,
       moved: false,
       startX: e.clientX,
       startY: e.clientY,
-      origX: pan.x,
-      origY: pan.y,
+      origX: panRef.current.x,
+      origY: panRef.current.y,
+      currentX: panRef.current.x,
+      currentY: panRef.current.y,
     };
     e.currentTarget.setPointerCapture(e.pointerId);
   };
@@ -506,12 +609,28 @@ export function GlobalRelationMapModal({
     if (Math.hypot(dx, dy) > 5) {
       dragRef.current.moved = true;
     }
-    const maxPanX = Math.max(320, Math.round(graph.width * 0.55 * scale));
-    const maxPanY = Math.max(260, Math.round(graph.height * 0.55 * scale));
-    setPan({
-      x: Math.max(-maxPanX, Math.min(maxPanX, dragRef.current.origX + dx)),
-      y: Math.max(-maxPanY, Math.min(maxPanY, dragRef.current.origY + dy)),
-    });
+    const maxPanX = Math.max(320, Math.round(graph.width * 0.55 * scaleRef.current));
+    const maxPanY = Math.max(260, Math.round(graph.height * 0.55 * scaleRef.current));
+    const nextX = Math.max(-maxPanX, Math.min(maxPanX, dragRef.current.origX + dx));
+    const nextY = Math.max(-maxPanY, Math.min(maxPanY, dragRef.current.origY + dy));
+    dragRef.current.currentX = nextX;
+    dragRef.current.currentY = nextY;
+
+    if (dragRafRef.current === null) {
+      dragRafRef.current = window.requestAnimationFrame(() => {
+        dragRafRef.current = null;
+        if (cameraGroupRef.current) {
+          cameraGroupRef.current.setAttribute(
+            'transform',
+            `translate(${graph.width / 2 + dragRef.current.currentX}, ${
+              graph.height / 2 + dragRef.current.currentY
+            }) scale(${scaleRef.current}) translate(${-graph.width / 2}, ${
+              -graph.height / 2
+            })`
+          );
+        }
+      });
+    }
   };
 
   const handleSelectTopCategory = (catId: 'all' | ArchiveCategory) => {
@@ -537,23 +656,31 @@ export function GlobalRelationMapModal({
   };
 
   const handlePointerUp = () => {
-    if (dragRef.current.active && !dragRef.current.moved) {
-      if (pathPicking) {
-        setPathPicking(false);
-      } else if (effectivePathTargetId) {
-        setPathTargetId(null);
-      } else if (effectiveFocusedId) {
-        setFocusedId(null);
+    if (dragRafRef.current !== null) {
+      window.cancelAnimationFrame(dragRafRef.current);
+      dragRafRef.current = null;
+    }
+    if (dragRef.current.active) {
+      if (dragRef.current.moved) {
+        const committed = {
+          x: dragRef.current.currentX,
+          y: dragRef.current.currentY,
+        };
+        panRef.current = committed;
+        setPan(committed);
+      } else {
+        if (pathPicking) {
+          setPathPicking(false);
+        } else if (effectivePathTargetId) {
+          setPathTargetId(null);
+        } else if (effectiveFocusedId) {
+          setFocusedId(null);
+        }
       }
     }
     dragRef.current.active = false;
     dragRef.current.moved = false;
     setIsDragging(false);
-  };
-
-  const handleWheelZoom = (e: React.WheelEvent<SVGSVGElement>) => {
-    const delta = e.deltaY > 0 ? -0.15 : 0.15;
-    setScale((s) => Math.max(0.6, Math.min(2.4, +(s + delta).toFixed(2))));
   };
 
   const handleResetView = () => {
@@ -575,7 +702,7 @@ export function GlobalRelationMapModal({
     if (nextIdx < 0 || nextIdx >= history.length) return;
     const targetId = history[nextIdx];
     if (!nodeById.has(targetId)) return;
-    setHistoryIndex(nextIdx);
+    setHistoryState((prev) => ({ ...prev, index: nextIdx }));
     setFocusedId(targetId);
     setPathPicking(false);
     setPathTargetId(null);
@@ -687,8 +814,8 @@ export function GlobalRelationMapModal({
                   id="global-graph-search-desktop"
                   type="search"
                   value={searchQuery}
-                  onFocus={() => setSearchOpen(true)}
-                  onBlur={() => setTimeout(() => setSearchOpen(false), 160)}
+                  onFocus={handleSearchFocus}
+                  onBlur={scheduleSearchBlurClose}
                   onChange={(e) => {
                     setSearchQuery(e.target.value);
                     setSearchOpen(true);
@@ -866,8 +993,8 @@ export function GlobalRelationMapModal({
                 id="global-graph-search-mobile"
                 type="search"
                 value={searchQuery}
-                onFocus={() => setSearchOpen(true)}
-                onBlur={() => setTimeout(() => setSearchOpen(false), 160)}
+                onFocus={handleSearchFocus}
+                onBlur={scheduleSearchBlurClose}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);
                   setSearchOpen(true);
@@ -1020,7 +1147,7 @@ export function GlobalRelationMapModal({
                       <button
                         type="button"
                         onClick={() => {
-                          setHistoryIndex(entry.index);
+                          setHistoryState((prev) => ({ ...prev, index: entry.index }));
                           setFocusedId(entry.id);
                           setPathPicking(false);
                           setPathTargetId(null);
@@ -1088,13 +1215,13 @@ export function GlobalRelationMapModal({
             </div>
           ) : (
             <svg
+              ref={svgRef}
               viewBox={`0 0 ${graph.width} ${graph.height}`}
               data-testid="global-graph-svg"
               onPointerDown={handlePointerDown}
               onPointerMove={handlePointerMove}
               onPointerUp={handlePointerUp}
               onPointerCancel={handlePointerUp}
-              onWheel={handleWheelZoom}
               className="h-full w-full touch-none select-none cursor-grab active:cursor-grabbing"
               aria-label="全局光影关系星图画布"
             >
@@ -1110,6 +1237,7 @@ export function GlobalRelationMapModal({
               </defs>
 
               <g
+                ref={cameraGroupRef}
                 transform={`translate(${graph.width / 2 + pan.x}, ${
                   graph.height / 2 + pan.y
                 }) scale(${scale}) translate(${-graph.width / 2}, ${
@@ -1118,7 +1246,7 @@ export function GlobalRelationMapModal({
                 style={{
                   transition: isDragging
                     ? 'none'
-                    : 'transform 260ms cubic-bezier(0.16, 1, 0.3, 1)',
+                    : 'transform 220ms cubic-bezier(0.16, 1, 0.3, 1)',
                 }}
               >
                 {/* Decorative Subtle Orbit Rings */}

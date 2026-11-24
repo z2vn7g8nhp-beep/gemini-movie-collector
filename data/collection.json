@@ -1,4 +1,29 @@
 {
-  "updatedAt": "2026-11-23T08:55:00.644Z",
-  "items": []
+  "updatedAt": "2026-11-24T03:41:44.607Z",
+  "items": [
+    {
+      "id": "arc-1795489202484-z8t1s",
+      "accessionNo": "CA-001",
+      "category": "film",
+      "title": "雷神",
+      "originalTitle": "Thor",
+      "subtitle": "电影 · IMDb 7.0 · 导演 Kenneth Branagh",
+      "year": "2011",
+      "region": "美国 / 法国",
+      "coverUrl": "/api/img-proxy?url=https%3A%2F%2Fimages.metahub.space%2Fposter%2Fmedium%2Ftt0800369%2Fimg",
+      "summary": "The powerful but arrogant god Thor is cast out of Asgard to live amongst humans in Midgard (Earth), where he soon becomes one of their finest defenders. · 奖项：5 wins & 30 nominations total",
+      "notes": "",
+      "rating": 0,
+      "status": "watchlist",
+      "tags": [
+        "动作",
+        "奇幻"
+      ],
+      "relatedIds": [],
+      "sourceName": "IMDb",
+      "sourceUrl": "https://www.imdb.com/title/tt0800369/",
+      "createdAt": "2026-11-24T03:00:02.484Z",
+      "updatedAt": "2026-11-24T03:41:44.607Z"
+    }
+  ]
 }

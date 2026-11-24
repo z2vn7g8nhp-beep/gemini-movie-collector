@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Bookmark, Check, CheckCircle2, Eye, Heart, X } from 'lucide-react';
 import type { ArchiveItem, CollectionStatus } from '../types/archive';
 import { CATEGORY_LABELS } from '../utils/archive';
@@ -51,18 +51,30 @@ export function QuickStatusPopover({
   const mountedAtRef = useRef<number>(Date.now());
   const options = getQuickStatusOptions(item.category);
 
-  const viewportWidth =
-    typeof window !== 'undefined' ? window.innerWidth : 1280;
-  const viewportHeight =
-    typeof window !== 'undefined' ? window.innerHeight : 800;
-  const isCompactMobile = viewportWidth < 640;
+  const [viewport, setViewport] = useState(() => ({
+    width: typeof window !== 'undefined' ? window.innerWidth : 1280,
+    height: typeof window !== 'undefined' ? window.innerHeight : 800,
+  }));
+
+  const isCompactMobile = viewport.width < 640;
 
   const desktopCoords = computeQuickMenuPosition(
     anchor,
     { width: MENU_WIDTH, height: MENU_ESTIMATED_HEIGHT },
-    { width: viewportWidth, height: viewportHeight },
+    viewport,
     14
   );
+
+  useEffect(() => {
+    const handleResize = () => {
+      setViewport({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     mountedAtRef.current = Date.now();
@@ -70,6 +82,38 @@ export function QuickStatusPopover({
       if (e.key === 'Escape') {
         e.preventDefault();
         onClose();
+        return;
+      }
+      if (
+        e.key === 'ArrowDown' ||
+        e.key === 'ArrowUp' ||
+        e.key === 'Home' ||
+        e.key === 'End'
+      ) {
+        const buttons = Array.from(
+          menuRef.current?.querySelectorAll<HTMLButtonElement>(
+            '[role="menuitemradio"]'
+          ) ?? []
+        );
+        if (buttons.length === 0) return;
+        e.preventDefault();
+        const activeIdx = buttons.findIndex(
+          (btn) => btn === document.activeElement
+        );
+        if (e.key === 'Home') {
+          buttons[0].focus({ preventScroll: true });
+        } else if (e.key === 'End') {
+          buttons[buttons.length - 1].focus({ preventScroll: true });
+        } else if (e.key === 'ArrowDown') {
+          const next = activeIdx >= 0 ? (activeIdx + 1) % buttons.length : 0;
+          buttons[next].focus({ preventScroll: true });
+        } else if (e.key === 'ArrowUp') {
+          const prev =
+            activeIdx >= 0
+              ? (activeIdx - 1 + buttons.length) % buttons.length
+              : buttons.length - 1;
+          buttons[prev].focus({ preventScroll: true });
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);

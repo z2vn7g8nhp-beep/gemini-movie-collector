@@ -1,13 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowUpRight, Check, Heart, Layers, Star } from 'lucide-react';
 import type { ArchiveCategory, ArchiveItem, CollectionStatus } from '../types/archive';
 import {
   CATEGORY_LABELS,
   formatRelatedSummary,
-  getRelatedItems,
   getStatusLabel,
 } from '../utils/archive';
 import { computeItemCompleteness } from '../utils/collector';
+import { buildRelationLookupMap } from '../utils/interactionHelpers';
 import {
   LONG_PRESS_DURATION_MS,
   isPointerDragExceeded,
@@ -59,6 +59,7 @@ const EXHIBITION_PLATES: Array<{
 interface ArchiveGridProps {
   items: ArchiveItem[];
   allItems: ArchiveItem[];
+  loading?: boolean;
   searchQuery: string;
   activeTag?: string;
   activeAlbumName?: string;
@@ -84,6 +85,7 @@ interface QuickMenuState {
 export function ArchiveGrid({
   items,
   allItems,
+  loading = false,
   searchQuery,
   activeTag = '',
   activeAlbumName = '',
@@ -100,12 +102,17 @@ export function ArchiveGrid({
   onJumpToCreate,
   onResetFilters,
 }: ArchiveGridProps) {
-  const selectedIdSet = new Set(selectedIds);
+  const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const relationLookupMap = useMemo(
+    () => buildRelationLookupMap(allItems),
+    [allItems]
+  );
   const [quickMenu, setQuickMenu] = useState<QuickMenuState | null>(null);
   const [pressingItemId, setPressingItemId] = useState<string | null>(null);
 
   const cardButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const longPressTimerRef = useRef<number | null>(null);
+  const pressFeedbackTimerRef = useRef<number | null>(null);
   const suppressClearTimerRef = useRef<number | null>(null);
   const suppressClickItemIdRef = useRef<string | null>(null);
   const pressStartRef = useRef<{
@@ -147,8 +154,12 @@ export function ArchiveGrid({
       window.clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
+    if (pressFeedbackTimerRef.current !== null) {
+      window.clearTimeout(pressFeedbackTimerRef.current);
+      pressFeedbackTimerRef.current = null;
+    }
     pressStartRef.current = null;
-    setPressingItemId(null);
+    setPressingItemId((prev) => (prev === null ? null : null));
   }, []);
 
   useEffect(() => {
@@ -162,6 +173,9 @@ export function ArchiveGrid({
     return () => {
       if (longPressTimerRef.current !== null) {
         window.clearTimeout(longPressTimerRef.current);
+      }
+      if (pressFeedbackTimerRef.current !== null) {
+        window.clearTimeout(pressFeedbackTimerRef.current);
       }
       if (suppressClearTimerRef.current !== null) {
         window.clearTimeout(suppressClearTimerRef.current);
@@ -194,10 +208,21 @@ export function ArchiveGrid({
         x: startX,
         y: startY,
       };
-      setPressingItemId(item.id);
+
+      // Delay visual press-hold ring slightly so ordinary taps/clicks never trigger a full grid re-render
+      pressFeedbackTimerRef.current = window.setTimeout(() => {
+        pressFeedbackTimerRef.current = null;
+        if (pressStartRef.current?.itemId === item.id) {
+          setPressingItemId(item.id);
+        }
+      }, 140);
 
       longPressTimerRef.current = window.setTimeout(() => {
         longPressTimerRef.current = null;
+        if (pressFeedbackTimerRef.current !== null) {
+          window.clearTimeout(pressFeedbackTimerRef.current);
+          pressFeedbackTimerRef.current = null;
+        }
         pressStartRef.current = null;
         setPressingItemId(null);
         suppressClickItemIdRef.current = item.id;
@@ -280,6 +305,33 @@ export function ArchiveGrid({
       allItems.find((i) => i.id === quickMenu.itemId) ??
       null
     : null;
+
+  if (loading && allItems.length === 0) {
+    return (
+      <section
+        aria-label="正在载入馆藏"
+        aria-busy="true"
+        data-testid="archive-grid-skeleton"
+        className="mx-auto max-w-[1180px] px-4 pt-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] min-[420px]:px-5 md:px-8 md:pb-16"
+      >
+        <div className="grid grid-cols-2 gap-3.5 min-[420px]:gap-4 sm:grid-cols-3 sm:gap-5 lg:grid-cols-4 lg:gap-6">
+          {[0, 1, 2, 3].map((idx) => (
+            <div
+              key={idx}
+              className="animate-pulse overflow-hidden rounded-[14px] border border-[#E6E0D4] bg-[#FFFDF9] p-1.5 dark:border-[#2E2924] dark:bg-[#1B1815]"
+            >
+              <div className="aspect-[3/4] w-full rounded-[9px] bg-[#ECE6DB] dark:bg-[#26221D]" />
+              <div className="space-y-2 px-2 py-3">
+                <div className="h-2.5 w-2/3 rounded bg-[#EAE4D9] dark:bg-[#2A2520]" />
+                <div className="h-4 w-4/5 rounded bg-[#E4DDD1] dark:bg-[#312B25]" />
+                <div className="h-2.5 w-1/2 rounded bg-[#EFEAE0] dark:bg-[#25211C]" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+    );
+  }
 
   if (allItems.length === 0) {
     return (
@@ -451,7 +503,7 @@ export function ArchiveGrid({
       >
         <div className="flex flex-col gap-2.5">
           {items.map((item) => {
-            const relatedItems = getRelatedItems(item, allItems);
+            const relatedItems = relationLookupMap.get(item.id) ?? [];
             const relatedSummary = formatRelatedSummary(relatedItems);
             const completeness = computeItemCompleteness(item);
             const isMasterpiece = completeness.tier === 'masterpiece';
@@ -475,7 +527,7 @@ export function ArchiveGrid({
                 key={item.id}
                 data-favorite-glow={cardVisual.hasFavoriteGlow ? 'true' : undefined}
                 data-located={isLocated ? 'true' : undefined}
-                className={`group relative flex items-center gap-3.5 rounded-xl border px-3.5 py-3 transition-all sm:px-5 sm:py-3.5 ${cardVisual.frameClassName}`}
+                className={`group relative flex items-center gap-3.5 rounded-xl border px-3.5 py-3 transition-[transform,border-color,box-shadow,background-color] duration-200 sm:px-5 sm:py-3.5 ${cardVisual.frameClassName}`}
               >
                 <button
                   ref={(node) => setCardButtonRef(item.id, node)}
@@ -662,7 +714,7 @@ export function ArchiveGrid({
     >
       <div className="grid grid-cols-2 gap-3.5 min-[420px]:gap-4 sm:grid-cols-3 sm:gap-5 lg:grid-cols-4 lg:gap-6">
         {items.map((item) => {
-          const relatedItems = getRelatedItems(item, allItems);
+          const relatedItems = relationLookupMap.get(item.id) ?? [];
           const relatedSummary = formatRelatedSummary(relatedItems);
           const completeness = computeItemCompleteness(item);
           const isMasterpiece = completeness.tier === 'masterpiece';

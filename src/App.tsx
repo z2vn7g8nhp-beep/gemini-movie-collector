@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import {
   BookOpen,
   CheckSquare,
@@ -119,6 +119,12 @@ import {
   toggleThemeMode,
   type ThemeMode,
 } from './utils/theme';
+import {
+  applyItemPatch,
+  pruneDeletedItemReferences,
+  serializeClearablePatch,
+  shouldAcceptMutationResponse,
+} from './utils/interactionHelpers';
 
 const LOCAL_STORAGE_KEY = 'cinearchive.collection.v2';
 const COLLECTOR_STORAGE_KEY = 'cinearchive.collector.v1';
@@ -212,6 +218,13 @@ export default function App() {
   const [collector, setCollector] = useState<CollectorState>(
     () => initialLocalCollectorRef.current ?? EMPTY_COLLECTOR
   );
+  const itemsRef = useRef<ArchiveItem[]>(items);
+  itemsRef.current = items;
+  const collectorRef = useRef<CollectorState>(collector);
+  collectorRef.current = collector;
+  const itemsMutationSeqRef = useRef(0);
+  const collectorMutationSeqRef = useRef(0);
+
   const [activeTab, setActiveTab] = useState<AppTab>(
     () => initialUiStateRef.current.activeTab ?? 'library'
   );
@@ -264,6 +277,7 @@ export default function App() {
   // Handoff state to Search / Create tabs
   const [pendingSearchQuery, setPendingSearchQuery] = useState('');
   const [pendingSearchCategory, setPendingSearchCategory] = useState<ArchiveCategory>('film');
+  const [pendingSearchCategoryTick, setPendingSearchCategoryTick] = useState(0);
   const [pendingCreateTitle, setPendingCreateTitle] = useState('');
   const [pendingCreateCategory, setPendingCreateCategory] = useState<ArchiveCategory>('film');
   const [pendingCreateRelatedIds, setPendingCreateRelatedIds] = useState<string[]>([]);
@@ -697,13 +711,15 @@ export default function App() {
 
   const displayItems = useMemo(() => items.map(localizeArchivedFilm), [items]);
 
+  const deferredLibraryQuery = useDeferredValue(libraryQuery);
+
   const filteredItems = useMemo(() => {
     const baseItems = activeAlbum ? resolveAlbumItems(activeAlbum, displayItems) : displayItems;
     return filterAndSortItems(baseItems, {
       category: activeCategory,
       status: statusFilter,
       tag: activeTag,
-      query: libraryQuery,
+      query: deferredLibraryQuery,
       sortBy,
       decade: decadeFilter,
       region: regionFilter,
@@ -716,7 +732,7 @@ export default function App() {
     activeCategory,
     statusFilter,
     activeTag,
-    libraryQuery,
+    deferredLibraryQuery,
     sortBy,
     decadeFilter,
     regionFilter,
@@ -773,6 +789,8 @@ export default function App() {
   };
 
   const persistCollector = async (nextState: CollectorState) => {
+    const seq = (collectorMutationSeqRef.current += 1);
+    collectorRef.current = nextState;
     setCollector(nextState);
     saveLocalCollector(nextState);
     if (runtimeModeRef.current !== 'server') return;
@@ -784,8 +802,11 @@ export default function App() {
       });
       if (res.ok) {
         const data = (await res.json()) as CollectorState;
-        setCollector(data);
-        saveLocalCollector(data);
+        if (shouldAcceptMutationResponse(seq, collectorMutationSeqRef.current)) {
+          collectorRef.current = data;
+          setCollector(data);
+          saveLocalCollector(data);
+        }
       }
     } catch {
       // Saved locally
@@ -793,16 +814,17 @@ export default function App() {
   };
 
   const handleCheckInToday = async () => {
-    const todayKey = formatLocalDateKey();
-    const { dates, added } = recordCheckIn(collector.checkInDates, todayKey);
+    const currentCollector = collectorRef.current;
+    const checkInDay = formatLocalDateKey();
+    const { dates, added } = recordCheckIn(currentCollector.checkInDates, checkInDay);
     if (!added) {
-      const streak = computeCheckInStreak(dates, todayKey);
+      const streak = computeCheckInStreak(dates, checkInDay);
       setNotice(`今日已巡馆盖章 · 已连续 ${streak.currentStreak} 天`);
       return;
     }
-    const nextState: CollectorState = { ...collector, checkInDates: dates };
+    const nextState: CollectorState = { ...currentCollector, checkInDates: dates };
     await persistCollector(nextState);
-    const streak = computeCheckInStreak(dates, todayKey);
+    const streak = computeCheckInStreak(dates, checkInDay);
     setNotice(`今日巡馆已盖章 · 连续 ${streak.currentStreak} 天`);
   };
 
@@ -811,6 +833,7 @@ export default function App() {
     tag?: string;
     targetCount: number;
   }) => {
+    const currentCollector = collectorRef.current;
     const newAlbum: CollectorAlbum = {
       id: `alb-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       name: draft.name.trim(),
@@ -819,18 +842,19 @@ export default function App() {
       createdAt: new Date().toISOString(),
     };
     const nextState: CollectorState = {
-      ...collector,
-      albums: [newAlbum, ...collector.albums],
+      ...currentCollector,
+      albums: [newAlbum, ...currentCollector.albums],
     };
     await persistCollector(nextState);
     setNotice(`已创建专题图鉴「${newAlbum.name}」`);
   };
 
   const handleDeleteAlbum = async (albumId: string) => {
-    const target = collector.albums.find((a) => a.id === albumId);
+    const currentCollector = collectorRef.current;
+    const target = currentCollector.albums.find((a) => a.id === albumId);
     const nextState: CollectorState = {
-      ...collector,
-      albums: collector.albums.filter((a) => a.id !== albumId),
+      ...currentCollector,
+      albums: currentCollector.albums.filter((a) => a.id !== albumId),
     };
     if (activeAlbumId === albumId) setActiveAlbumId('');
     await persistCollector(nextState);
@@ -838,18 +862,20 @@ export default function App() {
   };
 
   const handleSaveEditedAlbum = async (updated: CollectorAlbum) => {
+    const currentCollector = collectorRef.current;
     const nextState: CollectorState = {
-      ...collector,
-      albums: collector.albums.map((a) => (a.id === updated.id ? updated : a)),
+      ...currentCollector,
+      albums: currentCollector.albums.map((a) => (a.id === updated.id ? updated : a)),
     };
     await persistCollector(nextState);
     setNotice(`已更新专题图鉴「${updated.name}」`);
   };
 
   const handleSaveShowcase = async (nextConfig: ShowcaseConfig) => {
+    const currentCollector = collectorRef.current;
     const normalized = normalizeShowcaseConfig(nextConfig);
     const nextState: CollectorState = {
-      ...collector,
+      ...currentCollector,
       showcase: normalized,
     };
     await persistCollector(nextState);
@@ -857,7 +883,8 @@ export default function App() {
   };
 
   const handleTogglePinShowcase = async (target: ArchiveItem) => {
-    const current = normalizeShowcaseConfig(collector.showcase);
+    const currentCollector = collectorRef.current;
+    const current = normalizeShowcaseConfig(currentCollector.showcase);
     const alreadyPinned =
       current.primaryMode === 'pinned' && current.pinnedItemId === target.id;
     const nextShowcase: ShowcaseConfig = alreadyPinned
@@ -876,7 +903,7 @@ export default function App() {
           customLinkItemId: undefined,
         };
     await persistCollector({
-      ...collector,
+      ...currentCollector,
       showcase: normalizeShowcaseConfig(nextShowcase),
     });
     setNotice(
@@ -895,7 +922,7 @@ export default function App() {
   const handleBatchStatus = async (status: CollectionStatus) => {
     if (batchSelectedIds.length === 0) return;
     const { items: nextItems, updatedCount } = applyBatchStatusUpdate(
-      items,
+      itemsRef.current,
       batchSelectedIds,
       status
     );
@@ -911,7 +938,7 @@ export default function App() {
   const handleBatchAddTag = async (tag: string) => {
     if (batchSelectedIds.length === 0 || !tag.trim()) return;
     const { items: nextItems, updatedCount } = applyBatchTagAdd(
-      items,
+      itemsRef.current,
       batchSelectedIds,
       tag
     );
@@ -926,14 +953,15 @@ export default function App() {
 
   const handleBatchAddToAlbum = async (albumId: string) => {
     if (batchSelectedIds.length === 0) return;
-    const targetAlbum = collector.albums.find((a) => a.id === albumId);
+    const currentCollector = collectorRef.current;
+    const targetAlbum = currentCollector.albums.find((a) => a.id === albumId);
     if (!targetAlbum) return;
     const { albums: nextAlbums, addedCount } = applyBatchAddToAlbum(
-      collector.albums,
+      currentCollector.albums,
       albumId,
       batchSelectedIds
     );
-    await persistCollector({ ...collector, albums: nextAlbums });
+    await persistCollector({ ...currentCollector, albums: nextAlbums });
     setNotice(
       addedCount > 0
         ? `已将 ${addedCount} 件档案收入图鉴「${targetAlbum.name}」`
@@ -943,6 +971,8 @@ export default function App() {
   };
 
   const persistSnapshot = async (nextItems: ArchiveItem[]) => {
+    const seq = (itemsMutationSeqRef.current += 1);
+    itemsRef.current = nextItems;
     setItems(nextItems);
     saveLocalFallback(nextItems);
     if (runtimeModeRef.current !== 'server') return;
@@ -954,7 +984,11 @@ export default function App() {
       });
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data.items)) {
+        if (
+          Array.isArray(data.items) &&
+          shouldAcceptMutationResponse(seq, itemsMutationSeqRef.current)
+        ) {
+          itemsRef.current = data.items;
           setItems(data.items);
           saveLocalFallback(data.items);
         }
@@ -995,8 +1029,9 @@ export default function App() {
   };
 
   const handleCollectOnlineResult = async (result: OnlineSearchResult) => {
+    const currentItems = itemsRef.current;
     const existing = findExistingItemByTitle(
-      items,
+      currentItems,
       result.category,
       result.title,
       {
@@ -1013,7 +1048,7 @@ export default function App() {
     const now = new Date().toISOString();
     const newItem: ArchiveItem = {
       id: `arc-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      accessionNo: nextAccessionNo(items),
+      accessionNo: nextAccessionNo(currentItems),
       category: result.category,
       title: result.title,
       originalTitle: result.originalTitle,
@@ -1035,7 +1070,7 @@ export default function App() {
       createdAt: now,
       updatedAt: now,
     };
-    const nextItems = buildItemsWithNewAndBidirectionalLinks(newItem, items);
+    const nextItems = buildItemsWithNewAndBidirectionalLinks(newItem, currentItems);
     await persistSnapshot(nextItems);
     const recs = findRecommendedUnlinkedItems(newItem, nextItems, 6);
     if (recs.length > 0) {
@@ -1049,11 +1084,12 @@ export default function App() {
   };
 
   const handleCreateManualItem = async (draft: ArchiveDraftInput) => {
+    const currentItems = itemsRef.current;
     const now = new Date().toISOString();
     const explicitRelatedIds = Array.from(new Set(draft.relatedIds ?? []));
     const newItem: ArchiveItem = {
       id: `arc-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      accessionNo: nextAccessionNo(items),
+      accessionNo: nextAccessionNo(currentItems),
       category: draft.category,
       title: draft.title.trim(),
       originalTitle: draft.originalTitle?.trim() || undefined,
@@ -1076,7 +1112,7 @@ export default function App() {
       createdAt: now,
       updatedAt: now,
     };
-    const nextItems = buildItemsWithNewAndBidirectionalLinks(newItem, items);
+    const nextItems = buildItemsWithNewAndBidirectionalLinks(newItem, currentItems);
     await persistSnapshot(nextItems);
     const recs = findRecommendedUnlinkedItems(newItem, nextItems, 6);
     if (recs.length > 0) {
@@ -1095,6 +1131,7 @@ export default function App() {
   };
 
   const handleLinkMultiple = async (sourceId: string, targetIds: string[]) => {
+    const currentItems = itemsRef.current;
     const uniqueTargets = Array.from(
       new Set(targetIds.filter((tid) => tid && tid !== sourceId))
     );
@@ -1102,7 +1139,7 @@ export default function App() {
 
     const targetSet = new Set(uniqueTargets);
     const now = new Date().toISOString();
-    const nextItems = items.map((it) => {
+    const nextItems = currentItems.map((it) => {
       if (it.id === sourceId) {
         return {
           ...it,
@@ -1121,7 +1158,7 @@ export default function App() {
     });
     await persistSnapshot(nextItems);
     if (uniqueTargets.length === 1) {
-      const target = items.find((i) => i.id === uniqueTargets[0]);
+      const target = currentItems.find((i) => i.id === uniqueTargets[0]);
       setNotice(target ? `已建立关联「${target.title}」` : '已建立关联');
     } else {
       setNotice(`已一键建立 ${uniqueTargets.length} 项双向关联`);
@@ -1133,7 +1170,10 @@ export default function App() {
   };
 
   const handleLinkPairs = async (pairs: Array<[string, string]>) => {
-    const { nextItems, linkedPairCount } = computeBatchLinkItems(items, pairs);
+    const { nextItems, linkedPairCount } = computeBatchLinkItems(
+      itemsRef.current,
+      pairs
+    );
     if (linkedPairCount === 0) return;
     await persistSnapshot(nextItems);
     setNotice(`已写入 ${linkedPairCount} 条影史关联到馆藏`);
@@ -1141,7 +1181,7 @@ export default function App() {
 
   const handleUnlinkItems = async (sourceId: string, targetId: string) => {
     const now = new Date().toISOString();
-    const nextItems = items.map((it) => {
+    const nextItems = itemsRef.current.map((it) => {
       if (it.id === sourceId) {
         return {
           ...it,
@@ -1166,8 +1206,9 @@ export default function App() {
     sourceItem: ArchiveItem,
     candidate: OnlineSearchResult
   ) => {
+    const currentItems = itemsRef.current;
     const existing = findExistingItemByTitle(
-      items,
+      currentItems,
       candidate.category,
       candidate.title,
       {
@@ -1184,7 +1225,7 @@ export default function App() {
     const now = new Date().toISOString();
     const newItem: ArchiveItem = {
       id: `arc-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      accessionNo: nextAccessionNo(items),
+      accessionNo: nextAccessionNo(currentItems),
       category: candidate.category,
       title: candidate.title,
       originalTitle: candidate.originalTitle,
@@ -1214,34 +1255,37 @@ export default function App() {
       updatedAt: now,
     };
 
-    const nextItems = buildItemsWithNewAndBidirectionalLinks(newItem, items);
+    const nextItems = buildItemsWithNewAndBidirectionalLinks(newItem, currentItems);
     await persistSnapshot(nextItems);
     triggerPostCollectRecommendations(newItem, nextItems);
     setNotice(`已收录并关联「${newItem.title}」`);
   };
 
   const handleUpdateItem = async (id: string, patch: Partial<ArchiveItem>) => {
+    const seq = (itemsMutationSeqRef.current += 1);
     const updatedAt = new Date().toISOString();
-    setItems((prev) => {
-      const next = prev.map((it) => {
-        if (it.id !== id) return it;
-        const merged = { ...it, ...patch, updatedAt };
-        if (patch.coverUrl === '') delete merged.coverUrl;
-        return merged;
-      });
-      saveLocalFallback(next);
-      return next;
-    });
+    const wirePatch = serializeClearablePatch(patch);
+    const optimisticNext = itemsRef.current.map((it) =>
+      it.id === id ? applyItemPatch(it, wirePatch, updatedAt) : it
+    );
+    itemsRef.current = optimisticNext;
+    setItems(optimisticNext);
+    saveLocalFallback(optimisticNext);
+
     if (runtimeModeRef.current !== 'server') return;
     try {
       const res = await fetch(`/api/collection/${encodeURIComponent(id)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patch),
+        body: JSON.stringify(wirePatch),
       });
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data.items)) {
+        if (
+          Array.isArray(data.items) &&
+          shouldAcceptMutationResponse(seq, itemsMutationSeqRef.current)
+        ) {
+          itemsRef.current = data.items;
           setItems(data.items);
           saveLocalFallback(data.items);
         }
@@ -1265,17 +1309,48 @@ export default function App() {
   };
 
   const handleDeleteItem = async (id: string) => {
-    const target = items.find((i) => i.id === id);
-    setItems((prev) => {
-      const next = prev
-        .filter((i) => i.id !== id)
-        .map((i) => ({
-          ...i,
-          relatedIds: i.relatedIds.filter((rid) => rid !== id),
-        }));
-      saveLocalFallback(next);
-      return next;
+    const seq = (itemsMutationSeqRef.current += 1);
+    const currentItems = itemsRef.current;
+    const target = currentItems.find((i) => i.id === id);
+    const optimisticNext = currentItems
+      .filter((i) => i.id !== id)
+      .map((i) => ({
+        ...i,
+        relatedIds: i.relatedIds.filter((rid) => rid !== id),
+      }));
+    itemsRef.current = optimisticNext;
+    setItems(optimisticNext);
+    saveLocalFallback(optimisticNext);
+
+    // Prune any dangling UI or showcase references to the deleted item
+    const currentShowcase = collectorRef.current.showcase;
+    const cleanup = pruneDeletedItemReferences(id, {
+      batchSelectedIds,
+      locatedItemId,
+      pinnedItemId: currentShowcase?.pinnedItemId,
+      customLinkItemId: currentShowcase?.customLinkItemId,
     });
+    if (cleanup.batchSelectedIds.length !== batchSelectedIds.length) {
+      setBatchSelectedIds(cleanup.batchSelectedIds);
+    }
+    if (cleanup.locatedItemId !== locatedItemId) {
+      setLocatedItemId(cleanup.locatedItemId);
+    }
+    if (cleanup.clearPinnedItemId || cleanup.clearCustomLinkItemId) {
+      const baseShowcase = normalizeShowcaseConfig(currentShowcase);
+      const patchedShowcase: ShowcaseConfig = {
+        ...baseShowcase,
+        ...(cleanup.clearPinnedItemId
+          ? { primaryMode: 'daily' as const, pinnedItemId: undefined }
+          : {}),
+        ...(cleanup.clearCustomLinkItemId ? { customLinkItemId: undefined } : {}),
+      };
+      void persistCollector({
+        ...collectorRef.current,
+        showcase: normalizeShowcaseConfig(patchedShowcase),
+      });
+    }
+
     if (runtimeModeRef.current === 'server') {
       try {
         const res = await fetch(`/api/collection/${encodeURIComponent(id)}`, {
@@ -1283,7 +1358,11 @@ export default function App() {
         });
         if (res.ok) {
           const data = await res.json();
-          if (Array.isArray(data.items)) {
+          if (
+            Array.isArray(data.items) &&
+            shouldAcceptMutationResponse(seq, itemsMutationSeqRef.current)
+          ) {
+            itemsRef.current = data.items;
             setItems(data.items);
             saveLocalFallback(data.items);
           }
@@ -1298,24 +1377,16 @@ export default function App() {
   };
 
   const handleReplaceAll = async (nextItems: ArchiveItem[]) => {
-    setItems(nextItems);
-    saveLocalFallback(nextItems);
-    if (runtimeModeRef.current !== 'server') return;
-    try {
-      await fetch('/api/collection/replace', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: nextItems }),
-      });
-    } catch {
-      // Saved locally
-    }
+    await persistSnapshot(nextItems);
   };
 
   const jumpToSearch = (prefillQuery?: string, cat?: ArchiveCategory) => {
     setPendingSearchCategory(
       cat ?? (activeCategory === 'all' ? 'film' : activeCategory)
     );
+    if (cat) {
+      setPendingSearchCategoryTick((n) => n + 1);
+    }
     if (prefillQuery && prefillQuery.trim()) {
       setPendingSearchQuery(prefillQuery.trim());
     }
@@ -1582,6 +1653,7 @@ export default function App() {
             <CollectorSpotlightRail
               items={displayItems}
               collector={collector}
+              todayKey={todayKey}
               activeAlbumId={activeAlbumId}
               onCheckInToday={handleCheckInToday}
               onOpenDetail={(it) => setSelectedItemId(it.id)}
@@ -2189,7 +2261,8 @@ export default function App() {
 
             <ArchiveGrid
               items={filteredItems}
-              allItems={items}
+              allItems={displayItems}
+              loading={!hydrated}
               searchQuery={libraryQuery}
               activeTag={activeTag}
               activeAlbumName={activeAlbum?.name || ''}
@@ -2244,7 +2317,7 @@ export default function App() {
 
         {activeTab === 'timeline' && (
           <TimelineMemoriesView
-            items={items}
+            items={displayItems}
             onSelectItem={(it) => setSelectedItemId(it.id)}
             onJumpToSearch={() => jumpToSearch()}
             onJumpToCreate={() => jumpToCreate()}
@@ -2253,9 +2326,10 @@ export default function App() {
 
         {activeTab === 'search' && (
           <SearchTabView
-            existingItems={items}
+            existingItems={displayItems}
             initialQuery={pendingSearchQuery}
             initialCategory={pendingSearchCategory}
+            initialCategoryTick={pendingSearchCategoryTick}
             onConsumeInitialQuery={() => setPendingSearchQuery('')}
             onCollectResult={handleCollectOnlineResult}
             onJumpToManual={(title, cat) => jumpToCreate(title, cat)}
@@ -2264,7 +2338,7 @@ export default function App() {
 
         {activeTab === 'create' && (
           <ManualCreateView
-            existingItems={items}
+            existingItems={displayItems}
             initialTitle={pendingCreateTitle}
             initialCategory={pendingCreateCategory}
             initialRelatedIds={pendingCreateRelatedIds}
@@ -2280,7 +2354,7 @@ export default function App() {
 
         {activeTab === 'profile' && (
           <ProfileBackupView
-            items={items}
+            items={displayItems}
             stats={stats}
             collector={collector}
             runtimeMode={runtimeMode}
@@ -2324,12 +2398,12 @@ export default function App() {
       <PostCollectLinkSheet
         sourceItem={
           pendingLinkSuggestion
-            ? items.find((i) => i.id === pendingLinkSuggestion.sourceItemId) ??
+            ? displayItems.find((i) => i.id === pendingLinkSuggestion.sourceItemId) ??
               null
             : null
         }
         recommendations={pendingLinkSuggestion?.recommendations ?? []}
-        allItems={items}
+        allItems={displayItems}
         onLinkOne={handleLinkExisting}
         onLinkAll={handleLinkMultiple}
         onOpenDetail={(it) => setSelectedItemId(it.id)}
@@ -2344,7 +2418,7 @@ export default function App() {
 
       <DetailDrawer
         item={selectedItem}
-        allItems={items}
+        allItems={displayItems}
         albums={collector.albums}
         positionLabel={drawerPositionLabel}
         onPrevItem={prevDrawerItem ? () => setSelectedItemId(prevDrawerItem.id) : undefined}
@@ -2383,7 +2457,7 @@ export default function App() {
 
       <CollectibleCardModal
         item={cardModalItem}
-        allItems={items}
+        allItems={displayItems}
         onClose={() => setCardModalItemId(null)}
         onSelectItem={(it) => setCardModalItemId(it.id)}
         onOpenDetailEdit={(it) => {

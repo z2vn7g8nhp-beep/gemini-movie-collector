@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowUpRight, Dices, Film, Play, Star, X } from 'lucide-react';
 import type { ArchiveItem, DecadeFilterOption } from '../types/archive';
 import {
@@ -108,7 +108,7 @@ export function RandomEncounterModal({
     return item;
   }, [mode, allItems, watchlistPickedId, item]);
 
-  const handleDrawWatchlist = () => {
+  const handleDrawWatchlist = useCallback(() => {
     const { picked } = pickWatchlistBlindBoxItem(
       allItems,
       { decade: watchlistDecade, tag: watchlistTag },
@@ -116,7 +116,7 @@ export function RandomEncounterModal({
     );
     setWatchlistPickedId(picked?.id ?? null);
     setWatchlistDrawCount((n) => n + 1);
-  };
+  }, [allItems, watchlistDecade, watchlistTag, watchlistPickedId]);
 
   useEffect(() => {
     if (!open) return;
@@ -141,7 +141,16 @@ export function RandomEncounterModal({
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [open, mode, activeItem, allItems.length, onClose, onDrawAnother, onOpenFullDetail]);
+  }, [
+    open,
+    mode,
+    activeItem,
+    allItems.length,
+    onClose,
+    onDrawAnother,
+    onOpenFullDetail,
+    handleDrawWatchlist,
+  ]);
 
   const relatedItems = useMemo(
     () => (activeItem ? getRelatedItems(activeItem, allItems) : []),

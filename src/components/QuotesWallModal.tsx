@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowUpRight,
   Download,
@@ -46,14 +46,23 @@ export function QuotesWallModal({
   const [exportTheme, setExportTheme] = useState<ExportTheme>('ivory');
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [rendering, setRendering] = useState(false);
+  const renderSeqRef = useRef(0);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      renderSeqRef.current += 1;
+      setExportingItem(null);
+      setPreviewUrl(null);
+      setRendering(false);
+      return;
+    }
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         if (exportingItem) {
+          renderSeqRef.current += 1;
           setExportingItem(null);
           setPreviewUrl(null);
+          setRendering(false);
         } else {
           onClose();
         }
@@ -76,14 +85,18 @@ export function QuotesWallModal({
   if (!open) return null;
 
   const handleOpenQuoteCard = async (item: ArchiveItem, theme: ExportTheme = exportTheme) => {
+    const seq = ++renderSeqRef.current;
     setExportingItem(item);
     setRendering(true);
     setPreviewUrl(null);
     try {
       const url = await renderQuoteCardPng(item, theme);
+      if (seq !== renderSeqRef.current) return;
       setPreviewUrl(url);
     } finally {
-      setRendering(false);
+      if (seq === renderSeqRef.current) {
+        setRendering(false);
+      }
     }
   };
 
@@ -168,8 +181,10 @@ export function QuotesWallModal({
                 <button
                   type="button"
                   onClick={() => {
+                    renderSeqRef.current += 1;
                     setExportingItem(null);
                     setPreviewUrl(null);
+                    setRendering(false);
                   }}
                   className="min-h-[40px] rounded-xl border border-[#DCD6CB] bg-white px-3.5 text-xs font-medium text-[#1A1816] cursor-pointer dark:border-[#3A342D] dark:bg-[#24201C] dark:text-[#F3EFE6] dark:hover:border-[#564E44]"
                 >
